@@ -2,7 +2,7 @@
 # A Makefile to build, run and test Go code
 #
 
-.PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean
+.PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean .start_redis
 
 IMAGE_NAME := "multichain-collector:latest"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
@@ -11,20 +11,31 @@ GIT_COMMIT := $(shell git rev-list -1 HEAD)
 # Ex. in path /home/dev/app/my-app the APP_NAME will be set to my-app
 APP_NAME := $(notdir $(CURDIR))
 
+.start_redis: ## Start Redis if it isn't running
+ifeq ($(shell docker ps | grep redis:latest 2> /dev/null),)
+	docker run --name redis-bot --rm -p 6379:6379 -d redis:latest
+endif
+
 default: build ## Default: Build the binary for the service
 
 dependencies: ## Install dependencies for the service
+	docker pull redis
 	go mod tidy
 
 build: ## Build the binary for the service
 	CGO_ENABLED=0 go build -o ./bin/${APP_NAME} ./src/*.go
 
-run: build ## Build and run the service binary
+run: build .start_redis ## Build and run the service binary
 	# Add your environment variable here
 	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
 	CHAIN_ID="pisco-1" \
+	HIVE_ENDPOINT="https://phoenix-hive.terra.dev/graphql" \
+	RPC_ENDPOINT="https://phoenix-rpc.terra.dev" \
+	QUEUE_NAME="testqueue" \
+	REDIS_DATABASE=0 \
+	REDIS_ENDPOINT="127.0.0.1:6379" \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled
@@ -63,3 +74,4 @@ clean: ## Remove compiled binaries from bin/
 
 help: ## Display this help screen
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	
