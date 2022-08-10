@@ -15,11 +15,11 @@ The bot is composed of 4 distinct parts and more details are [available in this 
 Responsible for finding active credit accounts in Red Bank and via the credit
 manager.
 
-2. Liquidator
+2. Health Checker
 
 Queries all accounts to determine health factor.
 
-3. Executor
+3. Liquidator
 
 Handles liquidations of accounts via smart contracts.
 
