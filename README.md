@@ -1,5 +1,10 @@
 # Multichain liquidator bot
 
+> **Notice**
+>
+> Compilation, execution and utilities are a work in progress
+>
+
 The multichain liquidator bot is a scalable liquidation bot that ensures accounts
 are liquidated in a timely fashion.
 
@@ -22,5 +27,21 @@ Handles liquidations of accounts via smart contracts.
 
 Scales any of the services based on load.
 
-TODO: Installation, building and deployment
+## Usage
+
+Each service contains utilities to build and run the code in a uniform manner by
+way of Makefiles. Each Makefile contains a help that can be executed via 
+`make help`.
+
+The top-level Makefile contains helpers to build and run all the services and 
+contains the same `make help`.
+
+```shell
+# Build all services
+make
+
+# Build all Docker images
+make docker_build
+```
+
 
