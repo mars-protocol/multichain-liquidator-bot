@@ -60,9 +60,9 @@ func (queue *Redis) Fetch() ([]byte, error) {
 	if err != nil {
 		// The ErrNil error indicates nothing was available at the given key
 		if err == redis.ErrNil {
-			return []byte{}, nil
+			return nil, nil
 		}
-		return []byte{}, err
+		return nil, err
 	}
 	// The result is an array, parts[0] is the key the value comes from and
 	// parts[1] is the value in bytes
@@ -70,7 +70,7 @@ func (queue *Redis) Fetch() ([]byte, error) {
 	case []byte:
 		return v, nil
 	}
-	return []byte{}, nil
+	return nil, nil
 }
 
 // FetchMany retrieves multiple items from the Redis list at key
