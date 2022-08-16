@@ -31,11 +31,15 @@ run: build .start_redis ## Build and run the service binary
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
 	CHAIN_ID="pisco-1" \
-	HIVE_ENDPOINT="https://phoenix-hive.terra.dev/graphql" \
-	RPC_ENDPOINT="https://phoenix-rpc.terra.dev" \
-	QUEUE_NAME="testqueue" \
 	REDIS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
+	NEW_BLOCK_QUEUE_NAME="new_block" \
+	HEALTH_CHECK_QUEUE_NAME="health_check" \
+	RPC_ENDPOINT="https://rpc-terra-2.everstake.one:443" \
+	CONTRACT_ITEM_PREFIX="balance" \
+	CONTRACT_PAGE_OFFSET=0 \
+	CONTRACT_PAGE_LIMIT=20 \
+	CONTRACT_ADDRESS="terra1nsuqsk6kh58ulczatwev87ttq2z6r3pusulg9r24mfj2fvtzd4uq3exn26" \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled
@@ -44,6 +48,13 @@ run_race: ## Run the service with race condition checking enabled
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
 	CHAIN_ID="pisco-1" \
+	REDIS_DATABASE=0 \
+	REDIS_ENDPOINT="127.0.0.1:6379" \
+	NEW_BLOCK_QUEUE_NAME="new_block" \
+	HEALTH_CHECK_QUEUE_NAME="health_check" \
+	RPC_ENDPOINT=" https://rpc-terra-2.everstake.one:443" \
+	CONTRACT_PAGE_OFFSET=0 \
+	CONTRACT_PAGE_LIMIT=20 \
 	go run -race ./src/*.go
 
 docker_build: build ## Build the service Docker container
