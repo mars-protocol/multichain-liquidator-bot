@@ -2,6 +2,7 @@ package queue
 
 import (
 	"github.com/gomodule/redigo/redis"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/helpers"
 )
 
 // Redis implements a Redis queue using the LIST datastructure
@@ -52,10 +53,18 @@ func (queue *Redis) Push(data []byte) error {
 
 // PushMany pushes multiple items onto the queue
 func (queue *Redis) PushMany(data [][]byte) error {
-	// RPUSH returns an integer of items pushed and possibly an error
-	// https://redis.io/commands/rpush/
-	_, err := redis.Int(queue.conn.Do("RPUSH", redis.Args{}.Add(queue.key).AddFlat(data)...))
-	return err
+	// We can possibly receive quite a large amount of items in data. We batch
+	// these together in groups of 100 to push in batches
+	dataChunks := helpers.ChunkSlice(data, 100)
+	for _, dataChunk := range dataChunks {
+		// RPUSH returns an integer of items pushed and possibly an error
+		// https://redis.io/commands/rpush/
+		_, err := redis.Int(queue.conn.Do("RPUSH", redis.Args{}.Add(queue.key).AddFlat(dataChunk)...))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Fetch retrieves a single item from the Redis list at key and returns a byte
