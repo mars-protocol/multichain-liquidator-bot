@@ -1,10 +1,14 @@
-package queue
+package mock
 
 import (
+	"fmt"
+
 	"github.com/gomodule/redigo/redis"
+	redigomock "github.com/rafaeljusto/redigomock/v3"
 )
 
-// Redis implements a Redis queue using the LIST datastructure
+// Redis implements a mock Redis queue using the LIST datastructure that match
+// the queuer inerface
 type Redis struct {
 	// conn holds the Redis connection
 	conn redis.Conn
@@ -15,24 +19,45 @@ type Redis struct {
 	popTimeout int
 }
 
-// NewRedis creates a new instance of a Redis queue
+// NewRedis creates a new instance of the Redis mock queue
 // endpoint is the full URL of the Redis endpoint
 // database is the Redis database to use
 // queue is the name of the Redis key to keep the list at
-func NewRedis(endpoint string, database int, queueName string, popTimeout int) (*Redis, error) {
-	// Open the Redis connection
-	conn, err := redis.Dial(
-		"tcp",
-		endpoint,
-		// The Redis database number (0-15)
-		redis.DialDatabase(database),
-	)
+func NewRedis(queueName string, popTimeout int) (*Redis, error) {
+
+	conn := redigomock.NewConn()
+
+	// Set up simulated call for adding to the list
+	conn.GenericCommand("RPUSH").Handle(redigomock.ResponseHandler(func(args []interface{}) (interface{}, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("unexpected number of arguments: expected 2 or more, received %d", len(args))
+		}
+		return int64(len(args) - 1), nil
+	}))
+
+	// Set up simulated call for popping a single value from the list
+	conn.GenericCommand("BLPOP").Handle(redigomock.ResponseHandler(func(args []interface{}) (interface{}, error) {
+		fmt.Println(args)
+		if len(args) != 2 {
+			return nil, fmt.Errorf("unexpected number of arguments: expected 2, received %d", len(args))
+		}
+		return []interface{}{args[0], []byte("testvalue")}, nil
+	}))
+
+	// Set up simulated call for popping multiple values from the list
+	conn.GenericCommand("LPOP").Handle(redigomock.ResponseHandler(func(args []interface{}) (interface{}, error) {
+		fmt.Println(args)
+		if len(args) != 2 {
+			return nil, fmt.Errorf("unexpected number of arguments: expected 2, received %d", len(args))
+		}
+		return []interface{}{args[0], []byte("testvalue"), []byte("testvalue2"), []byte("testvalue3")}, nil
+	}))
 
 	return &Redis{
 		conn:       conn,
 		key:        queueName,
 		popTimeout: popTimeout,
-	}, err
+	}, nil
 }
 
 // Connect to a Redis instance

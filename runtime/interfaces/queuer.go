@@ -6,6 +6,8 @@ type Queuer interface {
 	Connect() error
 	// Push pushes data onto the queue
 	Push([]byte) error
+	// PushMany pushes multiple items onto the queue
+	PushMany([][]byte) error
 	// Fetch retrieves a single item from the queue and returns a byte slice
 	// of data
 	Fetch() ([]byte, error)
