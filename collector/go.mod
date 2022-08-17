@@ -5,16 +5,12 @@ go 1.18
 replace github.com/mars-protocol/multichain-liquidator-bot/runtime => ../runtime
 
 require (
-	github.com/cosmos/cosmos-sdk v0.45.5-0.20220523154235-2921a1c3c918
 	github.com/gogo/protobuf v1.3.3
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mars-protocol/multichain-liquidator-bot/runtime v0.0.0
-	github.com/regen-network/cosmos-proto v0.3.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/strangelove-ventures/lens v0.5.1
 	github.com/tendermint/tendermint v0.34.20-0.20220517115723-e6f071164839
-	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8
-	google.golang.org/grpc v1.47.0
 )
 
 require (
@@ -33,6 +29,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/confio/ics23/go v0.7.0 // indirect
 	github.com/cosmos/btcutil v1.0.4 // indirect
+	github.com/cosmos/cosmos-sdk v0.45.5-0.20220523154235-2921a1c3c918 // indirect
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/cosmos/gorocksdb v1.2.0 // indirect
 	github.com/cosmos/iavl v0.17.3 // indirect
@@ -88,6 +85,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0 // indirect
+	github.com/regen-network/cosmos-proto v0.3.1 // indirect
 	github.com/sasha-s/go-deadlock v0.2.1-0.20190427202633-1595213edefa // indirect
 	github.com/spf13/afero v1.8.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
@@ -114,6 +112,8 @@ require (
 	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
+	google.golang.org/genproto v0.0.0-20220602131408-e326c6e8e9c8 // indirect
+	google.golang.org/grpc v1.47.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

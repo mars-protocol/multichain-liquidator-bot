@@ -1,13 +1,10 @@
-// source: cosmwasm/wasm/v1/query.proto
+package collector
 
-package prototypes
+// Note: These types are extracted from various CosmWasm and Cosmos SDK types
+// to reduce the amount of dependencies we need to parse simple messages
 
 import (
-	query "github.com/cosmos/cosmos-sdk/types/query"
-	// _ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
-	// _ "google.golang.org/genproto/googleapis/api/annotations"
-
 	github_com_tendermint_tendermint_libs_bytes "github.com/tendermint/tendermint/libs/bytes"
 )
 
@@ -23,7 +20,7 @@ type QueryAllContractStateRequest struct {
 	// address is the address of the contract
 	Address string `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
 	// pagination defines an optional pagination for the request.
-	Pagination *query.PageRequest `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Pagination *PageRequest `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
 }
 
 func (m *QueryAllContractStateRequest) Reset()         { *m = QueryAllContractStateRequest{} }
@@ -38,7 +35,7 @@ func (*QueryAllContractStateRequest) Descriptor() ([]byte, []int) {
 type QueryAllContractStateResponse struct {
 	Models []Model `protobuf:"bytes,1,rep,name=models,proto3" json:"models"`
 	// pagination defines the pagination in the response.
-	Pagination *query.PageResponse `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Pagination *PageResponse `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
 }
 
 func (m *QueryAllContractStateResponse) Reset()         { *m = QueryAllContractStateResponse{} }
@@ -62,9 +59,120 @@ func (*Model) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e6155d98fa173e02, []int{7}
 }
 
+// PageRequest is to be embedded in gRPC request messages for efficient
+// pagination. Ex:
+//
+//  message SomeRequest {
+//          Foo some_parameter = 1;
+//          PageRequest pagination = 2;
+//  }
+type PageRequest struct {
+	// key is a value returned in PageResponse.next_key to begin
+	// querying the next page most efficiently. Only one of offset or key
+	// should be set.
+	Key []byte `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// offset is a numeric offset that can be used when key is unavailable.
+	// It is less efficient than using key. Only one of offset or key should
+	// be set.
+	Offset uint64 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	// limit is the total number of results to be returned in the result page.
+	// If left empty it will default to a value to be set by each app.
+	Limit uint64 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	// count_total is set to true  to indicate that the result set should include
+	// a count of the total number of items available for pagination in UIs.
+	// count_total is only respected when offset is used. It is ignored when key
+	// is set.
+	CountTotal bool `protobuf:"varint,4,opt,name=count_total,json=countTotal,proto3" json:"count_total,omitempty"`
+	// reverse is set to true if results are to be returned in the descending order.
+	//
+	// Since: cosmos-sdk 0.43
+	Reverse bool `protobuf:"varint,5,opt,name=reverse,proto3" json:"reverse,omitempty"`
+}
+
+func (m *PageRequest) Reset()         { *m = PageRequest{} }
+func (m *PageRequest) String() string { return proto.CompactTextString(m) }
+func (*PageRequest) ProtoMessage()    {}
+func (*PageRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_53d6d609fe6828af, []int{0}
+}
+
+func (m *PageRequest) GetKey() []byte {
+	if m != nil {
+		return m.Key
+	}
+	return nil
+}
+
+func (m *PageRequest) GetOffset() uint64 {
+	if m != nil {
+		return m.Offset
+	}
+	return 0
+}
+
+func (m *PageRequest) GetLimit() uint64 {
+	if m != nil {
+		return m.Limit
+	}
+	return 0
+}
+
+func (m *PageRequest) GetCountTotal() bool {
+	if m != nil {
+		return m.CountTotal
+	}
+	return false
+}
+
+func (m *PageRequest) GetReverse() bool {
+	if m != nil {
+		return m.Reverse
+	}
+	return false
+}
+
+// PageResponse is to be embedded in gRPC response messages where the
+// corresponding request message has used PageRequest.
+//
+//  message SomeResponse {
+//          repeated Bar results = 1;
+//          PageResponse page = 2;
+//  }
+type PageResponse struct {
+	// next_key is the key to be passed to PageRequest.key to
+	// query the next page most efficiently
+	NextKey []byte `protobuf:"bytes,1,opt,name=next_key,json=nextKey,proto3" json:"next_key,omitempty"`
+	// total is total number of results available if PageRequest.count_total
+	// was set, its value is undefined otherwise
+	Total uint64 `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+}
+
+func (m *PageResponse) Reset()         { *m = PageResponse{} }
+func (m *PageResponse) String() string { return proto.CompactTextString(m) }
+func (*PageResponse) ProtoMessage()    {}
+func (*PageResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_53d6d609fe6828af, []int{1}
+}
+
+func (m *PageResponse) GetNextKey() []byte {
+	if m != nil {
+		return m.NextKey
+	}
+	return nil
+}
+
+func (m *PageResponse) GetTotal() uint64 {
+	if m != nil {
+		return m.Total
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*QueryAllContractStateRequest)(nil), "cosmwasm.wasm.v1.QueryAllContractStateRequest")
 	proto.RegisterType((*QueryAllContractStateResponse)(nil), "cosmwasm.wasm.v1.QueryAllContractStateResponse")
+	proto.RegisterType((*PageRequest)(nil), "cosmos.base.query.v1beta1.PageRequest")
+	proto.RegisterType((*PageResponse)(nil), "cosmos.base.query.v1beta1.PageResponse")
 	proto.RegisterType((*Model)(nil), "cosmwasm.wasm.v1.Model")
 
 }
@@ -72,6 +180,7 @@ func init() {
 func init() {
 	proto.RegisterFile("cosmwasm/wasm/v1/query.proto", fileDescriptor_9677c207036b9f2b)
 	proto.RegisterFile("cosmwasm/wasm/v1/types.proto", fileDescriptor_e6155d98fa173e02)
+	proto.RegisterFile("cosmos/base/query/v1beta1/pagination.proto", fileDescriptor_53d6d609fe6828af)
 
 }
 
@@ -227,4 +336,26 @@ var fileDescriptor_e6155d98fa173e02 = []byte{
 	0x07, 0x15, 0x42, 0xfb, 0xf7, 0x16, 0xbf, 0x3a, 0x76, 0x71, 0x24, 0x7e, 0x79, 0xf8, 0xff, 0x4e,
 	0x67, 0x9d, 0x7f, 0xd5, 0x3e, 0xf8, 0x37, 0x00, 0x00, 0xff, 0xff, 0x21, 0x8c, 0xa0, 0x70, 0x10,
 	0x09, 0x00, 0x00,
+}
+
+var fileDescriptor_53d6d609fe6828af = []byte{
+	// 282 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x44, 0x90, 0xbd, 0x4e, 0xc3, 0x30,
+	0x14, 0x85, 0x6b, 0xfa, 0x2b, 0xb7, 0x03, 0xb2, 0x10, 0x72, 0x17, 0x13, 0x75, 0x8a, 0x90, 0x88,
+	0x55, 0xf1, 0x00, 0x48, 0x5d, 0x59, 0x50, 0xc4, 0xc4, 0x52, 0x39, 0xe1, 0x36, 0x44, 0x6d, 0xe2,
+	0x34, 0xbe, 0xa9, 0xc8, 0x1b, 0x30, 0xf2, 0x58, 0x8c, 0x1d, 0x19, 0x51, 0xf2, 0x22, 0x28, 0x76,
+	0x10, 0x93, 0xfd, 0x9d, 0x7b, 0x74, 0xef, 0xd1, 0xa1, 0xb7, 0xb1, 0x36, 0x99, 0x36, 0x32, 0x52,
+	0x06, 0xe4, 0xb1, 0x82, 0xb2, 0x96, 0xa7, 0x75, 0x04, 0xa8, 0xd6, 0xb2, 0x50, 0x49, 0x9a, 0x2b,
+	0x4c, 0x75, 0x1e, 0x14, 0xa5, 0x46, 0xcd, 0x96, 0xce, 0x1b, 0x74, 0xde, 0xc0, 0x7a, 0x83, 0xde,
+	0xbb, 0xfa, 0x20, 0x74, 0xfe, 0xa4, 0x12, 0x08, 0xe1, 0x58, 0x81, 0x41, 0x76, 0x49, 0x87, 0x7b,
+	0xa8, 0x39, 0xf1, 0x88, 0xbf, 0x08, 0xbb, 0x2f, 0xbb, 0xa6, 0x13, 0xbd, 0xdb, 0x19, 0x40, 0x7e,
+	0xe1, 0x11, 0x7f, 0x14, 0xf6, 0xc4, 0xae, 0xe8, 0xf8, 0x90, 0x66, 0x29, 0xf2, 0xa1, 0x95, 0x1d,
+	0xb0, 0x1b, 0x3a, 0x8f, 0x75, 0x95, 0xe3, 0x16, 0x35, 0xaa, 0x03, 0x1f, 0x79, 0xc4, 0x9f, 0x85,
+	0xd4, 0x4a, 0xcf, 0x9d, 0xc2, 0x38, 0x9d, 0x96, 0x70, 0x82, 0xd2, 0x00, 0x1f, 0xdb, 0xe1, 0x1f,
+	0xae, 0x1e, 0xe8, 0xc2, 0x25, 0x31, 0x85, 0xce, 0x0d, 0xb0, 0x25, 0x9d, 0xe5, 0xf0, 0x8e, 0xdb,
+	0xff, 0x3c, 0xd3, 0x8e, 0x1f, 0xa1, 0xee, 0x6e, 0xbb, 0xfd, 0x2e, 0x92, 0x83, 0xcd, 0xe6, 0xab,
+	0x11, 0xe4, 0xdc, 0x08, 0xf2, 0xd3, 0x08, 0xf2, 0xd9, 0x8a, 0xc1, 0xb9, 0x15, 0x83, 0xef, 0x56,
+	0x0c, 0x5e, 0xfc, 0x24, 0xc5, 0xb7, 0x2a, 0x0a, 0x62, 0x9d, 0xc9, 0xbe, 0x37, 0xf7, 0xdc, 0x99,
+	0xd7, 0xbd, 0xc4, 0xba, 0x00, 0xe3, 0x3a, 0x8c, 0x26, 0xb6, 0xb1, 0xfb, 0xdf, 0x00, 0x00, 0x00,
+	0xff, 0xff, 0x3d, 0x43, 0x85, 0xf7, 0x5f, 0x01, 0x00, 0x00,
 }

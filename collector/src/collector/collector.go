@@ -9,11 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/gogo/protobuf/proto"
 	"github.com/sirupsen/logrus"
 
-	"github.com/mars-protocol/multichain-liquidator-bot/collector/src/collector/prototypes"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 
 	lens "github.com/strangelove-ventures/lens/client"
@@ -137,9 +135,9 @@ func (service *Collector) fetchContractItems(
 		return addresses, err
 	}
 
-	var stateRequest prototypes.QueryAllContractStateRequest
+	var stateRequest QueryAllContractStateRequest
 	stateRequest.Address = contractAddress
-	stateRequest.Pagination = &query.PageRequest{
+	stateRequest.Pagination = &PageRequest{
 		Offset: offset,
 		Limit:  limit,
 	}
@@ -161,7 +159,7 @@ func (service *Collector) fetchContractItems(
 
 	// The value in the response also contains the contract state in
 	// protobuf encoded format
-	var stateResponse prototypes.QueryAllContractStateResponse
+	var stateResponse QueryAllContractStateResponse
 	err = proto.Unmarshal(rpcResponse.Response.GetValue(), &stateResponse)
 	if err != nil {
 		return addresses, err
