@@ -50,6 +50,14 @@ func (queue *Redis) Push(data []byte) error {
 	return err
 }
 
+// PushMany pushes multiple items onto the queue
+func (queue *Redis) PushMany(data [][]byte) error {
+	// RPUSH returns an integer of items pushed and possibly an error
+	// https://redis.io/commands/rpush/
+	_, err := redis.Int(queue.conn.Do("RPUSH", redis.Args{}.Add(queue.key).AddFlat(data)...))
+	return err
+}
+
 // Fetch retrieves a single item from the Redis list at key and returns a byte
 // slice of data
 func (queue *Redis) Fetch() ([]byte, error) {

@@ -15,6 +15,11 @@ func (queue *Redis) Push([]byte) error {
 	return nil
 }
 
+// PushMany pushes multiple items onto the queue
+func (queue *Redis) PushMany([][]byte) error {
+	return nil
+}
+
 // Fetch retrieves a single item from the queue and returns a byte slice
 // of data
 func (queue *Redis) Fetch() ([]byte, error) {
