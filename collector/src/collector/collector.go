@@ -105,11 +105,9 @@ func (service *Collector) Run() error {
 		// TODO Enrich the packet sent to the health check service
 		// to include endpoints / etc
 
-		// Push addresses to Redis in batches of X
-		addressChunks := chunkSlice(addresses, 50)
-		for _, addressChunk := range addressChunks {
-			service.healthCheckQueue.PushMany(addressChunk)
-		}
+		// Push addresses to Redis
+		service.healthCheckQueue.PushMany(addresses)
+
 		service.logger.WithFields(logrus.Fields{
 			"total":      len(addresses),
 			"elapsed_ms": time.Since(start).Milliseconds(),
@@ -199,29 +197,6 @@ func (service *Collector) fetchContractItems(
 		"elapsed_ms": time.Since(start).Milliseconds(),
 	}).Debug("Fetched contract items")
 	return addresses, nil
-}
-
-// TODO: Move this to Redis to automatically split the slice into smaller
-// parts
-// chunkSlice takes a slide of byte arrays and splits them into
-// groups of chunkSize
-func chunkSlice(slice [][]byte, chunkSize int) [][][]byte {
-	var chunks [][][]byte
-	for {
-		if len(slice) == 0 {
-			break
-		}
-
-		// necessary check to avoid slicing beyond
-		// slice capacity
-		if len(slice) < chunkSize {
-			chunkSize = len(slice)
-		}
-
-		chunks = append(chunks, slice[0:chunkSize])
-		slice = slice[chunkSize:]
-	}
-	return chunks
 }
 
 // Stop the service gracefully
