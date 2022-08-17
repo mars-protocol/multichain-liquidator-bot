@@ -18,18 +18,13 @@ import (
 type Config struct {
 	runtime.BaseConfig
 
+	// TODO: This isn't required, remove
 	ChainID string `envconfig:"CHAIN_ID" required:"true"`
 
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
 	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
-	NewBlockQueueName    string `envconfig:"NEW_BLOCK_QUEUE_NAME" required:"true"`
+	CollectorQueueName   string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
 	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
-
-	RPCEndpoint        string `envconfig:"RPC_ENDPOINT" required:"true"`
-	ContractItemPrefix string `envconfig:"CONTRACT_ITEM_PREFIX" required:"true"`
-	ContractPageOffset uint64 `envconfig:"CONTRACT_PAGE_OFFSET" required:"true"`
-	ContractPageLimit  uint64 `envconfig:"CONTRACT_PAGE_LIMIT" required:"true"`
-	ContractAddress    string `envconfig:"CONTRACT_ADDRESS" required:"true"`
 }
 
 func main() {
@@ -67,11 +62,11 @@ func main() {
 	logger.Info("Setting up dependencies")
 
 	// Set up Redis as queue provider for receiving new blocks
-	var newBlockQueue interfaces.Queuer
-	newBlockQueue, err = queue.NewRedis(
+	var collectorQueue interfaces.Queuer
+	collectorQueue, err = queue.NewRedis(
 		config.RedisEndpoint,
 		config.RedisDatabase,
-		config.NewBlockQueueName,
+		config.CollectorQueueName,
 		5, // BLPOP timeout seconds
 	)
 	if err != nil {
@@ -92,13 +87,8 @@ func main() {
 
 	// Set up collector
 	service, err := collector.New(
-		newBlockQueue,
+		collectorQueue,
 		healthCheckQueue,
-		config.RPCEndpoint,
-		config.ContractItemPrefix,
-		config.ContractPageOffset,
-		config.ContractPageLimit,
-		config.ContractAddress,
 		logger,
 	)
 	if err != nil {

@@ -3,30 +3,26 @@ package collector
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
-	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/gogo/protobuf/proto"
+	"github.com/sirupsen/logrus"
+
 	"github.com/mars-protocol/multichain-liquidator-bot/collector/src/collector/prototypes"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
-	"github.com/sirupsen/logrus"
 
 	lens "github.com/strangelove-ventures/lens/client"
 )
 
 // Collector implements the collection of accounts logic
 type Collector struct {
-	newBlockQueue    interfaces.Queuer
+	collectorQueue   interfaces.Queuer
 	healthCheckQueue interfaces.Queuer
-
-	rpcEndpoint        string
-	contractItemPrefix string
-	contractPageOffset uint64
-	contractPageLimit  uint64
-	contractAddress    string
 
 	logger *logrus.Entry
 
@@ -35,52 +31,30 @@ type Collector struct {
 
 // New creates a new instance of the collector
 func New(
-	newBlockQueue interfaces.Queuer,
+	collectorQueue interfaces.Queuer,
 	healthCheckQueue interfaces.Queuer,
-	rpcEndpoint string,
-	contractItemPrefix string,
-	contractPageOffset uint64,
-	contractPageLimit uint64,
-	contractAddress string,
 	logger *logrus.Entry,
 ) (*Collector, error) {
 
-	if newBlockQueue == nil || healthCheckQueue == nil {
+	if collectorQueue == nil || healthCheckQueue == nil {
 		return nil, errors.New("newBlockQueue and healthCheckQueue must be set")
-	}
-	if len(rpcEndpoint) == 0 {
-		return nil, errors.New("rpcEndpoint cannot be blank")
-	}
-	if len(contractItemPrefix) == 0 {
-		return nil, errors.New("contractItemPrefix cannot be blank")
-	}
-	if contractPageLimit == 0 {
-		return nil, errors.New("contractPageLimit must be greater then zero")
-	}
-	if len(contractAddress) == 0 {
-		return nil, errors.New("contractAddress cannot be blank")
 	}
 
 	return &Collector{
-		newBlockQueue:      newBlockQueue,
-		healthCheckQueue:   healthCheckQueue,
-		rpcEndpoint:        rpcEndpoint,
-		contractItemPrefix: contractItemPrefix,
-		contractPageOffset: contractPageOffset,
-		contractPageLimit:  contractPageLimit,
-		contractAddress:    contractAddress,
-		logger:             logger,
-		continueRunning:    0,
+		collectorQueue:   collectorQueue,
+		healthCheckQueue: healthCheckQueue,
+		logger:           logger,
+		continueRunning:  0,
 	}, nil
 }
 
 // Run the service forever
 func (service *Collector) Run() error {
-	err := service.newBlockQueue.Connect()
+	err := service.collectorQueue.Connect()
 	if err != nil {
 		return err
 	}
-	defer service.newBlockQueue.Disconnect()
+	defer service.collectorQueue.Disconnect()
 
 	err = service.healthCheckQueue.Connect()
 	if err != nil {
@@ -91,37 +65,55 @@ func (service *Collector) Run() error {
 	// Set long running to run
 	atomic.StoreUint32(&service.continueRunning, 1)
 
-	// The collector listens for a new block notification via Redis
-	// The monitor will notify the service when a new block is available
+	// When a new block becomes available the monitor service will hand out
+	// work items containing the parameters for querying the contract state
 	for atomic.LoadUint32(&service.continueRunning) == 1 {
 
 		// The queue will return a nil item but no error when no items were in
 		// the queue
-		item, err := service.newBlockQueue.Fetch()
+		item, err := service.collectorQueue.Fetch()
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		if item == nil {
+			// No items yet
 			continue
+		}
+
+		start := time.Now()
+		var workItem WorkItem
+		err = json.Unmarshal(item, &workItem)
+		if err != nil {
+			service.logger.Error(err)
+			return err
 		}
 
 		// Once a new block is available we need to query the contract's state
 		// and return the addresses contained in the given prefix.
 		addresses, err := service.fetchContractItems(
-			service.contractAddress,
-			service.rpcEndpoint,
-			service.contractItemPrefix,
-			service.contractPageOffset,
-			service.contractPageLimit,
+			workItem.ContractAddress,
+			workItem.RPCAddress,
+			workItem.ContractItemPrefix,
+			workItem.ContractPageOffset,
+			workItem.ContractPageLimit,
 		)
 		if err != nil {
 			return err
 		}
 
-		// TODO Push addresses to Redis
-		fmt.Println(addresses)
+		// TODO Enrich the packet sent to the health check service
+		// to include endpoints / etc
 
+		// Push addresses to Redis in batches of X
+		addressChunks := chunkSlice(addresses, 50)
+		for _, addressChunk := range addressChunks {
+			service.healthCheckQueue.PushMany(addressChunk)
+		}
+		service.logger.WithFields(logrus.Fields{
+			"total":      len(addresses),
+			"elapsed_ms": time.Since(start).Milliseconds(),
+		}).Info("Pushed addresses to Redis")
 	}
 
 	return nil
@@ -134,9 +126,11 @@ func (service *Collector) fetchContractItems(
 	endpoint string,
 	prefix string,
 	offset uint64,
-	limit uint64) ([]string, error) {
+	limit uint64) ([][]byte, error) {
 
-	var addresses []string
+	start := time.Now()
+
+	var addresses [][]byte
 
 	// Blocks are usually less than 6 seconds, we give ourselves 5 seconds
 	// to get the information. Ideally, it should be faster
@@ -186,11 +180,48 @@ func (service *Collector) fetchContractItems(
 		if err != nil {
 			return addresses, err
 		}
+		// The result from the raw contract state includes some non-alphanumeric
+		// values used within cw-storage-plus, we can strip them out
+		// to get a usable key value for our purposes
+		keyString := cleanBytes(key)
 
-		// TODO: Filter out the ones with prefix
-		addresses = append(addresses, string(key))
+		// Only capture those with the correct prefix
+		if strings.HasPrefix(keyString, prefix) {
+			address := strings.TrimPrefix(keyString, prefix)
+
+			// TODO: Depending on the final contract Map key structure, we might
+			// need to do some additional processing of the address here
+			addresses = append(addresses, []byte(address))
+		}
 	}
+	service.logger.WithFields(logrus.Fields{
+		"total":      len(addresses),
+		"elapsed_ms": time.Since(start).Milliseconds(),
+	}).Debug("Fetched contract items")
 	return addresses, nil
+}
+
+// TODO: Move this to Redis to automatically split the slice into smaller
+// parts
+// chunkSlice takes a slide of byte arrays and splits them into
+// groups of chunkSize
+func chunkSlice(slice [][]byte, chunkSize int) [][][]byte {
+	var chunks [][][]byte
+	for {
+		if len(slice) == 0 {
+			break
+		}
+
+		// necessary check to avoid slicing beyond
+		// slice capacity
+		if len(slice) < chunkSize {
+			chunkSize = len(slice)
+		}
+
+		chunks = append(chunks, slice[0:chunkSize])
+		slice = slice[chunkSize:]
+	}
+	return chunks
 }
 
 // Stop the service gracefully
