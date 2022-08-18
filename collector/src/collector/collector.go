@@ -17,7 +17,8 @@ import (
 	lens "github.com/strangelove-ventures/lens/client"
 )
 
-// Collector implements the collection of accounts logic
+// Collector implements the collection of accounts by querying the contract's
+// underlying storage direcctly
 type Collector struct {
 	collectorQueue   interfaces.Queuer
 	healthCheckQueue interfaces.Queuer
@@ -67,8 +68,9 @@ func (service *Collector) Run() error {
 	// work items containing the parameters for querying the contract state
 	for atomic.LoadUint32(&service.continueRunning) == 1 {
 
-		// The queue will return a nil item but no error when no items were in
-		// the queue
+		// The queue will return a nil item but no error when no items are in
+		// the queue. Fetch blocks for a few seconds while waiting for an item to
+		// bocome available
 		item, err := service.collectorQueue.Fetch()
 		if err != nil {
 			return err
@@ -87,8 +89,9 @@ func (service *Collector) Run() error {
 			return err
 		}
 
-		// Once a new block is available we need to query the contract's state
-		// and return the addresses contained in the given prefix.
+		// Once we receive a piece of work to execute we need to query the
+		// contract's state and return the addresses contained for the
+		// given prefix
 		addresses, err := service.fetchContractItems(
 			workItem.ContractAddress,
 			workItem.RPCAddress,
@@ -125,12 +128,10 @@ func (service *Collector) fetchContractItems(
 	limit uint64) ([][]byte, error) {
 
 	start := time.Now()
-
 	var addresses [][]byte
 
 	// Blocks are usually less than 6 seconds, we give ourselves 5 seconds
 	// to get the information. Ideally, it should be faster
-	// TODO: Remove lens dependency and go with http.Get directly
 	client, err := lens.NewRPCClient(endpoint, time.Second*5)
 	if err != nil {
 		return addresses, err
@@ -177,7 +178,7 @@ func (service *Collector) fetchContractItems(
 		if err != nil {
 			return addresses, err
 		}
-		// The result from the raw contract state includes some non-alphanumeric
+		// The result from the raw contract state includes some null / other
 		// values used within cw-storage-plus, we can strip them out
 		// to get a usable key value for our purposes
 		keyString := cleanBytes(key)
