@@ -67,10 +67,13 @@ fmt: ## Format the code using `go fmt`
 	go fmt ./...
 
 test: ## Run the tests
-	go test ./... -coverprofile=coverage.out
+	go test ./... -v
 
 test_cover: ## Run tests with a coverage report
 	go test ./... -v -cover -covermode=count -coverprofile=./coverage.out
+
+test_cover_view: test_cover
+	go tool cover -html=coverage.out
 
 clean: ## Remove compiled binaries from bin/
 	rm ./bin/*
