@@ -67,7 +67,7 @@ fmt: ## Format the code using `go fmt`
 	go fmt ./...
 
 test: ## Run the tests
-	go test ./...
+	go test ./... -coverprofile=coverage.out
 
 test_cover: ## Run tests with a coverage report
 	go test ./... -v -cover -covermode=count -coverprofile=./coverage.out
