@@ -18,7 +18,6 @@ import (
 type Config struct {
 	runtime.BaseConfig
 
-	// TODO: This isn't required, remove
 	ChainID string `envconfig:"CHAIN_ID" required:"true"`
 
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
