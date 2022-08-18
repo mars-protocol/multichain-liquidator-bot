@@ -5,8 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mars-protocol/multichain-liquidator-bot/runtime/mock"
 	"github.com/sirupsen/logrus"
+
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/mock"
 )
 
 func TestNewNoQueue(t *testing.T) {

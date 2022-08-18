@@ -7,15 +7,15 @@ import (
 )
 
 func TestParseWorkItem(t *testing.T) {
-	expectedRPCAddress := "https://sample-rpc.com:443"
+	expectedRPCEndpoint := "https://sample-rpc.com:443"
 	expectedContractAddress := "mars123456"
 	expectedContractItemPrefix := "user_debt"
 	expectedContractPageOffset := 1
 	expectedContractPageLimit := 15
 
 	input := fmt.Sprintf(
-		`{"rpc_address":"%s","contract_address":"%s","contract_item_prefix":"%s","contract_page_offset":%d,"contract_page_limit":%d}`,
-		expectedRPCAddress,
+		`{"rpc_endpoint":"%s","contract_address":"%s","contract_item_prefix":"%s","contract_page_offset":%d,"contract_page_limit":%d}`,
+		expectedRPCEndpoint,
 		expectedContractAddress,
 		expectedContractItemPrefix,
 		expectedContractPageOffset,
@@ -29,11 +29,11 @@ func TestParseWorkItem(t *testing.T) {
 		return
 	}
 
-	if expectedRPCAddress != workItem.RPCAddress {
+	if expectedRPCEndpoint != workItem.RPCEndpoint {
 		t.Errorf(
-			"parsed WorkItem RPC address did not match input JSON. Expected '%s', got '%s'",
-			expectedRPCAddress,
-			workItem.RPCAddress,
+			"parsed WorkItem RPC endpoint did not match input JSON. Expected '%s', got '%s'",
+			expectedRPCEndpoint,
+			workItem.RPCEndpoint,
 		)
 	}
 

@@ -7,11 +7,12 @@ import (
 	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/mars-protocol/multichain-liquidator-bot/collector/src/collector"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
-	log "github.com/sirupsen/logrus"
 )
 
 // Config defines the environment variables for the service
@@ -27,12 +28,14 @@ type Config struct {
 }
 
 func main() {
+	// Parse config vai environment variables
 	var config Config
 	err := envconfig.Process("", &config)
 	if err != nil {
 		log.Fatalf("Unable to process config: %s", err)
 	}
 
+	// Set up structured logging
 	log.SetOutput(os.Stdout)
 	log.SetFormatter(&log.JSONFormatter{
 		TimestampFormat: "Jan 02 15:04:05",
@@ -53,12 +56,12 @@ func main() {
 		"chain_id": strings.ToLower(config.ChainID),
 	})
 
-	// Setup signal handler
+	// Set up signal handler, ie ctrl+c
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start constructing the service
-	logger.Info("Setting up dependencies")
+	// Construct the service
+	logger.Info("Init service")
 
 	// Set up Redis as queue provider
 	var queueProvider interfaces.Queuer
@@ -99,5 +102,4 @@ func main() {
 	}
 
 	logger.Info("Shutdown")
-
 }
