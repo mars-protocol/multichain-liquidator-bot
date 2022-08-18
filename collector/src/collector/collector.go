@@ -35,7 +35,7 @@ func New(
 ) (*Collector, error) {
 
 	if collectorQueue == nil || healthCheckQueue == nil {
-		return nil, errors.New("newBlockQueue and healthCheckQueue must be set")
+		return nil, errors.New("collectorQueue and healthCheckQueue must be set")
 	}
 
 	return &Collector{
@@ -130,6 +130,7 @@ func (service *Collector) fetchContractItems(
 
 	// Blocks are usually less than 6 seconds, we give ourselves 5 seconds
 	// to get the information. Ideally, it should be faster
+	// TODO: Remove lens dependency and go with http.Get directly
 	client, err := lens.NewRPCClient(endpoint, time.Second*5)
 	if err != nil {
 		return addresses, err
