@@ -20,8 +20,9 @@ import (
 // Collector implements the collection of accounts by querying the contract's
 // underlying storage direcctly
 type Collector struct {
-	collectorQueue   interfaces.Queuer
-	healthCheckQueue interfaces.Queuer
+	queue                interfaces.Queuer
+	collectorQueueName   string
+	healthCheckQueueName string
 
 	logger *logrus.Entry
 
@@ -30,36 +31,36 @@ type Collector struct {
 
 // New creates a new instance of the collector
 func New(
-	collectorQueue interfaces.Queuer,
-	healthCheckQueue interfaces.Queuer,
+	queue interfaces.Queuer,
+	collectorQueueName string,
+	healthCheckQueueName string,
 	logger *logrus.Entry,
 ) (*Collector, error) {
 
-	if collectorQueue == nil || healthCheckQueue == nil {
-		return nil, errors.New("collectorQueue and healthCheckQueue must be set")
+	if queue == nil {
+		return nil, errors.New("queue must be set")
+	}
+
+	if collectorQueueName == "" || healthCheckQueueName == "" {
+		return nil, errors.New("collectorQueueName and healthCheckQueueName must not be blank")
 	}
 
 	return &Collector{
-		collectorQueue:   collectorQueue,
-		healthCheckQueue: healthCheckQueue,
-		logger:           logger,
-		continueRunning:  0,
+		queue:                queue,
+		collectorQueueName:   collectorQueueName,
+		healthCheckQueueName: healthCheckQueueName,
+		logger:               logger,
+		continueRunning:      0,
 	}, nil
 }
 
 // Run the service forever
 func (service *Collector) Run() error {
-	err := service.collectorQueue.Connect()
+	err := service.queue.Connect()
 	if err != nil {
 		return err
 	}
-	defer service.collectorQueue.Disconnect()
-
-	err = service.healthCheckQueue.Connect()
-	if err != nil {
-		return err
-	}
-	defer service.healthCheckQueue.Disconnect()
+	defer service.queue.Disconnect()
 
 	// Set long running to run
 	atomic.StoreUint32(&service.continueRunning, 1)
@@ -71,7 +72,7 @@ func (service *Collector) Run() error {
 		// The queue will return a nil item but no error when no items are in
 		// the queue. Fetch blocks for a few seconds while waiting for an item to
 		// bocome available
-		item, err := service.collectorQueue.Fetch()
+		item, err := service.queue.Fetch(service.collectorQueueName)
 		if err != nil {
 			return err
 		}
@@ -107,7 +108,7 @@ func (service *Collector) Run() error {
 		// to include endpoints / etc
 
 		// Push addresses to Redis
-		service.healthCheckQueue.PushMany(addresses)
+		service.queue.PushMany(service.healthCheckQueueName, addresses)
 
 		service.logger.WithFields(logrus.Fields{
 			"total":      len(addresses),

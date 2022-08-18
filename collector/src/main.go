@@ -61,24 +61,11 @@ func main() {
 	// Start constructing the service
 	logger.Info("Setting up dependencies")
 
-	// Set up Redis as queue provider for receiving new blocks
-	var collectorQueue interfaces.Queuer
-	collectorQueue, err = queue.NewRedis(
+	// Set up Redis as queue provider
+	var queueProvider interfaces.Queuer
+	queueProvider, err = queue.NewRedis(
 		config.RedisEndpoint,
 		config.RedisDatabase,
-		config.CollectorQueueName,
-		5, // BLPOP timeout seconds
-	)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	// Set up Redis as a queue provider for pushing accounts for health checks
-	var healthCheckQueue interfaces.Queuer
-	healthCheckQueue, err = queue.NewRedis(
-		config.RedisEndpoint,
-		config.RedisDatabase,
-		config.HealthCheckQueueName,
 		5, // BLPOP timeout seconds
 	)
 	if err != nil {
@@ -87,8 +74,9 @@ func main() {
 
 	// Set up collector
 	service, err := collector.New(
-		collectorQueue,
-		healthCheckQueue,
+		queueProvider,
+		config.CollectorQueueName,
+		config.HealthCheckQueueName,
 		logger,
 	)
 	if err != nil {

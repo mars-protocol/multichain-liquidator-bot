@@ -11,7 +11,7 @@ import (
 
 func TestNewNoQueue(t *testing.T) {
 	logger := logrus.WithFields(logrus.Fields{})
-	_, err := New(nil, nil, logger)
+	_, err := New(nil, "", "", logger)
 	if err == nil {
 		t.Errorf("expected failure to create Collector due to missing queues")
 	}
@@ -19,12 +19,12 @@ func TestNewNoQueue(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	logger := logrus.WithFields(logrus.Fields{})
-	queue, err := mock.NewRedis("testqueue", 5)
+	queue, err := mock.NewRedis()
 	if err != nil {
 		t.Errorf("failed to create mock Redis queue: %s", err)
 	}
 
-	_, err = New(queue, queue, logger)
+	_, err = New(queue, "collector", "health_check", logger)
 	if err != nil {
 		t.Errorf("unexpected failure to create Collector: %s", err)
 	}
@@ -32,12 +32,12 @@ func TestNew(t *testing.T) {
 
 func TestRPCFetch(t *testing.T) {
 	logger := logrus.WithFields(logrus.Fields{})
-	queue, err := mock.NewRedis("testqueue", 5)
+	queue, err := mock.NewRedis()
 	if err != nil {
 		t.Errorf("failed to create mock Redis queue: %s", err)
 	}
 
-	instance, err := New(queue, queue, logger)
+	instance, err := New(queue, "collector", "health_check", logger)
 	if err != nil {
 		t.Errorf("unexpected failure to create Collector: %s", err)
 	}
@@ -74,12 +74,12 @@ func TestRPCFetch(t *testing.T) {
 
 func TestRPCFetchIncorrectPrefix(t *testing.T) {
 	logger := logrus.WithFields(logrus.Fields{})
-	queue, err := mock.NewRedis("testqueue", 5)
+	queue, err := mock.NewRedis()
 	if err != nil {
 		t.Errorf("failed to create mock Redis queue: %s", err)
 	}
 
-	instance, err := New(queue, queue, logger)
+	instance, err := New(queue, "collector", "health_check", logger)
 	if err != nil {
 		t.Errorf("unexpected failure to create Collector: %s", err)
 	}
