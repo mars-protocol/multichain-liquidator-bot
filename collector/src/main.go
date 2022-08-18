@@ -7,7 +7,10 @@ import (
 	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/mars-protocol/multichain-liquidator-bot/collector/src/collector"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -15,13 +18,13 @@ import (
 type Config struct {
 	runtime.BaseConfig
 
-	ChainID      string `envconfig:"CHAIN_ID" required:"true"`
-	HiveEndpoint string `envconfig:"HIVE_ENDPOINT" required:"true"`
-	RPCEndpoint  string `envconfig:"RPC_ENDPOINT" required:"true"`
+	// TODO: This isn't required, remove
+	ChainID string `envconfig:"CHAIN_ID" required:"true"`
 
-	QueueName     string `envconfig:"QUEUE_NAME" required:"true"`
-	RedisEndpoint string `envconfig:"REDIS_ENDPOINT" required:"true"`
-	RedisDatabase int    `envconfig:"REDIS_DATABASE" required:"true"`
+	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
+	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
+	CollectorQueueName   string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
+	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
 }
 
 func main() {
@@ -55,8 +58,42 @@ func main() {
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
 
-	// Construct the service
-	logger.Info("Setting up collector")
+	// Start constructing the service
+	logger.Info("Setting up dependencies")
+
+	// Set up Redis as queue provider for receiving new blocks
+	var collectorQueue interfaces.Queuer
+	collectorQueue, err = queue.NewRedis(
+		config.RedisEndpoint,
+		config.RedisDatabase,
+		config.CollectorQueueName,
+		5, // BLPOP timeout seconds
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	// Set up Redis as a queue provider for pushing accounts for health checks
+	var healthCheckQueue interfaces.Queuer
+	healthCheckQueue, err = queue.NewRedis(
+		config.RedisEndpoint,
+		config.RedisDatabase,
+		config.HealthCheckQueueName,
+		5, // BLPOP timeout seconds
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	// Set up collector
+	service, err := collector.New(
+		collectorQueue,
+		healthCheckQueue,
+		logger,
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
 
 	// Handle stop signals
 	go func() {
@@ -64,16 +101,15 @@ func main() {
 		logger.WithFields(log.Fields{
 			"signal": sig,
 		}).Info("Received OS signal")
+		service.Stop()
 	}()
 
-	// Set up Redis as queue provider
-	// var redisQueue interfaces.Queuer
-	// redisQueue, err = queue.NewRedis(config.RedisEndpoint, config.RedisDatabase, config.QueueName, 5)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// TODO Set up collector
+	logger.Info("Start service")
+	// Run forever
+	err = service.Run()
+	if err != nil {
+		logger.Fatal(err)
+	}
 
 	logger.Info("Shutdown")
 

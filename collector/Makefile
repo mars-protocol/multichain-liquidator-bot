@@ -31,11 +31,10 @@ run: build .start_redis ## Build and run the service binary
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
 	CHAIN_ID="pisco-1" \
-	HIVE_ENDPOINT="https://phoenix-hive.terra.dev/graphql" \
-	RPC_ENDPOINT="https://phoenix-rpc.terra.dev" \
-	QUEUE_NAME="testqueue" \
 	REDIS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
+	COLLECTOR_QUEUE_NAME="collector" \
+	HEALTH_CHECK_QUEUE_NAME="health_check" \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled
@@ -44,6 +43,10 @@ run_race: ## Run the service with race condition checking enabled
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
 	CHAIN_ID="pisco-1" \
+	REDIS_DATABASE=0 \
+	REDIS_ENDPOINT="127.0.0.1:6379" \
+	COLLECTOR_QUEUE_NAME="collector" \
+	HEALTH_CHECK_QUEUE_NAME="health_check" \
 	go run -race ./src/*.go
 
 docker_build: build ## Build the service Docker container
