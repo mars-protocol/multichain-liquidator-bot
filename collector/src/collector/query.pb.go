@@ -171,8 +171,9 @@ func (m *PageResponse) GetTotal() uint64 {
 func init() {
 	proto.RegisterType((*QueryAllContractStateRequest)(nil), "cosmwasm.wasm.v1.QueryAllContractStateRequest")
 	proto.RegisterType((*QueryAllContractStateResponse)(nil), "cosmwasm.wasm.v1.QueryAllContractStateResponse")
-	proto.RegisterType((*PageRequest)(nil), "cosmos.base.query.v1beta1.PageRequest")
-	proto.RegisterType((*PageResponse)(nil), "cosmos.base.query.v1beta1.PageResponse")
+	// TODO: Once we remove all the Cosmos SDK dependencies, we'll need to add these back
+	// proto.RegisterType((*PageRequest)(nil), "cosmos.base.query.v1beta1.PageRequest")
+	// proto.RegisterType((*PageResponse)(nil), "cosmos.base.query.v1beta1.PageResponse")
 	proto.RegisterType((*Model)(nil), "cosmwasm.wasm.v1.Model")
 
 }
