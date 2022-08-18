@@ -85,3 +85,4 @@ typings/
 /.overlay
 /lib
 bin/
+coverage.*
