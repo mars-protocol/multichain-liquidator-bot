@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	jobsCount   = 10
-	workerCount = 2
+	jobsCount   = 20
+	workerCount = 10
 )
 
 func TestWorkerPool(t *testing.T) {
@@ -49,7 +49,7 @@ func TestWorkerPool(t *testing.T) {
 func TestWorkerPool_TimeOut(t *testing.T) {
 	wp := New(workerCount)
 
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Nanosecond*10)
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Millisecond*1000)
 	defer cancel()
 
 	go wp.Run(ctx)

@@ -2,14 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 )
 
 var (
-	errDefault = errors.New("wrong argument type")
 	descriptor = JobDescriptor{
 		ID:    JobID("1"),
 		JType: jobType("anyType"),
@@ -19,11 +16,12 @@ var (
 		},
 	}
 	execFn = func(ctx context.Context, args interface{}) (interface{}, error) {
+
 		argVal, ok := args.(int)
 		if !ok {
 			return nil, errDefault
 		}
-		fmt.Println("Do some task")
+
 		return argVal * 2, nil
 	}
 )
