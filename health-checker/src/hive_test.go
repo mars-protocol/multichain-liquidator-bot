@@ -11,12 +11,12 @@ func Test_weCanQueryMultipleUsers(t *testing.T) {
 	hiveEndpoint := "https://osmosis-testnet-hive.herokuapp.com/graphql"
 	redbankAddress := "osmo1mx2redehm4dtmwkfq3399k8ly2skfyqzfzg9clelw4enuuhtfeeq3dk9kj"
 	addresses := []string{"osmo18nm43hck80s2et26g2csvltecvhk49526dugd9"}
+	batchSize := 200
 
-	for i := 1; i < 200; i++ {
+	for i := 1; i < batchSize; i++ {
 		addresses = append(addresses, "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9")
 	}
 
-	fmt.Print(len(addresses))
 	result, err := FetchBatch(hiveEndpoint, redbankAddress, addresses)
 
 	if err != nil {
