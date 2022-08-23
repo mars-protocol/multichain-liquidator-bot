@@ -1,4 +1,4 @@
-package main
+package health_checker
 
 import (
 	"bytes"
@@ -15,7 +15,8 @@ type BatchQuery struct {
 
 // BatchEventsResponse defines the format for batch position responses
 type BatchEventsResponse []struct {
-	Data struct {
+	UserAddress string
+	Data        struct {
 		Wasm struct {
 			ContractQuery struct {
 				TotalCollateralInBaseAsset string `json:"total_collateral_in_base_asset"`
@@ -58,10 +59,12 @@ func FetchBatch(
 
 	queryBytes, err := json.Marshal(queries)
 	if err != nil {
+		fmt.Println(fmt.Errorf("An Error occurred fetching data: %v", err))
 		return batchEvents, err
 	}
 
 	response, err := http.Post(hiveEndpoint, "application/json", bytes.NewReader(queryBytes))
+
 	if err != nil {
 		return batchEvents, err
 	}
@@ -71,10 +74,16 @@ func FetchBatch(
 		return batchEvents, fmt.Errorf("not found %d", response.StatusCode)
 	}
 
-	// Parse to usable format
 	err = json.NewDecoder(response.Body).Decode(&batchEvents)
 	if err != nil {
 		return batchEvents, err
+	}
+
+	// We need to know the user address of each position, so we append it back once the query
+	// has completed. There is risk here that we get the wrong address for a position if
+	// the response from the server jumbles the queries
+	for index := range batchEvents {
+		batchEvents[index].UserAddress = addresses[index]
 	}
 
 	return batchEvents, nil

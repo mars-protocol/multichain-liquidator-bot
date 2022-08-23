@@ -1,4 +1,4 @@
-package main
+package health_checker
 
 import (
 	"context"
@@ -33,7 +33,7 @@ type WorkerPool struct {
 	Done         chan struct{}
 }
 
-func New(wcount int) WorkerPool {
+func InitiatePool(wcount int) WorkerPool {
 	return WorkerPool{
 		workersCount: wcount,
 		jobs:         make(chan Job, wcount),
@@ -44,7 +44,6 @@ func New(wcount int) WorkerPool {
 
 func (wp WorkerPool) Run(ctx context.Context) {
 	var wg sync.WaitGroup
-
 	for i := 0; i < wp.workersCount; i++ {
 		wg.Add(1)
 		// fan out worker goroutines
@@ -62,6 +61,7 @@ func (wp WorkerPool) Results() <-chan Result {
 	return wp.results
 }
 
+// Push jobs to jobs channel
 func (wp WorkerPool) GenerateFrom(jobsBulk []Job) {
 	for i, _ := range jobsBulk {
 		wp.jobs <- jobsBulk[i]

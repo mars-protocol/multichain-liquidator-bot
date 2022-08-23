@@ -1,4 +1,4 @@
-package main
+package health_checker
 
 import (
 	"context"
@@ -14,7 +14,7 @@ const (
 )
 
 func TestWorkerPool(t *testing.T) {
-	wp := New(workerCount)
+	wp := InitiatePool(workerCount)
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
@@ -47,7 +47,7 @@ func TestWorkerPool(t *testing.T) {
 }
 
 func TestWorkerPool_TimeOut(t *testing.T) {
-	wp := New(workerCount)
+	wp := InitiatePool(workerCount)
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Millisecond*1000)
 	defer cancel()
@@ -68,7 +68,7 @@ func TestWorkerPool_TimeOut(t *testing.T) {
 }
 
 func TestWorkerPool_Cancel(t *testing.T) {
-	wp := New(workerCount)
+	wp := InitiatePool(workerCount)
 
 	ctx, cancel := context.WithCancel(context.TODO())
 

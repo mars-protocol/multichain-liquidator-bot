@@ -1,4 +1,4 @@
-package main
+package health_checker
 
 import (
 	"context"
@@ -29,6 +29,7 @@ type Job struct {
 }
 
 func (j Job) execute(ctx context.Context) Result {
+
 	value, err := j.ExecFn(ctx, j.Args)
 	if err != nil {
 		return Result{
@@ -36,7 +37,6 @@ func (j Job) execute(ctx context.Context) Result {
 			Descriptor: j.Descriptor,
 		}
 	}
-
 	return Result{
 		Value:      value,
 		Descriptor: j.Descriptor,
