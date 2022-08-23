@@ -1,4 +1,4 @@
-package main
+package health_checker
 
 import (
 	"testing"
@@ -8,6 +8,9 @@ func Test_WeCanGenerateAndRunJobs(t *testing.T) {
 
 	addressesPerJob := 100
 	workerCount := 10
+	hiveEndpoint := "https://osmosis-testnet-hive.herokuapp.com/graphql"
+	redbankAddress := "osmo1mx2redehm4dtmwkfq3399k8ly2skfyqzfzg9clelw4enuuhtfeeq3dk9kj"
+	batchSize := 200
 	addresses := []string{"osmo18nm43hck80s2et26g2csvltecvhk49526dugd9"}
 	numberOfAddresses := 200
 
@@ -15,7 +18,12 @@ func Test_WeCanGenerateAndRunJobs(t *testing.T) {
 		addresses = append(addresses, "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9")
 	}
 
-	service := Service{}
+	service := HealthChecker{
+		hiveEndpoint:    hiveEndpoint,
+		redbankAddress:  redbankAddress,
+		addressesPerJob: addressesPerJob,
+		batchSize:       batchSize,
+	}
 	jobs := service.generateJobs(addresses, addressesPerJob)
 	positionCount, positionBatchResults := service.RunWorkerPool(workerCount, jobs)
 
