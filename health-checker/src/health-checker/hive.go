@@ -13,6 +13,8 @@ type BatchQuery struct {
 	Variables map[string]interface{} `json:"variables"`
 }
 
+type Hive struct{}
+
 // BatchEventsResponse defines the format for batch position responses
 type BatchEventsResponse []struct {
 	UserAddress string
@@ -33,7 +35,7 @@ type BatchEventsResponse []struct {
 }
 
 // fetchHiveEvents fetches events from Hive for the given block numbers
-func FetchBatch(
+func (hive Hive) FetchBatch(
 	hiveEndpoint string,
 	contractAddress string,
 	addresses []string,

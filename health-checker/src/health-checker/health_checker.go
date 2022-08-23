@@ -17,6 +17,7 @@ import (
 
 type HealthChecker struct {
 	queue                interfaces.Queuer
+	hive                 Hive
 	healthCheckQueueName string
 	liquidationQueueName string
 	hiveEndpoint         string
@@ -33,6 +34,7 @@ var (
 
 func New(
 	queue interfaces.Queuer,
+	hive Hive,
 	healthCheckQueueName string,
 	liquidationQueueName string,
 	hiveEndpoint string,
@@ -69,7 +71,7 @@ func (s HealthChecker) getExeuteFunction(hiveEndpoint string, redbankAddress str
 			return nil, errDefault
 		}
 
-		batchResults, err := FetchBatch(hiveEndpoint, redbankAddress, addresses)
+		batchResults, err := s.hive.FetchBatch(hiveEndpoint, redbankAddress, addresses)
 
 		if err != nil {
 			return nil, err
