@@ -8,6 +8,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	health_checker "github.com/mars-protocol/multichain-liquidator-bot/health-checker/src/health-checker"
+
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
@@ -60,35 +61,25 @@ func main() {
 	// Start constructing the service
 	logger.Info("Setting up dependencies")
 
-	// Set up Redis as queue provider for receiving new blocks
-	var liquidatorQueue interfaces.Queuer
-	liquidatorQueue, err = queue.NewRedis(
+	// Set up Redis as a queue provider for reading accounts to check and to push accounts to liquidate
+	var instance interfaces.Queuer
+	instance, err = queue.NewRedis(
 		config.RedisEndpoint,
 		config.RedisDatabase,
-		config.LiquidatorQueueName,
 		5, // BLPOP timeout seconds
 	)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	// Set up Redis as a queue provider for pushing accounts for health checks
-	var healthCheckQueue interfaces.Queuer
-	healthCheckQueue, err = queue.NewRedis(
-		config.RedisEndpoint,
-		config.RedisDatabase,
-		config.HealthCheckQueueName,
-		5, // BLPOP timeout seconds
-	)
-	if err != nil {
-		logger.Fatal(err)
-	}
+	hive := health_checker.Hive{HiveEndpoint: config.hiveEndpoint}
 
-	// Set up collector
+	// Set up health checker
 	healthCheckerService, err := health_checker.New(
-		healthCheckQueue,
-		liquidatorQueue,
-		config.hiveEndpoint,
+		instance,
+		hive,
+		config.HealthCheckQueueName,
+		config.LiquidatorQueueName,
 		config.jobsPerWoker,
 		config.batchSize,
 		config.addressesPerJob,
@@ -110,6 +101,7 @@ func main() {
 	}()
 
 	logger.Info("Start Health check service")
+
 	// Run forever
 	err = healthCheckerService.Run()
 	if err != nil {
