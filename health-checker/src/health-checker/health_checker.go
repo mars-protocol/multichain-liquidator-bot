@@ -20,7 +20,6 @@ type HealthChecker struct {
 	hive                 Hive
 	healthCheckQueueName string
 	liquidationQueueName string
-	hiveEndpoint         string
 	redbankAddress       string
 	addressesPerJob      int
 	batchSize            int
@@ -37,7 +36,6 @@ func New(
 	hive Hive,
 	healthCheckQueueName string,
 	liquidationQueueName string,
-	hiveEndpoint string,
 	jobsPerWorker int,
 	batchSize int,
 	addressesPerJob int,
@@ -62,7 +60,7 @@ func New(
 }
 
 // Generate an execute function for our Jobs, because
-func (s HealthChecker) getExeuteFunction(hiveEndpoint string, redbankAddress string) func(ctx context.Context, args interface{}) (interface{}, error) {
+func (s HealthChecker) getExeuteFunction(redbankAddress string) func(ctx context.Context, args interface{}) (interface{}, error) {
 	execute := func(
 		ctx context.Context,
 		args interface{}) (interface{}, error) {
@@ -108,7 +106,7 @@ func (s HealthChecker) generateJobs(addressList []string, addressesPerJob int) [
 					JType:    "HealthStatusBatch",
 					Metadata: nil,
 				},
-				ExecFn: s.getExeuteFunction(s.hiveEndpoint, s.redbankAddress),
+				ExecFn: s.getExeuteFunction(s.redbankAddress),
 				Args:   addressSubSlice,
 			})
 		}
