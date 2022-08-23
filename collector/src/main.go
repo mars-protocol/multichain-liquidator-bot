@@ -7,18 +7,18 @@ import (
 	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/mars-protocol/multichain-liquidator-bot/collector/src/collector"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
-	log "github.com/sirupsen/logrus"
 )
 
 // Config defines the environment variables for the service
 type Config struct {
 	runtime.BaseConfig
 
-	// TODO: This isn't required, remove
 	ChainID string `envconfig:"CHAIN_ID" required:"true"`
 
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
@@ -28,12 +28,14 @@ type Config struct {
 }
 
 func main() {
+	// Parse config vai environment variables
 	var config Config
 	err := envconfig.Process("", &config)
 	if err != nil {
 		log.Fatalf("Unable to process config: %s", err)
 	}
 
+	// Set up structured logging
 	log.SetOutput(os.Stdout)
 	log.SetFormatter(&log.JSONFormatter{
 		TimestampFormat: "Jan 02 15:04:05",
@@ -54,31 +56,18 @@ func main() {
 		"chain_id": strings.ToLower(config.ChainID),
 	})
 
-	// Setup signal handler
+	// Set up signal handler, ie ctrl+c
 	signalChannel := make(chan os.Signal, 1)
 	signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start constructing the service
-	logger.Info("Setting up dependencies")
+	// Construct the service
+	logger.Info("Init service")
 
-	// Set up Redis as queue provider for receiving new blocks
-	var collectorQueue interfaces.Queuer
-	collectorQueue, err = queue.NewRedis(
+	// Set up Redis as queue provider
+	var queueProvider interfaces.Queuer
+	queueProvider, err = queue.NewRedis(
 		config.RedisEndpoint,
 		config.RedisDatabase,
-		config.CollectorQueueName,
-		5, // BLPOP timeout seconds
-	)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	// Set up Redis as a queue provider for pushing accounts for health checks
-	var healthCheckQueue interfaces.Queuer
-	healthCheckQueue, err = queue.NewRedis(
-		config.RedisEndpoint,
-		config.RedisDatabase,
-		config.HealthCheckQueueName,
 		5, // BLPOP timeout seconds
 	)
 	if err != nil {
@@ -87,8 +76,9 @@ func main() {
 
 	// Set up collector
 	service, err := collector.New(
-		collectorQueue,
-		healthCheckQueue,
+		queueProvider,
+		config.CollectorQueueName,
+		config.HealthCheckQueueName,
 		logger,
 	)
 	if err != nil {
@@ -112,5 +102,4 @@ func main() {
 	}
 
 	logger.Info("Shutdown")
-
 }

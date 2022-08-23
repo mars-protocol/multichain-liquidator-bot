@@ -11,54 +11,57 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/sirupsen/logrus"
+	lens "github.com/strangelove-ventures/lens/client"
 
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
-
-	lens "github.com/strangelove-ventures/lens/client"
 )
 
-// Collector implements the collection of accounts logic
+// Collector implements the collection of accounts by querying the contract's
+// underlying storage directly
 type Collector struct {
-	collectorQueue   interfaces.Queuer
-	healthCheckQueue interfaces.Queuer
+	queue                interfaces.Queuer
+	collectorQueueName   string
+	healthCheckQueueName string
 
 	logger *logrus.Entry
 
 	continueRunning uint32
 }
 
-// New creates a new instance of the collector
+// New creates a new instance of the collector and returns it and an error
+// when applicable
 func New(
-	collectorQueue interfaces.Queuer,
-	healthCheckQueue interfaces.Queuer,
+	queue interfaces.Queuer,
+	collectorQueueName string,
+	healthCheckQueueName string,
 	logger *logrus.Entry,
 ) (*Collector, error) {
 
-	if collectorQueue == nil || healthCheckQueue == nil {
-		return nil, errors.New("newBlockQueue and healthCheckQueue must be set")
+	if queue == nil {
+		return nil, errors.New("queue must be set")
+	}
+
+	if collectorQueueName == "" || healthCheckQueueName == "" {
+		return nil, errors.New("collectorQueueName and healthCheckQueueName must not be blank")
 	}
 
 	return &Collector{
-		collectorQueue:   collectorQueue,
-		healthCheckQueue: healthCheckQueue,
-		logger:           logger,
-		continueRunning:  0,
+		queue:                queue,
+		collectorQueueName:   collectorQueueName,
+		healthCheckQueueName: healthCheckQueueName,
+		logger:               logger,
+		continueRunning:      0,
 	}, nil
 }
 
 // Run the service forever
 func (service *Collector) Run() error {
-	err := service.collectorQueue.Connect()
+	// Ensure we are connected to the queue
+	err := service.queue.Connect()
 	if err != nil {
 		return err
 	}
-	defer service.collectorQueue.Disconnect()
-
-	err = service.healthCheckQueue.Connect()
-	if err != nil {
-		return err
-	}
-	defer service.healthCheckQueue.Disconnect()
+	defer service.queue.Disconnect()
 
 	// Set long running to run
 	atomic.StoreUint32(&service.continueRunning, 1)
@@ -67,15 +70,19 @@ func (service *Collector) Run() error {
 	// work items containing the parameters for querying the contract state
 	for atomic.LoadUint32(&service.continueRunning) == 1 {
 
-		// The queue will return a nil item but no error when no items were in
-		// the queue
-		item, err := service.collectorQueue.Fetch()
+		// The queue will return a nil item but no error when no items are in
+		// the queue. Fetch blocks for a few seconds while waiting for an item to
+		// bocome available
+		item, err := service.queue.Fetch(service.collectorQueueName)
 		if err != nil {
 			return err
 		}
 
 		if item == nil {
-			// No items yet
+			// No items yet, continue
+			// Because queue.Fetch blocks for a few seconds while waiting for
+			// an item this continue doesn't cause the service to eat up all
+			// available CPU resources
 			continue
 		}
 
@@ -87,11 +94,12 @@ func (service *Collector) Run() error {
 			return err
 		}
 
-		// Once a new block is available we need to query the contract's state
-		// and return the addresses contained in the given prefix.
+		// Once we receive a piece of work to execute we need to query the
+		// contract's state and return the addresses contained for the
+		// given prefix
 		addresses, err := service.fetchContractItems(
 			workItem.ContractAddress,
-			workItem.RPCAddress,
+			workItem.RPCEndpoint,
 			workItem.ContractItemPrefix,
 			workItem.ContractPageOffset,
 			workItem.ContractPageLimit,
@@ -102,9 +110,11 @@ func (service *Collector) Run() error {
 
 		// TODO Enrich the packet sent to the health check service
 		// to include endpoints / etc
+		// This will be updated as work on the health checker and liquidator
+		// progresses
 
 		// Push addresses to Redis
-		service.healthCheckQueue.PushMany(addresses)
+		service.queue.PushMany(service.healthCheckQueueName, addresses)
 
 		service.logger.WithFields(logrus.Fields{
 			"total":      len(addresses),
@@ -116,21 +126,20 @@ func (service *Collector) Run() error {
 }
 
 // fetchContractItems retrieves a maximum of limit items from the contract
-// state starting at the given offset from contract
+// state starting at the given offset from contractAddress
 func (service *Collector) fetchContractItems(
 	contractAddress string,
-	endpoint string,
+	rpcEndpoint string,
 	prefix string,
 	offset uint64,
 	limit uint64) ([][]byte, error) {
 
 	start := time.Now()
-
 	var addresses [][]byte
 
-	// Blocks are usually less than 6 seconds, we give ourselves 5 seconds
-	// to get the information. Ideally, it should be faster
-	client, err := lens.NewRPCClient(endpoint, time.Second*5)
+	// Blocks are usually less than 6 seconds, we give ourselves an absolute
+	// maximum of 5 seconds to get the information. Ideally, it should be faster
+	client, err := lens.NewRPCClient(rpcEndpoint, time.Second*5)
 	if err != nil {
 		return addresses, err
 	}
@@ -141,6 +150,7 @@ func (service *Collector) fetchContractItems(
 		Offset: offset,
 		Limit:  limit,
 	}
+
 	// The structure of the request requires the query parameters to be passed
 	// as protobuf encoded content
 	rpcRequest, err := proto.Marshal(&stateRequest)
@@ -150,6 +160,7 @@ func (service *Collector) fetchContractItems(
 
 	rpcResponse, err := client.ABCIQuery(
 		context.Background(),
+		// RPC query path for the raw state
 		"/cosmwasm.wasm.v1.Query/AllContractState",
 		rpcRequest,
 	)
@@ -165,6 +176,7 @@ func (service *Collector) fetchContractItems(
 		return addresses, err
 	}
 
+	// Structure of raw state we are querying
 	// If a contract has a cw-storage-plus Map "balances" then the raw
 	// state keys for that Map will have "balances" as a prefix. Here we need
 	// to filter out all the keys we're interested in by looking for the
@@ -176,9 +188,9 @@ func (service *Collector) fetchContractItems(
 		if err != nil {
 			return addresses, err
 		}
-		// The result from the raw contract state includes some non-alphanumeric
-		// values used within cw-storage-plus, we can strip them out
-		// to get a usable key value for our purposes
+		// The result from the raw contract state includes some null / other
+		// bytes used within cw-storage-plus, we can strip them out
+		// to get a usable key for our purposes
 		keyString := cleanBytes(key)
 
 		// Only capture those with the correct prefix

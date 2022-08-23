@@ -18,9 +18,9 @@ type Redis struct {
 
 // NewRedis creates a new instance of a Redis queue
 // endpoint is the full URL of the Redis endpoint
-// database is the Redis database to use
-// queue is the name of the Redis key to keep the list at
-func NewRedis(endpoint string, database int, queueName string, popTimeout int) (*Redis, error) {
+// database is the Redis database number to use
+// popTimeout is the time a BLPOP call will wait before continuing
+func NewRedis(endpoint string, database int, popTimeout int) (*Redis, error) {
 	// Open the Redis connection
 	conn, err := redis.Dial(
 		"tcp",
@@ -31,7 +31,6 @@ func NewRedis(endpoint string, database int, queueName string, popTimeout int) (
 
 	return &Redis{
 		conn:       conn,
-		key:        queueName,
 		popTimeout: popTimeout,
 	}, err
 }
@@ -43,23 +42,23 @@ func (queue *Redis) Connect() error {
 	return queue.conn.Err()
 }
 
-// Push pushes byte data onto the Redis list at key
-func (queue *Redis) Push(data []byte) error {
+// Push pushes data onto the queue at key
+func (queue *Redis) Push(key string, data []byte) error {
 	// RPUSH returns an integer of items pushed and possibly an error
 	// https://redis.io/commands/rpush/
-	_, err := redis.Int(queue.conn.Do("RPUSH", queue.key, data))
+	_, err := redis.Int(queue.conn.Do("RPUSH", key, data))
 	return err
 }
 
-// PushMany pushes multiple items onto the queue
-func (queue *Redis) PushMany(data [][]byte) error {
+// PushMany pushes multiple items onto the queue at key
+func (queue *Redis) PushMany(key string, data [][]byte) error {
 	// We can possibly receive quite a large amount of items in data. We batch
 	// these together in groups of 100 to push in batches
 	dataChunks := helpers.ChunkSlice(data, 100)
 	for _, dataChunk := range dataChunks {
 		// RPUSH returns an integer of items pushed and possibly an error
 		// https://redis.io/commands/rpush/
-		_, err := redis.Int(queue.conn.Do("RPUSH", redis.Args{}.Add(queue.key).AddFlat(dataChunk)...))
+		_, err := redis.Int(queue.conn.Do("RPUSH", redis.Args{}.Add(key).AddFlat(dataChunk)...))
 		if err != nil {
 			return err
 		}
@@ -67,13 +66,13 @@ func (queue *Redis) PushMany(data [][]byte) error {
 	return nil
 }
 
-// Fetch retrieves a single item from the Redis list at key and returns a byte
-// slice of data
-func (queue *Redis) Fetch() ([]byte, error) {
+// Fetch retrieves a single item from the queue at key and returns a
+// byte slice of data
+func (queue *Redis) Fetch(key string) ([]byte, error) {
 	// BLPOP returns the first element from key by waiting up to popTimeout
 	// for an element to be available
 	// https://redis.io/commands/blpop/
-	parts, err := redis.Values(queue.conn.Do("BLPOP", queue.key, queue.popTimeout))
+	parts, err := redis.Values(queue.conn.Do("BLPOP", key, queue.popTimeout))
 	if err != nil {
 		// The ErrNil error indicates nothing was available at the given key
 		if err == redis.ErrNil {
@@ -90,14 +89,14 @@ func (queue *Redis) Fetch() ([]byte, error) {
 	return nil, nil
 }
 
-// FetchMany retrieves multiple items from the Redis list at key
-// and returns a list of byte slices up to count
-func (queue *Redis) FetchMany(count int) ([][]byte, error) {
+// FetchMany retrieves up to the specified count from the queue at key and
+// returns a slive of byte slices
+func (queue *Redis) FetchMany(key string, count int) ([][]byte, error) {
 	var items [][]byte
 
 	// LPOP returns count number of elements from the key
 	// https://redis.io/commands/lpop/
-	values, err := redis.Values(queue.conn.Do("LPOP", queue.key, count))
+	values, err := redis.Values(queue.conn.Do("LPOP", key, count))
 	if err != nil {
 		// The ErrNil error indicates nothing was available at the given key
 		if err == redis.ErrNil {
