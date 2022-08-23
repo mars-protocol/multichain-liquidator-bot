@@ -16,14 +16,15 @@ import (
 )
 
 type HealthChecker struct {
-	healthCheckQueue interfaces.Queuer
-	liquidationQueue interfaces.Queuer
-	hiveEndpoint     string
-	redbankAddress   string
-	addressesPerJob  int
-	batchSize        int
-	logger           *logrus.Entry
-	continueRunning  uint32
+	queue                interfaces.Queuer
+	healthCheckQueueName string
+	liquidationQueueName string
+	hiveEndpoint         string
+	redbankAddress       string
+	addressesPerJob      int
+	batchSize            int
+	logger               *logrus.Entry
+	continueRunning      uint32
 }
 
 var (
@@ -31,8 +32,9 @@ var (
 )
 
 func New(
-	healthCheckQueue interfaces.Queuer,
-	liquidationQueue interfaces.Queuer,
+	queue interfaces.Queuer,
+	healthCheckQueueName string,
+	liquidationQueueName string,
 	hiveEndpoint string,
 	jobsPerWorker int,
 	batchSize int,
@@ -41,15 +43,19 @@ func New(
 	logger *logrus.Entry,
 ) (*HealthChecker, error) {
 
-	if liquidationQueue == nil || healthCheckQueue == nil {
+	if queue == nil {
+		return nil, errors.New("queue must be set")
+	}
+
+	if liquidationQueueName == "" || healthCheckQueueName == "" {
 		return nil, errors.New("HealthCheckQueue and liquidationQueue must be set")
 	}
 
 	return &HealthChecker{
-		healthCheckQueue: healthCheckQueue,
-		liquidationQueue: liquidationQueue,
-		logger:           logger,
-		continueRunning:  0,
+		healthCheckQueueName: healthCheckQueueName,
+		liquidationQueueName: liquidationQueueName,
+		logger:               logger,
+		continueRunning:      0,
 	}, nil
 }
 
@@ -110,17 +116,12 @@ func (s HealthChecker) generateJobs(addressList []string, addressesPerJob int) [
 
 // Runs until interrupted
 func (s HealthChecker) Run() error {
-	err := s.healthCheckQueue.Connect()
+	err := s.queue.Connect()
 	if err != nil {
 		return err
 	}
-	defer s.healthCheckQueue.Disconnect()
-
-	err = s.liquidationQueue.Connect()
-	if err != nil {
-		return err
-	}
-	defer s.liquidationQueue.Disconnect()
+	// cleanup
+	defer s.queue.Disconnect()
 
 	// Set long running to run
 	atomic.StoreUint32(&s.continueRunning, 1)
@@ -129,7 +130,7 @@ func (s HealthChecker) Run() error {
 
 		// The queue will return a nil item but no error when no items were in
 		// the queue
-		items, err := s.healthCheckQueue.FetchMany(s.batchSize)
+		items, err := s.queue.FetchMany(s.healthCheckQueueName, s.batchSize)
 		if err != nil {
 			return err
 		}
@@ -185,7 +186,7 @@ func (s HealthChecker) Run() error {
 
 		if len(unhealthyAddresses) > 0 {
 
-			err := s.liquidationQueue.PushMany(unhealthyAddresses)
+			err := s.queue.PushMany(s.liquidationQueueName, unhealthyAddresses)
 			if err != nil {
 				s.logger.Errorf("Failed to push unhealthy addresses to queue. Error : %v", err)
 			}
@@ -219,7 +220,7 @@ func (s HealthChecker) RunWorkerPool(workerCount int, jobs []Job) (int, []BatchE
 	results := []BatchEventsResponse{}
 	totalPositionsFetched := 0
 
-	// Iterate, pushing results into list until we are done
+	// Iterate, pushing results into results list until we are done
 	for {
 		select {
 		case r, ok := <-wp.Results():
