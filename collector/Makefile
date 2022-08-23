@@ -31,11 +31,10 @@ run: build .start_redis ## Build and run the service binary
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
 	CHAIN_ID="pisco-1" \
-	HIVE_ENDPOINT="https://phoenix-hive.terra.dev/graphql" \
-	RPC_ENDPOINT="https://phoenix-rpc.terra.dev" \
-	QUEUE_NAME="testqueue" \
 	REDIS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
+	COLLECTOR_QUEUE_NAME="collector" \
+	HEALTH_CHECK_QUEUE_NAME="health_check" \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled
@@ -44,6 +43,10 @@ run_race: ## Run the service with race condition checking enabled
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
 	CHAIN_ID="pisco-1" \
+	REDIS_DATABASE=0 \
+	REDIS_ENDPOINT="127.0.0.1:6379" \
+	COLLECTOR_QUEUE_NAME="collector" \
+	HEALTH_CHECK_QUEUE_NAME="health_check" \
 	go run -race ./src/*.go
 
 docker_build: build ## Build the service Docker container
@@ -55,6 +58,10 @@ docker_run: ## Run the Docker container in interactive mode
 		-e LOG_FORMAT=text \
 		-e SERVICE_NAME="bot-collector" \
 		-e CHAIN_ID="pisco-1" \
+		-e REDIS_DATABASE=0 \
+		-e REDIS_ENDPOINT="127.0.0.1:6379" \
+		-e COLLECTOR_QUEUE_NAME="collector" \
+		-e HEALTH_CHECK_QUEUE_NAME="health_check" \
 		${IMAGE_NAME}
 
 docker_push: ## Push the Docker container to the registry
@@ -64,10 +71,13 @@ fmt: ## Format the code using `go fmt`
 	go fmt ./...
 
 test: ## Run the tests
-	go test ./...
+	go test ./... -v
 
 test_cover: ## Run tests with a coverage report
 	go test ./... -v -cover -covermode=count -coverprofile=./coverage.out
+
+test_cover_view: test_cover ## Run tests with coverage report and open HTML view
+	go tool cover -html=coverage.out
 
 clean: ## Remove compiled binaries from bin/
 	rm ./bin/*
