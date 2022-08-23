@@ -13,7 +13,9 @@ type BatchQuery struct {
 	Variables map[string]interface{} `json:"variables"`
 }
 
-type Hive struct{}
+type Hive struct {
+	hiveEndpoint string
+}
 
 // BatchEventsResponse defines the format for batch position responses
 type BatchEventsResponse []struct {
@@ -36,7 +38,6 @@ type BatchEventsResponse []struct {
 
 // fetchHiveEvents fetches events from Hive for the given block numbers
 func (hive Hive) FetchBatch(
-	hiveEndpoint string,
 	contractAddress string,
 	addresses []string,
 ) (BatchEventsResponse, error) {
@@ -65,7 +66,7 @@ func (hive Hive) FetchBatch(
 		return batchEvents, err
 	}
 
-	response, err := http.Post(hiveEndpoint, "application/json", bytes.NewReader(queryBytes))
+	response, err := http.Post(hive.hiveEndpoint, "application/json", bytes.NewReader(queryBytes))
 
 	if err != nil {
 		return batchEvents, err

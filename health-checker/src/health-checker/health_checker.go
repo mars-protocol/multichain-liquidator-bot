@@ -71,7 +71,7 @@ func (s HealthChecker) getExeuteFunction(hiveEndpoint string, redbankAddress str
 			return nil, errDefault
 		}
 
-		batchResults, err := s.hive.FetchBatch(hiveEndpoint, redbankAddress, addresses)
+		batchResults, err := s.hive.FetchBatch(redbankAddress, addresses)
 
 		if err != nil {
 			return nil, err

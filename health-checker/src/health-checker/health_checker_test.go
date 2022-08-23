@@ -17,9 +17,9 @@ func Test_WeCanGenerateAndRunJobs(t *testing.T) {
 	for i := 1; i < numberOfAddresses; i++ {
 		addresses = append(addresses, "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9")
 	}
-
+	hive := Hive{hiveEndpoint}
 	service := HealthChecker{
-		hiveEndpoint:    hiveEndpoint,
+		hive:            hive,
 		redbankAddress:  redbankAddress,
 		addressesPerJob: addressesPerJob,
 		batchSize:       batchSize,
@@ -34,4 +34,9 @@ func Test_WeCanGenerateAndRunJobs(t *testing.T) {
 	if len(positionBatchResults) != numberOfAddresses/addressesPerJob {
 		t.Error("Incorrect number of batches")
 	}
+}
+
+func Test_Integration(t *testing.T) {
+	// set up mock redis
+	// set up
 }

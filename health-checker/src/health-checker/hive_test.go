@@ -17,9 +17,9 @@ func Test_weCanQueryMultipleUsers(t *testing.T) {
 		addresses = append(addresses, "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9")
 	}
 
-	hive := Hive{}
+	hive := Hive{hiveEndpoint}
 
-	result, err := hive.FetchBatch(hiveEndpoint, redbankAddress, addresses)
+	result, err := hive.FetchBatch(redbankAddress, addresses)
 
 	if err != nil {
 		t.Errorf("Error occured during request: %s", err)
