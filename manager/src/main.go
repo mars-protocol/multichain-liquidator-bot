@@ -58,8 +58,17 @@ func main() {
 	// Construct the service
 	logger.Info("Setting up manager")
 
-	// TODO Create monitor
-	// TODO Run monitor
+	// TODO Set up the deployer, AWS or Docker
+	// TODO 	Deployer needs the container images for collector, health-checker
+	// TODO 	and liquidator
+	// TODO Set up the scaler with the given deployer
+	// TODO 	Scaler requires the Redis queues for collector, health-checker
+	// TODO		and liquidator
+	// TODO Set up the manager with the scaler
+	// TODO 	Manager requires an RPC websocket for being notified of new
+	// TODO 	blocks. It also needs to check whether the current amount of
+	// TODO 	collectors are able to query all the possible positions
+	// TODO Run manager
 
 	// Handle stop signals
 	go func() {
