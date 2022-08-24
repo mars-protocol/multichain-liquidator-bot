@@ -59,7 +59,7 @@ func New(
 	}, nil
 }
 
-// Generate an execute function for our Jobs, because
+// Generate an execute function for our Jobs
 func (s HealthChecker) getExeuteFunction(redbankAddress string) func(ctx context.Context, args interface{}) (interface{}, error) {
 	execute := func(
 		ctx context.Context,
@@ -176,7 +176,7 @@ func (s HealthChecker) Run() error {
 			return err
 		}
 
-		// fetch unhealthy positions
+		// Dispatch workers to fetch position statuses
 		jobs := s.generateJobs(addresses, s.addressesPerJob)
 		totalPositions, results := s.RunWorkerPool(10, jobs)
 

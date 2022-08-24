@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	// test params
 	jobsCount   = 20
 	workerCount = 10
 )

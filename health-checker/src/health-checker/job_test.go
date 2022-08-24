@@ -15,6 +15,8 @@ var (
 			"bar":     "bar",
 		},
 	}
+
+	// simple mock execution to mock some work
 	execFn = func(ctx context.Context, args interface{}) (interface{}, error) {
 
 		argVal, ok := args.(int)
