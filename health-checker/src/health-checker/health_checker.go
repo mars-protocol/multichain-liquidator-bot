@@ -114,6 +114,30 @@ func (s HealthChecker) generateJobs(addressList []string, addressesPerJob int) [
 	return jobs
 }
 
+// Filter unhealthy positions into array of byte arrays.
+// TODO handle different liquidation types (e.g redbank, rover). Currently we only store address
+func (s HealthChecker) produceUnhealthyAddresses(results []BatchEventsResponse) [][]byte {
+
+	var unhealthyAddresses [][]byte
+	for _, batch := range results {
+		for _, position := range batch {
+			i, err := strconv.ParseFloat(position.Data.Wasm.ContractQuery.HealthStatus.Borrowing, 32)
+			if err != nil {
+				s.logger.Errorf("An Error Occurred decoding health status. %v", err)
+			} else if i < 1 {
+				address, decodeError := hex.DecodeString(position.UserAddress)
+				if decodeError == nil {
+					unhealthyAddresses = append(unhealthyAddresses, address)
+				} else {
+					s.logger.Errorf("An Error Occurred decoding user address. %v", err)
+				}
+			}
+		}
+	}
+
+	return unhealthyAddresses
+}
+
 // Runs until interrupted
 func (s HealthChecker) Run() error {
 	err := s.queue.Connect()
@@ -164,25 +188,7 @@ func (s HealthChecker) Run() error {
 			}).Warn("Failed to load all positions")
 		}
 
-		// Filter unhealthy positions into array of byte arrays.
-		// TODO handle different liquidation types (e.g redbank, rover).
-		// Currently we only store address
-		var unhealthyAddresses [][]byte
-		for _, batch := range results {
-			for _, position := range batch {
-				i, err := strconv.Atoi(position.Data.Wasm.ContractQuery.HealthStatus.Borrowing)
-				if err != nil {
-					s.logger.Errorf("An Error Occurred decoding health status. %v", err)
-				} else if i < 1 {
-					address, decodeError := hex.DecodeString(position.UserAddress)
-					if decodeError == nil {
-						unhealthyAddresses = append(unhealthyAddresses, address)
-					} else {
-						s.logger.Errorf("An Error Occurred decoding user address. %v", err)
-					}
-				}
-			}
-		}
+		unhealthyAddresses := s.produceUnhealthyAddresses(results)
 
 		if len(unhealthyAddresses) > 0 {
 

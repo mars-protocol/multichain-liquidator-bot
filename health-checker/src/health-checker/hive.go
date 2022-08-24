@@ -14,27 +14,36 @@ type BatchQuery struct {
 }
 
 type Hive struct {
-	hiveEndpoint string
+	HiveEndpoint string
+}
+
+type HealthStatus struct {
+	Borrowing string `json:"borrowing"`
+}
+type ContractQuery struct {
+	TotalCollateralInBaseAsset string       `json:"total_collateral_in_base_asset"`
+	TotalDebtInBaseAsset       string       `json:"total_debt_in_base_asset"`
+	HealthStatus               HealthStatus `json:"health_status"`
+}
+type Wasm struct {
+	ContractQuery ContractQuery `json:"contractQuery"`
+}
+type Data struct {
+	Wasm Wasm `json:"wasm"`
+}
+
+type Error struct {
+	Message string `json:"message"`
+}
+
+type UserPosition struct {
+	UserAddress string
+	Data        Data    `json:"data"`
+	Errors      []Error `json:"errors"`
 }
 
 // BatchEventsResponse defines the format for batch position responses
-type BatchEventsResponse []struct {
-	UserAddress string
-	Data        struct {
-		Wasm struct {
-			ContractQuery struct {
-				TotalCollateralInBaseAsset string `json:"total_collateral_in_base_asset"`
-				TotalDebtInBaseAsset       string `json:"total_debt_in_base_asset"`
-				HealthStatus               struct {
-					Borrowing string `json:"borrowing"`
-				} `json:"health_status"`
-			} `json:"contractQuery"`
-		} `json:"wasm"`
-	} `json:"data"`
-	Errors []struct {
-		Message string `json:"message"`
-	} `json:"errors"`
-}
+type BatchEventsResponse []UserPosition
 
 // fetchHiveEvents fetches events from Hive for the given block numbers
 func (hive Hive) FetchBatch(
@@ -66,7 +75,7 @@ func (hive Hive) FetchBatch(
 		return batchEvents, err
 	}
 
-	response, err := http.Post(hive.hiveEndpoint, "application/json", bytes.NewReader(queryBytes))
+	response, err := http.Post(hive.HiveEndpoint, "application/json", bytes.NewReader(queryBytes))
 
 	if err != nil {
 		return batchEvents, err
