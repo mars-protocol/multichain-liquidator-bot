@@ -5,6 +5,7 @@ go 1.18
 replace github.com/mars-protocol/multichain-liquidator-bot/runtime => ../runtime
 
 require (
+	github.com/gorilla/websocket v1.5.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mars-protocol/multichain-liquidator-bot/runtime v0.0.0
 	github.com/sirupsen/logrus v1.9.0

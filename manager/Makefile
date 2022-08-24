@@ -33,6 +33,7 @@ run: build .start_redis ## Build and run the service binary
 	CHAIN_ID="pisco-1" \
 	HIVE_ENDPOINT="https://phoenix-hive.terra.dev/graphql" \
 	RPC_ENDPOINT="https://phoenix-rpc.terra.dev" \
+	RPC_WEBSOCKET_ENDPOINT="wss://rpc.osmosis.zone/websocket" \
 	QUEUE_NAME="testqueue" \
 	REDIS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \

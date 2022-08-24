@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/mars-protocol/multichain-liquidator-bot/monitor/src/manager"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
 	log "github.com/sirupsen/logrus"
 )
@@ -15,9 +16,10 @@ import (
 type Config struct {
 	runtime.BaseConfig
 
-	ChainID      string `envconfig:"CHAIN_ID" required:"true"`
-	HiveEndpoint string `envconfig:"HIVE_ENDPOINT" required:"true"`
-	RPCEndpoint  string `envconfig:"RPC_ENDPOINT" required:"true"`
+	ChainID              string `envconfig:"CHAIN_ID" required:"true"`
+	HiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
+	RPCEndpoint          string `envconfig:"RPC_ENDPOINT" required:"true"`
+	RPCWebsocketEndpoint string `envconfig:"RPC_WEBSOCKET_ENDPOINT" required:"true"`
 
 	QueueName     string `envconfig:"QUEUE_NAME" required:"true"`
 	RedisEndpoint string `envconfig:"REDIS_ENDPOINT" required:"true"`
@@ -69,6 +71,10 @@ func main() {
 	// TODO 	blocks. It also needs to check whether the current amount of
 	// TODO 	collectors are able to query all the possible positions
 	// TODO Run manager
+	service, err := manager.New(config.RPCWebsocketEndpoint, logger)
+	if err != nil {
+		panic(err)
+	}
 
 	// Handle stop signals
 	go func() {
@@ -76,7 +82,15 @@ func main() {
 		logger.WithFields(log.Fields{
 			"signal": sig,
 		}).Info("Received OS signal")
+		service.Stop()
 	}()
+
+	logger.Info("Start service")
+	// Run forever
+	err = service.Run()
+	if err != nil {
+		logger.Fatal(err)
+	}
 
 	logger.Info("Shutdown")
 
