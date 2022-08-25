@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/sirupsen/logrus"
 )
 
@@ -11,6 +12,10 @@ import (
 // for the liquidation bot
 type Manager struct {
 	rpcWebsocketEndpoint string
+	queue                interfaces.Queuer
+	collectorQueueName   string
+	healthCheckQueueName string
+	executorQueueName    string
 
 	logger *logrus.Entry
 
@@ -19,14 +24,33 @@ type Manager struct {
 
 // New creates a new instance of the manager and returns the instance and an
 // error if applicable
-func New(rpcWebsocketEndpoint string, logger *logrus.Entry) (*Manager, error) {
+func New(
+	rpcWebsocketEndpoint string,
+	queue interfaces.Queuer,
+	collectorQueueName string,
+	healthCheckQueueName string,
+	executorQueueName string,
+	logger *logrus.Entry,
+) (*Manager, error) {
 
 	if rpcWebsocketEndpoint == "" {
 		return nil, errors.New("rpcWebsocketEndpoint must not be blank")
 	}
 
+	if queue == nil {
+		return nil, errors.New("queue must be set")
+	}
+
+	if collectorQueueName == "" || healthCheckQueueName == "" || executorQueueName == "" {
+		return nil, errors.New("collectorQueueName, healthCheckQueueName and executorQueueName must not be blank")
+	}
+
 	return &Manager{
 		rpcWebsocketEndpoint: rpcWebsocketEndpoint,
+		queue:                queue,
+		collectorQueueName:   collectorQueueName,
+		healthCheckQueueName: healthCheckQueueName,
+		executorQueueName:    executorQueueName,
 		logger:               logger,
 		continueRunning:      0,
 	}, nil
@@ -34,6 +58,13 @@ func New(rpcWebsocketEndpoint string, logger *logrus.Entry) (*Manager, error) {
 
 // Run the service forever
 func (service *Manager) Run() error {
+	// Ensure we are connected to the queue
+	err := service.queue.Connect()
+	if err != nil {
+		return err
+	}
+	defer service.queue.Disconnect()
+
 	// Set long running routines to run
 	atomic.StoreUint32(&service.continueRunning, 1)
 
@@ -44,16 +75,43 @@ func (service *Manager) Run() error {
 	}
 
 	for newBlock := range newBlockReceiver {
+
 		service.logger.WithFields(logrus.Fields{
 			"height":    newBlock.Result.Data.Value.Block.Header.Height,
 			"timestamp": newBlock.Result.Data.Value.Block.Header.Time,
-		}).Info("Processing new block")
+		}).Debug("Processing new block")
+
+		// At the start of a new block, check if we had any work left for the
+		// collector to do
+		// If there are items left in the queue, we need to scale the collector
+		// If there are no items left, we need to determine if we have too
+		// many collectors running
+		// Clear the items out at the start of a block
+		collectorItemCount, err := service.queue.CountItems("collector_test")
+		if err != nil {
+			return err
+		}
+		service.logger.WithFields(logrus.Fields{
+			"height":     newBlock.Result.Data.Value.Block.Header.Height,
+			"item_count": collectorItemCount,
+		}).Debug("Checked collector queue size")
+
+		// Clear the queue from any remaining work
+		err = service.queue.Purge("collector_test")
+		if err != nil {
+			return err
+		}
 
 		// TODO: Send out new work for the collector
 		// TODO: Send out notification to the scaler to monitor?
 		// TODO: We need to monitor how long ago we received a new block
 		// 		if we don't receive a new block in X seconds, we need to
 		// 		potentially reconnect
+
+		service.logger.WithFields(logrus.Fields{
+			"height":    newBlock.Result.Data.Value.Block.Header.Height,
+			"timestamp": newBlock.Result.Data.Value.Block.Header.Time,
+		}).Info("Block processed")
 	}
 
 	return nil

@@ -30,13 +30,15 @@ run: build .start_redis ## Build and run the service binary
 	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-manager" \
-	CHAIN_ID="pisco-1" \
+	CHAIN_ID="osmosis-1" \
 	HIVE_ENDPOINT="https://phoenix-hive.terra.dev/graphql" \
 	RPC_ENDPOINT="https://phoenix-rpc.terra.dev" \
 	RPC_WEBSOCKET_ENDPOINT="wss://rpc.osmosis.zone/websocket" \
-	QUEUE_NAME="testqueue" \
 	REDIS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
+	COLLECTOR_QUEUE_NAME="collector" \
+	HEALTH_CHECK_QUEUE_NAME="health_check" \
+	EXECUTOR_QUEUE_NAME="executor" \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled

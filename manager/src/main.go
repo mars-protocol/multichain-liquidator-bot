@@ -9,6 +9,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/mars-protocol/multichain-liquidator-bot/monitor/src/manager"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,9 +23,11 @@ type Config struct {
 	RPCEndpoint          string `envconfig:"RPC_ENDPOINT" required:"true"`
 	RPCWebsocketEndpoint string `envconfig:"RPC_WEBSOCKET_ENDPOINT" required:"true"`
 
-	QueueName     string `envconfig:"QUEUE_NAME" required:"true"`
-	RedisEndpoint string `envconfig:"REDIS_ENDPOINT" required:"true"`
-	RedisDatabase int    `envconfig:"REDIS_DATABASE" required:"true"`
+	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
+	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
+	CollectorQueueName   string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
+	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
+	ExecutorQueueName    string `envconfig:"EXECUTOR_QUEUE_NAME" required:"true"`
 }
 
 func main() {
@@ -60,6 +64,17 @@ func main() {
 	// Construct the service
 	logger.Info("Setting up manager")
 
+	// Set up Redis as queue provider
+	var queueProvider interfaces.Queuer
+	queueProvider, err = queue.NewRedis(
+		config.RedisEndpoint,
+		config.RedisDatabase,
+		5, // BLPOP timeout seconds
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	// TODO Set up the deployer, AWS or Docker
 	// TODO 	Deployer needs the container images for collector, health-checker
 	// TODO 	and liquidator
@@ -71,7 +86,14 @@ func main() {
 	// TODO 	blocks. It also needs to check whether the current amount of
 	// TODO 	collectors are able to query all the possible positions
 	// TODO Run manager
-	service, err := manager.New(config.RPCWebsocketEndpoint, logger)
+	service, err := manager.New(
+		config.RPCWebsocketEndpoint,
+		queueProvider,
+		config.CollectorQueueName,
+		config.HealthCheckQueueName,
+		config.ExecutorQueueName,
+		logger,
+	)
 	if err != nil {
 		panic(err)
 	}
