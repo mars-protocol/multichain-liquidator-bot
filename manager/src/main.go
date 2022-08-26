@@ -80,7 +80,8 @@ func main() {
 	// TODO Set up the deployer, AWS or Docker
 	// TODO 	Deployer needs the container images for collector, health-checker
 	// TODO 	and liquidator
-	collectorDeployer, err := deployer.NewDocker("collector", "testcontainer", logger)
+	containerEnv := make(map[string]string)
+	collectorDeployer, err := deployer.NewDocker("collector", "redis:latest", containerEnv, logger)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -89,8 +90,8 @@ func main() {
 		queueProvider,
 		config.CollectorQueueName,
 		collectorDeployer,
-		10,
-		50,
+		0, // Scale down when we have no items in the queue
+		1, // Scale up when we have 1 or more items in the queue
 		logger,
 	)
 	if err != nil {

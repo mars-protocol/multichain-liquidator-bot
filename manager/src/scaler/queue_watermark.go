@@ -50,8 +50,8 @@ func NewQueueWatermark(
 		return nil, errors.New("a deployer must be provided")
 	}
 
-	if lowWaterMark == 0 || highWaterMark == 0 {
-		return nil, errors.New("low and high watermarks must be larger than zero")
+	if highWaterMark == 0 {
+		return nil, errors.New("high watermarks must be larger than zero")
 	}
 
 	return &QueueWatermark{
@@ -89,8 +89,13 @@ func (qwm *QueueWatermark) ScaleAutomatic() (string, bool, error) {
 		"item_count": itemCount,
 	}).Debug("Checked queue size")
 
+	// TODO Need to rethink the logic here, if we scale down when there are
+	// no items in the queue, we might end up with a up/down loop if we
+	// are processing everything just in time
+	// If low watermark is zero, we'll never scale down
+
 	// If the item count has dropped below the low watermark, we can scale down
-	if itemCount <= qwm.lowWaterMark {
+	if itemCount < qwm.lowWaterMark {
 		return "down", true, qwm.deployer.Decrease()
 	}
 

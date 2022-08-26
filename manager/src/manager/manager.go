@@ -137,5 +137,6 @@ func (service *Manager) Run() error {
 func (service *Manager) Stop() error {
 	// Block long running routines from continuing
 	atomic.StoreUint32(&service.continueRunning, 0)
-	return nil
+	// Remove all collector services
+	return service.collectorScaler.ScaleToZero()
 }
