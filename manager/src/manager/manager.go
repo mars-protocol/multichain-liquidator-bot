@@ -4,8 +4,10 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/sirupsen/logrus"
+
+	managerinterfaces "github.com/mars-protocol/multichain-liquidator-bot/monitor/src/interfaces"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 )
 
 // Manager implements the management service for the collection of services
@@ -16,6 +18,8 @@ type Manager struct {
 	collectorQueueName   string
 	healthCheckQueueName string
 	executorQueueName    string
+
+	collectorScaler managerinterfaces.Scaler
 
 	logger *logrus.Entry
 
@@ -30,6 +34,7 @@ func New(
 	collectorQueueName string,
 	healthCheckQueueName string,
 	executorQueueName string,
+	collectorScaler managerinterfaces.Scaler,
 	logger *logrus.Entry,
 ) (*Manager, error) {
 
@@ -45,12 +50,17 @@ func New(
 		return nil, errors.New("collectorQueueName, healthCheckQueueName and executorQueueName must not be blank")
 	}
 
+	if collectorScaler == nil {
+		return nil, errors.New("collectorScaler must be provided")
+	}
+
 	return &Manager{
 		rpcWebsocketEndpoint: rpcWebsocketEndpoint,
 		queue:                queue,
 		collectorQueueName:   collectorQueueName,
 		healthCheckQueueName: healthCheckQueueName,
 		executorQueueName:    executorQueueName,
+		collectorScaler:      collectorScaler,
 		logger:               logger,
 		continueRunning:      0,
 	}, nil
@@ -74,6 +84,7 @@ func (service *Manager) Run() error {
 		return err
 	}
 
+	// Read new blocks from the channel until the channel is closed
 	for newBlock := range newBlockReceiver {
 
 		service.logger.WithFields(logrus.Fields{
@@ -87,17 +98,20 @@ func (service *Manager) Run() error {
 		// If there are no items left, we need to determine if we have too
 		// many collectors running
 		// Clear the items out at the start of a block
-		collectorItemCount, err := service.queue.CountItems("collector_test")
+		scaleDirection, shouldScale, err := service.collectorScaler.ScaleAutomatic()
 		if err != nil {
 			return err
 		}
-		service.logger.WithFields(logrus.Fields{
-			"height":     newBlock.Result.Data.Value.Block.Header.Height,
-			"item_count": collectorItemCount,
-		}).Debug("Checked collector queue size")
+
+		if shouldScale {
+			service.logger.WithFields(logrus.Fields{
+				"height":    newBlock.Result.Data.Value.Block.Header.Height,
+				"direction": scaleDirection,
+			}).Debug("Service is scaling")
+		}
 
 		// Clear the queue from any remaining work
-		err = service.queue.Purge("collector_test")
+		err = service.queue.Purge(service.collectorQueueName)
 		if err != nil {
 			return err
 		}

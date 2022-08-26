@@ -7,7 +7,9 @@ import (
 	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/mars-protocol/multichain-liquidator-bot/monitor/src/deployer"
 	"github.com/mars-protocol/multichain-liquidator-bot/monitor/src/manager"
+	"github.com/mars-protocol/multichain-liquidator-bot/monitor/src/scaler"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
@@ -78,6 +80,19 @@ func main() {
 	// TODO Set up the deployer, AWS or Docker
 	// TODO 	Deployer needs the container images for collector, health-checker
 	// TODO 	and liquidator
+	collectorDeployer, err := deployer.NewDocker("testcontainer", logger)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	collectorScaler, err := scaler.NewQueueWatermark(
+		queueProvider,
+		config.CollectorQueueName,
+		collectorDeployer,
+		10,
+		50,
+		logger,
+	)
 	// TODO Set up the scaler with the given deployer
 	// TODO 	Scaler requires the Redis queues for collector, health-checker
 	// TODO		and liquidator
@@ -92,6 +107,7 @@ func main() {
 		config.CollectorQueueName,
 		config.HealthCheckQueueName,
 		config.ExecutorQueueName,
+		collectorScaler,
 		logger,
 	)
 	if err != nil {
