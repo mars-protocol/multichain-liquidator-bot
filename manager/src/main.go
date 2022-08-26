@@ -80,7 +80,7 @@ func main() {
 	// TODO Set up the deployer, AWS or Docker
 	// TODO 	Deployer needs the container images for collector, health-checker
 	// TODO 	and liquidator
-	collectorDeployer, err := deployer.NewDocker("testcontainer", logger)
+	collectorDeployer, err := deployer.NewDocker("collector", "testcontainer", logger)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -93,6 +93,9 @@ func main() {
 		50,
 		logger,
 	)
+	if err != nil {
+		logger.Fatal(err)
+	}
 	// TODO Set up the scaler with the given deployer
 	// TODO 	Scaler requires the Redis queues for collector, health-checker
 	// TODO		and liquidator
