@@ -20,6 +20,7 @@ func (service *Manager) newBlockReceiver(
 	if err != nil {
 		return nil, err
 	}
+	service.logger.Info("Websocket connected")
 
 	// Construct the request to subscribe to new block events
 	subscribeRequest := RPCMethodRequest{
