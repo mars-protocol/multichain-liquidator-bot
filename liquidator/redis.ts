@@ -2,13 +2,13 @@
 import { commandOptions, RedisClientType } from '@redis/client';
 import { createClient } from 'redis';
 
-interface IRedisInterface {
+export interface IRedisInterface {
     connect() : Promise<RedisClientType>
     fetchUnhealthyAddresses() : string[]
 }
 
 
-class RedisInterface implements IRedisInterface {
+export class RedisInterface implements IRedisInterface {
 
     LIQUIDATION_QUEUE_NAME : string = process.env.LIQUIDATION_QUEUE_NAME!
 
