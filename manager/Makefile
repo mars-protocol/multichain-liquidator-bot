@@ -41,12 +41,20 @@ run: build .start_redis ## Build and run the service binary
 	EXECUTOR_QUEUE_NAME="executor" \
 	./bin/${APP_NAME}
 
-run_race: ## Run the service with race condition checking enabled
+run_race: .start_redis ## Run the service with race condition checking enabled
 	# Add your environment variable here
 	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
-	SERVICE_NAME="bot-collector" \
-	CHAIN_ID="pisco-1" \
+	SERVICE_NAME="bot-manager" \
+	CHAIN_ID="osmosis-1" \
+	HIVE_ENDPOINT="https://phoenix-hive.terra.dev/graphql" \
+	RPC_ENDPOINT="https://phoenix-rpc.terra.dev" \
+	RPC_WEBSOCKET_ENDPOINT="wss://rpc.osmosis.zone/websocket" \
+	REDIS_DATABASE=0 \
+	REDIS_ENDPOINT="127.0.0.1:6379" \
+	COLLECTOR_QUEUE_NAME="collector" \
+	HEALTH_CHECK_QUEUE_NAME="health_check" \
+	EXECUTOR_QUEUE_NAME="executor" \
 	go run -race ./src/*.go
 
 docker_build: build ## Build the service Docker container
