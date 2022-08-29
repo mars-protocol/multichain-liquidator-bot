@@ -80,6 +80,9 @@ func (dep *Docker) Increase() error {
 		},
 		&container.HostConfig{
 			AutoRemove: true,
+			RestartPolicy: container.RestartPolicy{
+				MaximumRetryCount: 0,
+			},
 		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},

@@ -6,7 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	managerinterfaces "github.com/mars-protocol/multichain-liquidator-bot/monitor/src/interfaces"
+	managerinterfaces "github.com/mars-protocol/multichain-liquidator-bot/manager/src/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 )
 
@@ -146,5 +146,7 @@ func (qwm *QueueWatermark) ScaleDown() error {
 
 // ScaleToZero scales the service down to zero instances
 func (qwm *QueueWatermark) ScaleToZero() error {
+	// Scale to zero won't work with a minimum service count
+	qwm.minimumServiceCount = 0
 	return qwm.deployer.RemoveAll()
 }
