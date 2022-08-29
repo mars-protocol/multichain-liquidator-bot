@@ -2,6 +2,7 @@ package scaler
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 
@@ -13,11 +14,12 @@ import (
 // active services fall between the given watermark levels based on queue
 // sizes
 type QueueWatermark struct {
-	queue         interfaces.Queuer
-	queueName     string
-	deployer      managerinterfaces.Deployer
-	lowWaterMark  int
-	highWaterMark int
+	queue               interfaces.Queuer
+	queueName           string
+	deployer            managerinterfaces.Deployer
+	lowWaterMark        int
+	highWaterMark       int
+	minimumServiceCount int
 
 	logger *logrus.Entry
 }
@@ -35,6 +37,7 @@ func NewQueueWatermark(
 	deployer managerinterfaces.Deployer,
 	lowWaterMark int,
 	highWaterMark int,
+	minimumServiceCount int,
 	logger *logrus.Entry,
 ) (*QueueWatermark, error) {
 
@@ -55,11 +58,12 @@ func NewQueueWatermark(
 	}
 
 	return &QueueWatermark{
-		queue:         queue,
-		queueName:     queueName,
-		deployer:      deployer,
-		lowWaterMark:  lowWaterMark,
-		highWaterMark: highWaterMark,
+		queue:               queue,
+		queueName:           queueName,
+		deployer:            deployer,
+		lowWaterMark:        lowWaterMark,
+		highWaterMark:       highWaterMark,
+		minimumServiceCount: minimumServiceCount,
 		logger: logger.WithFields(logrus.Fields{
 			"subservice": "scaler",
 			"type":       "queuewatermark",
@@ -79,6 +83,17 @@ func (qwm *QueueWatermark) ScaleAutomatic() (string, bool, error) {
 		return "none", false, nil
 	}
 
+	// If a minimum service count should be enforced, ensure we comply
+	if qwm.minimumServiceCount > 0 {
+		currentServiceCount, err := qwm.deployer.Count()
+		if err != nil {
+			return "none", false, err
+		}
+		if currentServiceCount < qwm.minimumServiceCount {
+			return "up", true, qwm.ScaleUp()
+		}
+	}
+
 	// Check the amount of items in the queue and determine whether we should
 	// scale up or down
 	itemCount, err := qwm.queue.CountItems(qwm.queueName)
@@ -96,12 +111,12 @@ func (qwm *QueueWatermark) ScaleAutomatic() (string, bool, error) {
 
 	// If the item count has dropped below the low watermark, we can scale down
 	if itemCount < qwm.lowWaterMark {
-		return "down", true, qwm.deployer.Decrease()
+		return "down", true, qwm.ScaleDown()
 	}
 
 	// If the item count has risen above the high watermark, we can scale up
 	if itemCount >= qwm.highWaterMark {
-		return "up", true, qwm.deployer.Increase()
+		return "up", true, qwm.ScaleUp()
 	}
 
 	return "none", false, err
@@ -114,6 +129,18 @@ func (qwm *QueueWatermark) ScaleUp() error {
 
 // ScaleDown scales the service down by one instance
 func (qwm *QueueWatermark) ScaleDown() error {
+	currentServiceCount, err := qwm.deployer.Count()
+	if err != nil {
+		return err
+	}
+	proposedServiceCount := currentServiceCount - 1
+	if proposedServiceCount < qwm.minimumServiceCount {
+		return fmt.Errorf(
+			"unable to scale down, proposed count of %d is lower than minimum of %d",
+			proposedServiceCount,
+			qwm.minimumServiceCount,
+		)
+	}
 	return qwm.deployer.Decrease()
 }
 
