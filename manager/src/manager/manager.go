@@ -9,7 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	managerinterfaces "github.com/mars-protocol/multichain-liquidator-bot/monitor/src/interfaces"
+	managerinterfaces "github.com/mars-protocol/multichain-liquidator-bot/manager/src/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 )
 
@@ -21,7 +21,7 @@ type Manager struct {
 	collectorQueueName   string
 	healthCheckQueueName string
 	executorQueueName    string
-	collectorScaler      managerinterfaces.Scaler
+	scalers              map[string]managerinterfaces.Scaler
 
 	logger *logrus.Entry
 
@@ -40,7 +40,7 @@ func New(
 	collectorQueueName string,
 	healthCheckQueueName string,
 	executorQueueName string,
-	collectorScaler managerinterfaces.Scaler,
+	scalers map[string]managerinterfaces.Scaler,
 	logger *logrus.Entry,
 ) (*Manager, error) {
 
@@ -56,8 +56,8 @@ func New(
 		return nil, errors.New("collectorQueueName, healthCheckQueueName and executorQueueName must not be blank")
 	}
 
-	if collectorScaler == nil {
-		return nil, errors.New("collectorScaler must be provided")
+	if scalers == nil {
+		return nil, errors.New("you must provide scalers to the manager")
 	}
 
 	return &Manager{
@@ -66,7 +66,7 @@ func New(
 		collectorQueueName:   collectorQueueName,
 		healthCheckQueueName: healthCheckQueueName,
 		executorQueueName:    executorQueueName,
-		collectorScaler:      collectorScaler,
+		scalers:              scalers,
 		logger:               logger,
 		lastBlockTime:        time.Now(),
 		continueRunning:      0,
@@ -122,22 +122,25 @@ func (service *Manager) Run() error {
 
 		// At the start of a new block, check if we had any work left for the
 		// collector to do
-		// If there are items left in the queue, we need to scale the collector
+		// If there are items left in the queue, we need to scale the service
 		// If there are no items left, we need to determine if we have too
-		// many collectors running
-		// Clear the items out at the start of a block
-		scaleDirection, shouldScale, err := service.collectorScaler.ScaleAutomatic()
-		if err != nil {
-			return err
+		// many services running
+		for scalerName, scaler := range service.scalers {
+			scaleDirection, shouldScale, err := scaler.ScaleAutomatic()
+			if err != nil {
+				return err
+			}
+
+			if shouldScale {
+				service.logger.WithFields(logrus.Fields{
+					"scaler":    scalerName,
+					"height":    newBlock.Result.Data.Value.Block.Header.Height,
+					"direction": scaleDirection,
+				}).Debug("Service is scaling")
+			}
 		}
 
-		if shouldScale {
-			service.logger.WithFields(logrus.Fields{
-				"height":    newBlock.Result.Data.Value.Block.Header.Height,
-				"direction": scaleDirection,
-			}).Debug("Service is scaling")
-		}
-
+		// TODO: Can we move this somewhere else
 		// Clear the queue from any remaining work
 		err = service.queue.Purge(service.collectorQueueName)
 		if err != nil {
@@ -188,6 +191,9 @@ func (service *Manager) monitorBlocksReceived() error {
 func (service *Manager) Stop() error {
 	// Block long running routines from continuing
 	atomic.StoreUint32(&service.continueRunning, 0)
-	// Remove all collector services
-	return service.collectorScaler.ScaleToZero()
+	// Remove all services
+	for _, scaler := range service.scalers {
+		scaler.ScaleToZero()
+	}
+	return nil
 }

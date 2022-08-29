@@ -7,13 +7,24 @@ import (
 	"syscall"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/mars-protocol/multichain-liquidator-bot/monitor/src/deployer"
-	"github.com/mars-protocol/multichain-liquidator-bot/monitor/src/manager"
-	"github.com/mars-protocol/multichain-liquidator-bot/monitor/src/scaler"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/mars-protocol/multichain-liquidator-bot/manager/src/deployer"
+	managerinterfaces "github.com/mars-protocol/multichain-liquidator-bot/manager/src/interfaces"
+	"github.com/mars-protocol/multichain-liquidator-bot/manager/src/manager"
+	"github.com/mars-protocol/multichain-liquidator-bot/manager/src/scaler"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
-	log "github.com/sirupsen/logrus"
+)
+
+const (
+	// DeployerTypeDocker is for deployments using Docker
+	DeployerTypeDocker = "docker"
+	// DeployerTypeECS is for deployments using AWS Elastic Container Service
+	DeployerTypeECS = "aws-ecs"
+	// ScalingTypeWatermark scales based on watermark levels
+	ScalingTypeWatermark = "watermark"
 )
 
 // Config defines the environment variables for the service
@@ -30,6 +41,13 @@ type Config struct {
 	CollectorQueueName   string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
 	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
 	ExecutorQueueName    string `envconfig:"EXECUTOR_QUEUE_NAME" required:"true"`
+
+	DeployerType       string `envconfig:"DEPLOYER_TYPE" required:"true"`
+	CollectorImage     string `envconfig:"COLLECTOR_IMAGE" required:"true"`
+	HealthCheckerImage string `envconfig:"HEALTH_CHECKER_IMAGE" required:"true"`
+	ExecutorImage      string `envconfig:"EXECUTOR_IMAGE" required:"true"`
+
+	ScalingType string `envconfig:"SCALING_TYPE" required:"true"`
 }
 
 func main() {
@@ -77,27 +95,109 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	// TODO Set up the deployer, AWS or Docker
-	// TODO 	Deployer needs the container images for collector, health-checker
-	// TODO 	and liquidator
-	containerEnv := make(map[string]string)
-	collectorDeployer, err := deployer.NewDocker("collector", "redis:latest", containerEnv, logger)
-	if err != nil {
-		logger.Fatal(err)
+	// Define all the deployers
+	var collectorDeployer managerinterfaces.Deployer
+	var healthCheckerDeployer managerinterfaces.Deployer
+	var executorDeployer managerinterfaces.Deployer
+
+	// We provide a map of scalers to the manager as we don't care about
+	// individual scalers but rather that everything is handled in the
+	// same manner each block
+	scalers := make(map[string]managerinterfaces.Scaler)
+
+	// Set up the deployer, AWS or Docker
+	// The deployers need the container images for collector, health-checker
+	// and liquidator
+	switch strings.ToLower(config.DeployerType) {
+	case DeployerTypeDocker:
+		containerEnv := make(map[string]string)
+
+		// Set up the collector's deployer
+		collectorDeployer, err = deployer.NewDocker(
+			"collector",
+			config.CollectorImage,
+			containerEnv,
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		// Set up the health checker's deployer
+		healthCheckerDeployer, err = deployer.NewDocker(
+			"health-checker",
+			config.HealthCheckerImage,
+			containerEnv,
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		// Set up the executor's deployer
+		executorDeployer, err = deployer.NewDocker(
+			"executor",
+			config.ExecutorImage,
+			containerEnv,
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+	case DeployerTypeECS:
+	default:
+		logger.Fatal("Invalid deployer type specified: ", config.DeployerType)
+
 	}
 
-	collectorScaler, err := scaler.NewQueueWatermark(
-		queueProvider,
-		config.CollectorQueueName,
-		collectorDeployer,
-		0, // Scale down when we have no items in the queue
-		1, // Scale up when we have 1 or more items in the queue
-		1, // Minimum number of services
-		logger,
-	)
-	if err != nil {
-		logger.Fatal(err)
+	switch strings.ToLower(config.ScalingType) {
+	case ScalingTypeWatermark:
+		// Set up the collector's scaler with the given deployer
+		scalers["collector"], err = scaler.NewQueueWatermark(
+			queueProvider,
+			config.CollectorQueueName,
+			collectorDeployer,
+			0, // Scale down when we have no items in the queue
+			1, // Scale up when we have 1 or more items in the queue
+			1, // Minimum number of services
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		// Set up the health checker's scaler with the given deployer
+		scalers["health-check"], err = scaler.NewQueueWatermark(
+			queueProvider,
+			config.HealthCheckQueueName,
+			healthCheckerDeployer,
+			0,   // Scale down when we have no items in the queue
+			100, // Scale up when we have 1 or more items in the queue
+			1,   // Minimum number of services
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		// Set up the executor's scaler with the given deployer
+		scalers["executor"], err = scaler.NewQueueWatermark(
+			queueProvider,
+			config.ExecutorQueueName,
+			executorDeployer,
+			0,  // Scale down when we have no items in the queue
+			50, // Scale up when we have 1 or more items in the queue
+			1,  // Minimum number of services
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+	default:
+		logger.Fatal("Invalid scaling type specified: ", config.ScalingType)
 	}
+
 	// TODO Set up the scaler with the given deployer
 	// TODO 	Scaler requires the Redis queues for collector, health-checker
 	// TODO		and liquidator
@@ -112,7 +212,7 @@ func main() {
 		config.CollectorQueueName,
 		config.HealthCheckQueueName,
 		config.ExecutorQueueName,
-		collectorScaler,
+		scalers,
 		logger,
 	)
 	if err != nil {

@@ -39,6 +39,11 @@ run: build .start_redis ## Build and run the service binary
 	COLLECTOR_QUEUE_NAME="collector" \
 	HEALTH_CHECK_QUEUE_NAME="health_check" \
 	EXECUTOR_QUEUE_NAME="executor" \
+	DEPLOYER_TYPE="docker" \
+	COLLECTOR_IMAGE=redis:latest \
+	HEALTH_CHECKER_IMAGE=redis:latest \
+	EXECUTOR_IMAGE=redis:latest \
+	SCALING_TYPE="watermark" \
 	./bin/${APP_NAME}
 
 run_race: .start_redis ## Run the service with race condition checking enabled

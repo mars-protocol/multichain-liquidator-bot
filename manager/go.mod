@@ -1,4 +1,4 @@
-module github.com/mars-protocol/multichain-liquidator-bot/monitor
+module github.com/mars-protocol/multichain-liquidator-bot/manager
 
 go 1.18
 
