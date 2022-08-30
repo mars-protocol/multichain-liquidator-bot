@@ -45,6 +45,8 @@ type UserPosition struct {
 type UserResult struct {
 	Address       string
 	ContractQuery ContractQuery
+	Debts         []Asset
+	Collateral    []Asset
 }
 
 // BatchEventsResponse defines the format for batch position responses
@@ -53,27 +55,32 @@ type BatchEventsResponse []UserPosition
 // fetchHiveEvents fetches events from Hive for the given block numbers
 func (hive Hive) FetchBatch(
 	contractAddress string,
-	addresses []string,
+	positions []Position,
 ) ([]UserResult, error) {
+	fmt.Println("MADE IT TO HERE")
 
 	var userResults []UserResult
 	var batchEvents BatchEventsResponse
+	positonMap := make(map[string]Position)
 
-	// Batch all the blocknumbers into a single request
 	var queries []BatchQuery
-	for _, address := range addresses {
+	for _, position := range positions {
+
+		// store addresses in this local map so that we can easily add debts and collateral later
+		positonMap[position.Address] = position
 		batchQuery := BatchQuery{
 			Query: fmt.Sprintf(`query($contractAddress: String! $userAddress: String!) {
                         %s:wasm {
 							contractQuery(contractAddress: $contractAddress, query: { user_position : { user_address: $userAddress } })
 						}
-                    }`, address),
+                    }`, position.Address),
 			Variables: map[string]interface{}{
 				"contractAddress": contractAddress,
-				"userAddress":     address,
+				"userAddress":     position.Address,
 			},
 		}
 		queries = append(queries, batchQuery)
+		fmt.Println(batchQuery)
 	}
 
 	queryBytes, err := json.Marshal(queries)
@@ -101,9 +108,14 @@ func (hive Hive) FetchBatch(
 	for _, event := range batchEvents {
 		// event.Data is now the address[contractQuery] map
 		for address, data := range event.Data {
+			fmt.Println(address, data)
+
+			position := positonMap[address]
 			userResults = append(userResults, UserResult{
 				Address:       address,
 				ContractQuery: data.ContractQuery,
+				Debts:         position.Debts,
+				Collateral:    position.Collateral,
 			})
 		}
 	}

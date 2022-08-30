@@ -32,6 +32,17 @@ var (
 	errDefault = errors.New("wrong argument type")
 )
 
+type Position struct {
+	Address    string  `json:"address"`
+	Debts      []Asset `json:"debts"`
+	Collateral []Asset `json:"collateral"`
+}
+
+type Asset struct {
+	Token  string  `json:"token"`
+	Amount float64 `json:"amount"`
+}
+
 func New(
 	queue interfaces.Queuer,
 	hive Hive,
@@ -65,12 +76,12 @@ func (s HealthChecker) getExeuteFunction(redbankAddress string) func(ctx context
 	execute := func(
 		ctx context.Context,
 		args interface{}) (interface{}, error) {
-		addresses, ok := args.([]string)
+		positions, ok := args.([]Position)
 		if !ok {
 			return nil, errDefault
 		}
 
-		batchResults, err := s.hive.FetchBatch(redbankAddress, addresses)
+		batchResults, err := s.hive.FetchBatch(redbankAddress, positions)
 
 		if err != nil {
 			return nil, err
@@ -84,22 +95,22 @@ func (s HealthChecker) getExeuteFunction(redbankAddress string) func(ctx context
 
 // Generate a list of jobs. Each job represents a batch of requests for N number
 // of address health status'
-func (s HealthChecker) generateJobs(addressList []string, addressesPerJob int) []Job {
+func (s HealthChecker) generateJobs(positionList []Position, addressesPerJob int) []Job {
 
-	numberOfAddresses := len(addressList)
+	numberOfAddresses := len(positionList)
 
 	jobs := []Job{}
-
 	// Slice our address into jobs, each job fetching N number of addresses
-	for i := 0; i < len(addressList); i += addressesPerJob {
+	for i := 0; i < len(positionList); i += addressesPerJob {
 
 		remainingAddresses := float64(numberOfAddresses - i)
 		maxAddresses := float64(addressesPerJob)
 		sliceEnd := i + int(math.Min(remainingAddresses, maxAddresses))
 
-		addressSubSlice := addressList[i:sliceEnd]
+		positionsSubSlice := positionList[i:sliceEnd]
 
-		if len(addressSubSlice) > 0 {
+		if len(positionsSubSlice) > 0 {
+
 			// insert job
 			jobs = append(jobs, Job{
 				Descriptor: JobDescriptor{
@@ -108,7 +119,7 @@ func (s HealthChecker) generateJobs(addressList []string, addressesPerJob int) [
 					Metadata: nil,
 				},
 				ExecFn: s.getExeuteFunction(s.redbankAddress),
-				Args:   addressSubSlice,
+				Args:   positionsSubSlice,
 			})
 		}
 	}
@@ -117,7 +128,7 @@ func (s HealthChecker) generateJobs(addressList []string, addressesPerJob int) [
 
 // Filter unhealthy positions into array of byte arrays.
 // TODO handle different liquidation types (e.g redbank, rover). Currently we only store address
-func (s HealthChecker) produceUnhealthyAddresses(results []UserResult) [][]byte {
+func (s HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte {
 	var unhealthyAddresses [][]byte
 	for _, userResult := range results {
 		ltv, err := strconv.ParseFloat(userResult.ContractQuery.HealthStatus.Borrowing, 32)
@@ -164,9 +175,9 @@ func (s HealthChecker) Run() error {
 
 		start := time.Now()
 
-		var addresses []string
+		var positions []Position
 		for _, item := range items {
-			err = json.Unmarshal(item, &addresses)
+			err = json.Unmarshal(item, &positions)
 		}
 
 		if err != nil {
@@ -175,14 +186,14 @@ func (s HealthChecker) Run() error {
 		}
 
 		// Dispatch workers to fetch position statuses
-		jobs := s.generateJobs(addresses, s.addressesPerJob)
+		jobs := s.generateJobs(positions, s.addressesPerJob)
 		userResults, success := s.RunWorkerPool(jobs)
 
 		// A warning incase we do not successfully load data for all positions.
 		// This will likely not occur but it it does is important we notice.
-		if len(userResults) < len(addresses) {
+		if len(userResults) < len(positions) {
 			s.logger.WithFields(logrus.Fields{
-				"missed": len(addresses) - len(userResults),
+				"missed": len(positions) - len(userResults),
 			}).Warn("Failed to load all positions")
 		}
 
@@ -190,7 +201,7 @@ func (s HealthChecker) Run() error {
 			s.logger.Errorf("Worker pool execution returned false. ")
 		}
 
-		unhealthyAddresses := s.produceUnhealthyAddresses(userResults)
+		unhealthyAddresses := s.produceUnhealthyPositions(userResults)
 
 		if len(unhealthyAddresses) > 0 {
 
@@ -205,7 +216,7 @@ func (s HealthChecker) Run() error {
 		}
 
 		s.logger.WithFields(logrus.Fields{
-			"total":      len(addresses),
+			"total":      len(positions),
 			"elapsed_ms": time.Since(start).Milliseconds(),
 		}).Debug("Fetched contract items")
 
@@ -231,6 +242,7 @@ func (s HealthChecker) RunWorkerPool(jobs []Job) ([]UserResult, bool) {
 	for {
 		select {
 		case r, ok := <-wp.Results():
+
 			if !ok {
 				fmt.Println(fmt.Errorf("An unknown error occurred fetching data."))
 				continue
@@ -243,11 +255,7 @@ func (s HealthChecker) RunWorkerPool(jobs []Job) ([]UserResult, bool) {
 			}
 
 			val := r.Value.([]UserResult)
-
-			for _, userResult := range val {
-				results = append(results, userResult)
-
-			}
+			results = append(results, val...)
 		case <-wp.Done:
 			// We return totalPositionsFetched to verify we found all addresses
 			return results, true
