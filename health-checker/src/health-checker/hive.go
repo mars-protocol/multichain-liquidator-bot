@@ -57,7 +57,6 @@ func (hive Hive) FetchBatch(
 	contractAddress string,
 	positions []Position,
 ) ([]UserResult, error) {
-	fmt.Println("MADE IT TO HERE")
 
 	var userResults []UserResult
 	var batchEvents BatchEventsResponse
@@ -80,7 +79,6 @@ func (hive Hive) FetchBatch(
 			},
 		}
 		queries = append(queries, batchQuery)
-		fmt.Println(batchQuery)
 	}
 
 	queryBytes, err := json.Marshal(queries)
@@ -108,7 +106,6 @@ func (hive Hive) FetchBatch(
 	for _, event := range batchEvents {
 		// event.Data is now the address[contractQuery] map
 		for address, data := range event.Data {
-			fmt.Println(address, data)
 
 			position := positonMap[address]
 			userResults = append(userResults, UserResult{

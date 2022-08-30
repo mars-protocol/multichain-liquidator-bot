@@ -44,7 +44,6 @@ func InitiatePool(wcount int) WorkerPool {
 
 func (wp WorkerPool) Run(ctx context.Context) {
 	var wg sync.WaitGroup
-	fmt.Printf("Workers are %d\n", wp.workersCount)
 	for i := 0; i < wp.workersCount; i++ {
 		wg.Add(1)
 		// fan out worker goroutines

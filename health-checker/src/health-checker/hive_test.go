@@ -37,7 +37,6 @@ func Test_weCanQueryMultipleUsers(t *testing.T) {
 	if expectedLength != actualLength {
 		t.Errorf("Length was incorrect. Expected %d but got %d", expectedLength, actualLength)
 	}
-	fmt.Println(result[0])
 	intLTV := 0
 	fmt.Sscan(result[batchSize/2].ContractQuery.HealthStatus.Borrowing, &intLTV)
 	if intLTV <= 0 {
