@@ -160,7 +160,8 @@ func (s HealthChecker) Run() error {
 		}
 
 		if items == nil {
-			// No items yet
+			// No items yet, sleep to prevent spam of fetch many
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
