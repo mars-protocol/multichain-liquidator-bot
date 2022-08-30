@@ -2,7 +2,6 @@ package health_checker
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -129,22 +128,23 @@ func (s HealthChecker) generateJobs(positionList []Position, addressesPerJob int
 // Filter unhealthy positions into array of byte arrays.
 // TODO handle different liquidation types (e.g redbank, rover). Currently we only store address
 func (s HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte {
-	var unhealthyAddresses [][]byte
+	var unhealthyPositions [][]byte
 	for _, userResult := range results {
 		ltv, err := strconv.ParseFloat(userResult.ContractQuery.HealthStatus.Borrowing, 32)
 		if err != nil {
 			s.logger.Errorf("An Error Occurred decoding health status. %v", err)
 		} else if ltv < 1 {
-			address, decodeError := hex.DecodeString(userResult.Address)
+
+			positionDecoded, decodeError := json.Marshal(userResult)
 			if decodeError == nil {
-				unhealthyAddresses = append(unhealthyAddresses, address)
+				unhealthyPositions = append(unhealthyPositions, positionDecoded)
 			} else {
 				s.logger.Errorf("An Error Occurred decoding user address. %v", err)
 			}
 		}
 	}
 
-	return unhealthyAddresses
+	return unhealthyPositions
 }
 
 // Runs until interrupted
