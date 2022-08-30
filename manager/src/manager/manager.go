@@ -1,13 +1,16 @@
 package manager
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/sirupsen/logrus"
+	lens "github.com/strangelove-ventures/lens/client"
 
 	managerinterfaces "github.com/mars-protocol/multichain-liquidator-bot/manager/src/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
@@ -99,6 +102,35 @@ func (service *Manager) Run() error {
 		}
 	}()
 
+	err = service.monitorContractStorageSize(
+		"https://rpc-terra-2.everstake.one:443",
+		"terra1nsuqsk6kh58ulczatwev87ttq2z6r3pusulg9r24mfj2fvtzd4uq3exn26",
+	)
+	if err != nil {
+		service.logger.Fatal(err)
+	}
+	return nil
+
+	// We need to ensure that all the elements in a contract's storage is
+	// processed by the collector as well as determine how many pages/items
+	// can be assigned to each instance. For that we need to know the total
+	// count of items in storage. The collector could check this, however,
+	// getting the total count is a slow process and is actually used here and
+	// not in the collector
+	service.waitGroup.Add(1)
+	go func() {
+		defer service.waitGroup.Done()
+		// {"rpc_endpoint":"https://rpc-terra-2.everstake.one:443","contract_address":"terra1nsuqsk6kh58ulczatwev87ttq2z6r3pusulg9r24mfj2fvtzd4uq3exn26","contract_item_prefix":"balance","contract_page_offset":0,"contract_page_limit":10}
+
+		err := service.monitorContractStorageSize(
+			"https://rpc-terra-2.everstake.one:443",
+			"terra1nsuqsk6kh58ulczatwev87ttq2z6r3pusulg9r24mfj2fvtzd4uq3exn26",
+		)
+		if err != nil {
+			service.logger.Fatal(err)
+		}
+	}()
+
 	// Set up the receiver channel for new blocks received via the websocket
 	newBlockReceiver, err := service.newBlockReceiver(service.rpcWebsocketEndpoint)
 	if err != nil {
@@ -121,7 +153,7 @@ func (service *Manager) Run() error {
 		service.monitorLock.Unlock()
 
 		// At the start of a new block, check if we had any work left for the
-		// collector to do
+		// services to do
 		// If there are items left in the queue, we need to scale the service
 		// If there are no items left, we need to determine if we have too
 		// many services running
@@ -162,9 +194,9 @@ func (service *Manager) Run() error {
 	return nil
 }
 
-// monitorBlocksReceived checks the delay in blocks received. If we aren't
-// receiving blocks for an extended time, we need to exit and restart
-// the service
+// monitorBlocksReceived checks the delay in blocks received for safety.
+// If we aren't receiving blocks for an extended time, we need to exit
+// and restart the service
 func (service *Manager) monitorBlocksReceived() error {
 	for atomic.LoadUint32(&service.continueRunning) == 1 {
 
@@ -182,6 +214,70 @@ func (service *Manager) monitorBlocksReceived() error {
 		// Check this every 10 seconds
 		time.Sleep(time.Second * 10)
 	}
+	return nil
+}
+
+// monitorContractStorageSize gets the total amount of items in a contract's
+// storage to help determine whether everything is being processed as well
+// as making decisions on how many pages can be completed by an instance
+func (service *Manager) monitorContractStorageSize(
+	rpcEndpoint string,
+	contractAddress string,
+) error {
+
+	// TODO: Query the contract to get the full size via RPC
+	// TODO: Store the total amount of items in the contract store
+
+	start := time.Now()
+
+	// Blocks are usually less than 6 seconds, we give ourselves an absolute
+	// maximum of 5 seconds to get the information. Ideally, it should be faster
+	client, err := lens.NewRPCClient(rpcEndpoint, time.Second*5)
+	if err != nil {
+		return err
+	}
+
+	var stateRequest QueryAllContractStateRequest
+	stateRequest.Address = contractAddress
+	stateRequest.Pagination = &PageRequest{
+		Offset:     0,
+		Limit:      1,
+		CountTotal: true,
+	}
+
+	// The structure of the request requires the query parameters to be passed
+	// as protobuf encoded content
+	rpcRequest, err := proto.Marshal(&stateRequest)
+	if err != nil {
+		return err
+	}
+
+	rpcResponse, err := client.ABCIQuery(
+		context.Background(),
+		// RPC query path for the raw state
+		"/cosmwasm.wasm.v1.Query/AllContractState",
+		rpcRequest,
+	)
+	if err != nil {
+		return err
+	}
+
+	// The value in the response also contains the contract state in
+	// protobuf encoded format
+	var stateResponse QueryAllContractStateResponse
+	err = proto.Unmarshal(rpcResponse.Response.GetValue(), &stateResponse)
+	if err != nil {
+		return err
+	}
+
+	service.logger.WithFields(logrus.Fields{
+		"total":      stateResponse.Pagination.Total,
+		"elapsed_ms": time.Since(start).Milliseconds(),
+	}).Debug("Fetched contract items")
+
+	// TODO Compare total amount of items vs total collected by the collector
+	// TODO Store the total amount of items
+
 	return nil
 }
 
