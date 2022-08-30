@@ -201,17 +201,17 @@ func (s HealthChecker) Run() error {
 			s.logger.Errorf("Worker pool execution returned false. ")
 		}
 
-		unhealthyAddresses := s.produceUnhealthyPositions(userResults)
+		unhealthPositions := s.produceUnhealthyPositions(userResults)
 
-		if len(unhealthyAddresses) > 0 {
+		if len(unhealthPositions) > 0 {
 
-			err := s.queue.PushMany(s.liquidationQueueName, unhealthyAddresses)
+			err := s.queue.PushMany(s.liquidationQueueName, unhealthPositions)
 			if err != nil {
 				s.logger.Errorf("Failed to push unhealthy addresses to queue. Error : %v", err)
 			}
 
 			s.logger.WithFields(logrus.Fields{
-				"total": len(unhealthyAddresses),
+				"total": len(unhealthPositions),
 			}).Info("Found unhealthy positions")
 		}
 
