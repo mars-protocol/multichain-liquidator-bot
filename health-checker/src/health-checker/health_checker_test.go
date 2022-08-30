@@ -39,49 +39,40 @@ func TestWeCanGenerateAndRunJobs(t *testing.T) {
 	service := initService()
 
 	jobs := service.generateJobs(addresses, service.addressesPerJob)
-	positionCount, positionBatchResults := service.RunWorkerPool(workerCount, jobs)
+	userResults, success := service.RunWorkerPool(jobs)
 
-	if positionCount != numberOfAddresses {
-		t.Error("Position count is incorrect")
+	if !success {
+		t.Error("Unknown error occurred during processing of jobs")
 	}
 
-	if len(positionBatchResults) != numberOfAddresses/service.addressesPerJob {
-		t.Error("Incorrect number of batches")
+	if len(userResults) != len(addresses) {
+		t.Errorf("Incorrect number of batches, found %d but expected %d", len(userResults), len(addresses))
 	}
 }
 
 func TestCanFilterUnhealthyPositions(t *testing.T) {
-	dataA := Data{
-		Wasm{
-			ContractQuery{
-				TotalCollateralInBaseAsset: "100",
-				TotalDebtInBaseAsset:       "100",
-				HealthStatus:               HealthStatus{Borrowing: "0.99"},
-			},
-		},
-	}
+	dataA :=
+		ContractQuery{
+			TotalCollateralInBaseAsset: "100",
+			TotalDebtInBaseAsset:       "100",
+			HealthStatus:               HealthStatus{Borrowing: "0.99"}}
 
-	dataB := Data{
-		Wasm{
-			ContractQuery{
-				TotalCollateralInBaseAsset: "100",
-				TotalDebtInBaseAsset:       "100",
-				HealthStatus:               HealthStatus{Borrowing: "1.01"},
-			},
-		},
-	}
+	dataB :=
+		ContractQuery{
+			TotalCollateralInBaseAsset: "100",
+			TotalDebtInBaseAsset:       "100",
+			HealthStatus:               HealthStatus{Borrowing: "1.01"},
+		}
 
 	// create fake positions
-	results := []BatchEventsResponse{
+	results := []UserResult{
 		{
-			UserPosition{
-				UserAddress: "aaaaaa",
-				Data:        dataA,
-			},
-			UserPosition{
-				UserAddress: "bbbbbb",
-				Data:        dataB,
-			},
+			Address:       "aaaaaa",
+			ContractQuery: dataA,
+		},
+		{
+			Address:       "bbbbbb",
+			ContractQuery: dataB,
 		},
 	}
 

@@ -31,8 +31,7 @@ func Test_weCanQueryMultipleUsers(t *testing.T) {
 		t.Errorf("Length was incorrect. Expected %d but got %d", expectedLength, actualLength)
 	}
 	intLTV := 0
-	fmt.Sscan(result[0].Data.Wasm.ContractQuery.HealthStatus.Borrowing, &intLTV)
-
+	fmt.Sscan(result[batchSize/2].ContractQuery.HealthStatus.Borrowing, &intLTV)
 	if intLTV <= 0 {
 		t.Errorf("Failed to correctly fetch health factor")
 	}

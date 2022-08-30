@@ -38,8 +38,13 @@ type Error struct {
 
 type UserPosition struct {
 	UserAddress string
-	Data        Data    `json:"data"`
-	Errors      []Error `json:"errors"`
+	Data        map[string]Wasm `json:"data"`
+	Errors      []Error         `json:"errors"`
+}
+
+type UserResult struct {
+	Address       string
+	ContractQuery ContractQuery
 }
 
 // BatchEventsResponse defines the format for batch position responses
@@ -49,18 +54,20 @@ type BatchEventsResponse []UserPosition
 func (hive Hive) FetchBatch(
 	contractAddress string,
 	addresses []string,
-) (BatchEventsResponse, error) {
+) ([]UserResult, error) {
 
+	var userResults []UserResult
 	var batchEvents BatchEventsResponse
+
 	// Batch all the blocknumbers into a single request
 	var queries []BatchQuery
 	for _, address := range addresses {
 		batchQuery := BatchQuery{
-			Query: `query($contractAddress: String! $userAddress: String!) {
-                        wasm {
+			Query: fmt.Sprintf(`query($contractAddress: String! $userAddress: String!) {
+                        %s:wasm {
 							contractQuery(contractAddress: $contractAddress, query: { user_position : { user_address: $userAddress } })
 						}
-                    }`,
+                    }`, address),
 			Variables: map[string]interface{}{
 				"contractAddress": contractAddress,
 				"userAddress":     address,
@@ -72,31 +79,34 @@ func (hive Hive) FetchBatch(
 	queryBytes, err := json.Marshal(queries)
 	if err != nil {
 		fmt.Println(fmt.Errorf("An Error occurred fetching data: %v", err))
-		return batchEvents, err
+		return userResults, err
 	}
 
 	response, err := http.Post(hive.HiveEndpoint, "application/json", bytes.NewReader(queryBytes))
 
 	if err != nil {
-		return batchEvents, err
+		return userResults, err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return batchEvents, fmt.Errorf("not found %d", response.StatusCode)
+		return userResults, fmt.Errorf("not found %d", response.StatusCode)
 	}
 
 	err = json.NewDecoder(response.Body).Decode(&batchEvents)
 	if err != nil {
-		return batchEvents, err
+		return userResults, err
 	}
 
-	// We need to know the user address of each position, so we append it back once the query
-	// has completed. There is risk here that we get the wrong address for a position if
-	// the response from the server jumbles the queries
-	for index := range batchEvents {
-		batchEvents[index].UserAddress = addresses[index]
+	for _, event := range batchEvents {
+		// event.Data is now the address[contractQuery] map
+		for address, data := range event.Data {
+			userResults = append(userResults, UserResult{
+				Address:       address,
+				ContractQuery: data.ContractQuery,
+			})
+		}
 	}
 
-	return batchEvents, nil
+	return userResults, nil
 }
