@@ -5,6 +5,9 @@ go 1.18
 replace github.com/mars-protocol/multichain-liquidator-bot/runtime => ../runtime
 
 require (
+	github.com/aws/aws-sdk-go-v2 v1.16.12
+	github.com/aws/aws-sdk-go-v2/config v1.17.3
+	github.com/aws/aws-sdk-go-v2/service/ecs v1.18.17
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/gogo/protobuf v1.3.3
 	github.com/google/uuid v1.3.0
@@ -14,6 +17,7 @@ require (
 	github.com/opencontainers/image-spec v1.0.2
 	github.com/sirupsen/logrus v1.9.0
 	github.com/strangelove-ventures/lens v0.5.1
+	github.com/tendermint/tendermint v0.34.20-0.20220517115723-e6f071164839
 )
 
 require (
@@ -24,6 +28,16 @@ require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/armon/go-metrics v0.4.0 // indirect
 	github.com/avast/retry-go/v4 v4.0.5 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.12.16 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.13 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.19 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.13 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.20 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.13 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.11.19 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.13.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.16.15 // indirect
+	github.com/aws/smithy-go v1.13.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.1.0 // indirect
 	github.com/btcsuite/btcd v0.22.1 // indirect
@@ -71,6 +85,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hdevalence/ed25519consensus v0.0.0-20210204194344-59a8610d2b87 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
 	github.com/keybase/go-keychain v0.0.0-20190712205309-48d3d31d256d // indirect
 	github.com/libp2p/go-buffer-pool v0.0.2 // indirect
@@ -109,7 +124,6 @@ require (
 	github.com/tendermint/btcd v0.1.1 // indirect
 	github.com/tendermint/crypto v0.0.0-20191022145703-50d29ede1e15 // indirect
 	github.com/tendermint/go-amino v0.16.0 // indirect
-	github.com/tendermint/tendermint v0.34.20-0.20220517115723-e6f071164839 // indirect
 	github.com/tendermint/tm-db v0.6.7 // indirect
 	github.com/tharsis/ethermint v0.16.0 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect

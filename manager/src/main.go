@@ -146,6 +146,7 @@ func main() {
 		}
 
 	case DeployerTypeECS:
+
 	default:
 		logger.Fatal("Invalid deployer type specified: ", config.DeployerType)
 
