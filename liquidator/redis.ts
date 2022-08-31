@@ -1,10 +1,11 @@
 
 import { commandOptions, RedisClientType } from '@redis/client';
 import { createClient } from 'redis';
+import { Position } from './types/position';
 
 export interface IRedisInterface {
     connect() : Promise<RedisClientType>
-    fetchUnhealthyAddresses() : string[]
+    fetchUnhealthyPositions() : Position[]
 }
 
 
@@ -21,9 +22,9 @@ export class RedisInterface implements IRedisInterface {
      * Note that the max this can return at 1 time is 1000, any more will be left in 
      * the list
      */
-    fetchUnhealthyAddresses(): string[] {
+    fetchUnhealthyPositions(): Position[] {
 
-        this.client.lPop( this.LIQUIDATION_QUEUE_NAME)
+        this.client.lPop(this.LIQUIDATION_QUEUE_NAME)
 
         throw new Error("Method not implemented.");
     }

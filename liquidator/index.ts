@@ -1,6 +1,7 @@
 import { IRedisInterface, RedisInterface } from "./redis"
 import { TxHelper } from "./tx_helpers"
 import { LiquidationTx } from "./types/liquidation"
+import { Position } from "./types/position"
 
 
 // Program entry
@@ -17,12 +18,12 @@ export const main = async () => {
 
 // exported for testing
 export const run = async (txHelper: TxHelper, redis : IRedisInterface) => {
-    const addresses : string[] = redis.fetchUnhealthyAddresses()
+    const positions : Position[] = redis.fetchUnhealthyPositions()
     
-    if (addresses.length == 0) return
+    if (positions.length == 0) return
 
     // for each address, send liquidate tx
-    const txs : LiquidationTx[] = addresses.map((address: string) => txHelper.produceLiquidationTx(address))
+    const txs : LiquidationTx[] = positions.map((position: Position) => txHelper.produceLiquidationTx(position))
     
     // dispatch transactions
     await txHelper.sendLiquidationTxs(txs)

@@ -6,14 +6,16 @@ import { IRedisInterface, RedisInterface } from '../redis'
 import { TxHelper } from '../tx_helpers'
 
 describe('Testing Behaviour', () => {
+
+    
     test(`We dont send liquidation When no addresses found`, async () => {
         
         const redis : IRedisInterface = {
-            fetchUnhealthyAddresses : jest.fn(() => []),
+            fetchUnhealthyPositions : jest.fn(() => []),
             connect: jest.fn()
         }
 
-        expect(redis.fetchUnhealthyAddresses().length).toBe(0)
+        expect(redis.fetchUnhealthyPositions().length).toBe(0)
 
         const txHelper : TxHelper = {
             produceLiquidationTx : jest.fn(),
