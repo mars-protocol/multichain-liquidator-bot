@@ -18,7 +18,7 @@ export const main = async () => {
 
 // exported for testing
 export const run = async (txHelper: TxHelper, redis : IRedisInterface) => {
-    const positions : Position[] = redis.fetchUnhealthyPositions()
+    const positions : Position[] = await redis.fetchUnhealthyPositions()
     
     if (positions.length == 0) return
 
@@ -26,5 +26,7 @@ export const run = async (txHelper: TxHelper, redis : IRedisInterface) => {
     const txs : LiquidationTx[] = positions.map((position: Position) => txHelper.produceLiquidationTx(position))
     
     // dispatch transactions
-    await txHelper.sendLiquidationTxs(txs)
+    const result = await txHelper.sendLiquidationTxs(txs)
+
+    await txHelper.swapCollateralClaimed(result)
 }
