@@ -26,6 +26,9 @@ type Manager struct {
 	executorQueueName    string
 	scalers              map[string]managerinterfaces.Scaler
 
+	rpcEndpoint       string
+	collectorContract string
+
 	logger *logrus.Entry
 
 	lastBlockTime   time.Time
@@ -38,17 +41,19 @@ type Manager struct {
 // New creates a new instance of the manager and returns the instance and an
 // error if applicable
 func New(
+	rpcEndpoint string,
 	rpcWebsocketEndpoint string,
 	queue interfaces.Queuer,
 	collectorQueueName string,
 	healthCheckQueueName string,
 	executorQueueName string,
 	scalers map[string]managerinterfaces.Scaler,
+	collectorContract string,
 	logger *logrus.Entry,
 ) (*Manager, error) {
 
-	if rpcWebsocketEndpoint == "" {
-		return nil, errors.New("rpcWebsocketEndpoint must not be blank")
+	if rpcEndpoint == "" || rpcWebsocketEndpoint == "" {
+		return nil, errors.New("rpcEndpoint and rpcWebsocketEndpoint must not be blank")
 	}
 
 	if queue == nil {
@@ -63,6 +68,10 @@ func New(
 		return nil, errors.New("you must provide scalers to the manager")
 	}
 
+	if collectorContract == "" {
+		return nil, errors.New("you must provide the contract to be monitored")
+	}
+
 	return &Manager{
 		rpcWebsocketEndpoint: rpcWebsocketEndpoint,
 		queue:                queue,
@@ -70,6 +79,7 @@ func New(
 		healthCheckQueueName: healthCheckQueueName,
 		executorQueueName:    executorQueueName,
 		scalers:              scalers,
+		collectorContract:    collectorContract,
 		logger:               logger,
 		lastBlockTime:        time.Now(),
 		continueRunning:      0,
@@ -111,11 +121,10 @@ func (service *Manager) Run() error {
 	service.waitGroup.Add(1)
 	go func() {
 		defer service.waitGroup.Done()
-		// {"rpc_endpoint":"https://rpc-terra-2.everstake.one:443","contract_address":"terra1nsuqsk6kh58ulczatwev87ttq2z6r3pusulg9r24mfj2fvtzd4uq3exn26","contract_item_prefix":"balance","contract_page_offset":0,"contract_page_limit":10}
 
 		err := service.monitorContractStorageSize(
-			"https://rpc-terra-2.everstake.one:443",
-			"terra1nsuqsk6kh58ulczatwev87ttq2z6r3pusulg9r24mfj2fvtzd4uq3exn26",
+			service.rpcEndpoint,
+			service.collectorContract,
 		)
 		if err != nil {
 			service.logger.Fatal(err)
@@ -171,7 +180,7 @@ func (service *Manager) Run() error {
 		}
 
 		// TODO: Send out new work for the collector
-		// TODO: Send out notification to the scaler to monitor?
+		// TODO: This will be added when changes to the Red Bank are completed
 
 		service.logger.WithFields(logrus.Fields{
 			"height":     newBlock.Result.Data.Value.Block.Header.Height,
@@ -266,6 +275,7 @@ func (service *Manager) monitorContractStorageSize(
 
 		// TODO Compare total amount of items vs total collected by the collector
 		// TODO Store the total amount of items
+		// TODO This will be implemented after changes are completed by Red Bank
 
 		// Check this every 10 seconds
 		time.Sleep(time.Second * 10)

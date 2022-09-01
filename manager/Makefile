@@ -44,13 +44,14 @@ run: build .start_redis ## Build and run the service binary
 	HEALTH_CHECKER_IMAGE=redis:latest \
 	EXECUTOR_IMAGE=redis:latest \
 	SCALING_TYPE="watermark" \
-	AWS_ACCESS_KEY_ID="secret" \
-	AWS_SECRET_ACCESS_KEY="secret" \
-	AWS_CLUSTER_ARN="secret" \
+	COLLECTOR_CONTRACT="osmo123" \
+	AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
+	AWS_SECRET_ACCESS_KEY="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" \
+	AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
 	AWS_SERVICE_CPU_UNITS=512 \
 	AWS_SERVICE_MEMORY_MB=1024 \
-	AWS_SERVICE_SUBNETS="subnet-secret" \
-	AWS_SERVICE_SECURITY_GROUPS="sg-secret" \
+	AWS_SERVICE_SUBNETS="subnet-14ef644c" \
+	AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
 	./bin/${APP_NAME}
 
 run_race: .start_redis ## Run the service with race condition checking enabled

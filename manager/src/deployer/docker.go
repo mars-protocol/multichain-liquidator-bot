@@ -125,7 +125,7 @@ func (dep *Docker) Decrease() error {
 
 	dep.requestedServiceCount--
 
-	// Only kill  the first one
+	// Only kill the first one
 	serviceContainer := serviceContainers[0]
 	// Remove kills and removes the first container
 	err = dep.client.ContainerRemove(

@@ -30,7 +30,7 @@ type AWSECS struct {
 }
 
 // NewAWSECS creates a new instance of the AWS ECS deployer that will deploy
-// the given container
+// the given container in the specified cluster
 func NewAWSECS(
 	service string,
 	container string,
@@ -108,6 +108,7 @@ func (dep *AWSECS) Increase() error {
 	if err != nil {
 		return err
 	}
+
 	// Set AWS call timeout to 10 seconds
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*10)
 	defer cancel()
@@ -136,6 +137,7 @@ func (dep *AWSECS) Decrease() error {
 	if err != nil {
 		return err
 	}
+
 	// Set AWS call timeout to 10 seconds
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*10)
 	defer cancel()
@@ -161,6 +163,7 @@ func (dep *AWSECS) RemoveAll() error {
 	if err != nil {
 		return err
 	}
+
 	// Set AWS call timeout to 10 seconds
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*10)
 	defer cancel()
@@ -284,6 +287,7 @@ func getOrCreateService(
 		// 10 second timeout for AWS calls
 		ctx, cancel := context.WithTimeout(context.TODO(), time.Second*10)
 		defer cancel()
+
 		// Unable to find service, create it instead
 		service, err := client.CreateService(ctx, &ecs.CreateServiceInput{
 			ServiceName: aws.String(serviceName),
@@ -307,7 +311,9 @@ func getOrCreateService(
 			TaskDefinition:       aws.String(taskDefinitionARN),
 			NetworkConfiguration: &types.NetworkConfiguration{
 				AwsvpcConfiguration: &types.AwsVpcConfiguration{
-					Subnets:        subnets,
+					Subnets: subnets,
+					// We need an IP assigned (even though it is inaccesssible)
+					// in order to fetch container images
 					AssignPublicIp: types.AssignPublicIpEnabled,
 					SecurityGroups: securityGroups,
 				},
@@ -349,5 +355,5 @@ func getService(
 		}
 	}
 
-	return types.Service{}, errors.New("unabel to find service in cluster")
+	return types.Service{}, errors.New("unable to find service in cluster")
 }

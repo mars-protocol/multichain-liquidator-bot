@@ -48,6 +48,8 @@ type Config struct {
 	ExecutorImage      string `envconfig:"EXECUTOR_IMAGE" required:"true"`
 
 	ScalingType string `envconfig:"SCALING_TYPE" required:"true"`
+
+	CollectorContract string `envconfig:"COLLECTOR_CONTRACT" required:"true"`
 }
 
 func main() {
@@ -146,7 +148,6 @@ func main() {
 		}
 
 	case DeployerTypeECS:
-
 	default:
 		logger.Fatal("Invalid deployer type specified: ", config.DeployerType)
 
@@ -174,7 +175,7 @@ func main() {
 			config.HealthCheckQueueName,
 			healthCheckerDeployer,
 			0,   // Scale down when we have no items in the queue
-			100, // Scale up when we have 1 or more items in the queue
+			100, // Scale up when we have 100 or more items in the queue
 			1,   // Minimum number of services
 			logger,
 		)
@@ -188,7 +189,7 @@ func main() {
 			config.ExecutorQueueName,
 			executorDeployer,
 			0,  // Scale down when we have no items in the queue
-			50, // Scale up when we have 1 or more items in the queue
+			50, // Scale up when we have 50 or more items in the queue
 			1,  // Minimum number of services
 			logger,
 		)
@@ -199,21 +200,19 @@ func main() {
 		logger.Fatal("Invalid scaling type specified: ", config.ScalingType)
 	}
 
-	// TODO Set up the scaler with the given deployer
-	// TODO 	Scaler requires the Redis queues for collector, health-checker
-	// TODO		and liquidator
-	// TODO Set up the manager with the scaler
-	// TODO 	Manager requires an RPC websocket for being notified of new
-	// TODO 	blocks. It also needs to check whether the current amount of
-	// TODO 	collectors are able to query all the possible positions
-	// TODO Run manager
+	// Set up the manager with the scalers
+	// Manager requires an RPC websocket for being notified of new
+	// blocks. It also needs to check whether the current amount of
+	// collectors are able to query all the possible positions
 	service, err := manager.New(
+		config.RPCEndpoint,
 		config.RPCWebsocketEndpoint,
 		queueProvider,
 		config.CollectorQueueName,
 		config.HealthCheckQueueName,
 		config.ExecutorQueueName,
 		scalers,
+		config.CollectorContract,
 		logger,
 	)
 	if err != nil {
@@ -230,6 +229,7 @@ func main() {
 	}()
 
 	logger.Info("Start service")
+
 	// Run forever
 	err = service.Run()
 	if err != nil {

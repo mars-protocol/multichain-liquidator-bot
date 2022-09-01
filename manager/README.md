@@ -66,6 +66,7 @@ COLLECTOR_IMAGE|string|The Docker image for the Collector service|
 HEALTH_CHECKER_IMAGE|string|The Docker image for the Health Checker service|
 EXECUTOR_IMAGE|string|The Docker image for the executor service|
 SCALING_TYPE|string|The method to use for determining scaling, only watermark is available|
+COLLECTOR_CONTRACT|string|The contract size to monitor for scaling the collector|
 
 
 __AWS ECS specific variables__
