@@ -3,7 +3,7 @@ import {run} from '../index'
 import jestConfig from '../jest.config'
 import { createLiquidationTx } from '../liquidation_generator'
 import { IRedisInterface, RedisInterface } from '../redis'
-import { TxHelper } from '../tx_helpers'
+import { LiquidationHelper } from '../liquidation_helpers'
 import { Position } from '../types/position'
 
 describe('Testing Behaviour', () => {
@@ -18,11 +18,12 @@ describe('Testing Behaviour', () => {
             }),
             connect: jest.fn()
         }
-        
-        const txHelper : TxHelper = {
+
+        //@ts-ignore who cares its a test :)
+        const txHelper : LiquidationHelper = {
             produceLiquidationTx : jest.fn(),
             sendLiquidationTxs : jest.fn(),
-            swapCollateralClaimed: jest.fn()
+            swap: jest.fn()
         }
 
         await run(txHelper, redis)

@@ -35,7 +35,6 @@ export const main = async () => {
 
     // run
     while (true) await run(liquidationHelper, redis)
-   
 }
 
 // exported for testing
@@ -64,7 +63,6 @@ export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) 
     // Swap collaterals to replace the debt that was repaid
     results.forEach(async (result: LiquidationResult) => {
         
-        // todo 
         await txHelper.swap(
             result.collateralReceivedDenom, 
             result.debtRepaidDenom, 

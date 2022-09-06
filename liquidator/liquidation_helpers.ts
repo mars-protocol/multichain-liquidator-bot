@@ -78,7 +78,7 @@ export class LiquidationHelper implements ILiquidationHelper {
             tokenOutMinAmount: '0' 
           })
     }
-    
+
     async sendLiquidationTxs(txs: LiquidationTx[], coins: Coin[]): Promise<LiquidationResult[]> {
         
         const msg = {
@@ -136,8 +136,5 @@ export class LiquidationHelper implements ILiquidationHelper {
     produceLiquidationTx(position: Position): LiquidationTx {
         return createLiquidationTx(position)
     }
-
-
-
 
 }
