@@ -78,6 +78,7 @@ export class LiquidationHelper implements ILiquidationHelper {
             tokenOutMinAmount: '0' 
           })
     }
+    
     async sendLiquidationTxs(txs: LiquidationTx[], coins: Coin[]): Promise<LiquidationResult[]> {
         
         const msg = {
@@ -105,24 +106,23 @@ export class LiquidationHelper implements ILiquidationHelper {
     parseLiquidationResultInner(wasm: Event) : LiquidationResult {
 
         const result : LiquidationResult = {
-            collateralRecievedDenom : '',
+            collateralReceivedDenom : '',
             debtRepaidDenom: '',
             debtRepaidAmount: '',
-            amount: ''
+            collateralReceivedAmount: ''
         }
 
-         // seach for 'collateral_denom' and 'collateral_amount_liquidated'
          wasm.attributes.forEach((attribute: Attribute) => {
             // find all parameters
             switch(attribute.key) {
                 case "collateral_denom":
-                    result.collateralRecievedDenom = attribute.value
+                    result.collateralReceivedDenom = attribute.value
                     break
                 case "debt_denom":
                     result.debtRepaidDenom = attribute.value
                     break
                 case "collateral_amount_liquidated":
-                    result.amount = attribute.value
+                    result.collateralReceivedAmount = attribute.value
                     break
                 case "debt_amount_repaid":
                     result.debtRepaidAmount = attribute.value
