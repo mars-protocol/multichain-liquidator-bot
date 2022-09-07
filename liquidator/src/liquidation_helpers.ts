@@ -3,8 +3,8 @@ import { coin, Coin, logs } from "@cosmjs/stargate";
 import { Attribute, Event } from "@cosmjs/stargate/build/logs";
 import { LcdPool, OsmosisApiClient } from "cosmology";
 import { createLiquidationTx } from "./liquidation_generator";
-import { LiquidationResult, LiquidationTx } from "./types/liquidation";
-import { Position } from "./types/position";
+import { LiquidationResult, LiquidationTx } from "./src/types/liquidation";
+import { Position } from "./src/types/position";
 import { osmosis } from 'osmojs'
 import { SwapAmountInRoute } from "osmojs/types/proto/osmosis/gamm/v1beta1/tx";
 const {
@@ -112,23 +112,23 @@ export class LiquidationHelper implements ILiquidationHelper {
             collateralReceivedAmount: ''
         }
 
-         wasm.attributes.forEach((attribute: Attribute) => {
-            // find all parameters
-            switch(attribute.key) {
-                case "collateral_denom":
-                    result.collateralReceivedDenom = attribute.value
-                    break
-                case "debt_denom":
-                    result.debtRepaidDenom = attribute.value
-                    break
-                case "collateral_amount_liquidated":
-                    result.collateralReceivedAmount = attribute.value
-                    break
-                case "debt_amount_repaid":
-                    result.debtRepaidAmount = attribute.value
-                    break
-            }
-         })
+        wasm.attributes.forEach((attribute: Attribute) => {
+        // find all parameters
+        switch(attribute.key) {
+            case "collateral_denom":
+                result.collateralReceivedDenom = attribute.value
+                break
+            case "debt_denom":
+                result.debtRepaidDenom = attribute.value
+                break
+            case "collateral_amount_liquidated":
+                result.collateralReceivedAmount = attribute.value
+                break
+            case "debt_amount_repaid":
+                result.debtRepaidAmount = attribute.value
+                break
+        }
+        })
 
          return result
     }
