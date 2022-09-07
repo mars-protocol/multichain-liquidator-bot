@@ -6,6 +6,7 @@ import { Position } from "./types/position"
 import { Coin, GasPrice } from "@cosmjs/stargate"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from "@cosmjs/cosmwasm-stargate"
+import { sleep } from "./helpers"
 
 const PREFIX = process.env.PREFIX!
 const GAS_PRICE = process.env.GAS_PRICE!
@@ -42,7 +43,13 @@ export const main = async () => {
 export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) => {
     const positions : Position[] = await redis.fetchUnhealthyPositions()
     
-    if (positions.length == 0) return
+    if (positions.length == 0){
+        
+        //sleep to avoid spamming redis db when empty
+        sleep(200)
+
+        return
+    } 
 
     const txs: LiquidationTx[] = []
     const coins: Coin[] = []
@@ -70,6 +77,8 @@ export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) 
             Number(result.collateralReceivedAmount)
             )
     })
+
+
 }
 
 
