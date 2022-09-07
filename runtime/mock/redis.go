@@ -32,7 +32,6 @@ func NewRedis() (*Redis, error) {
 
 	// Set up simulated call for popping a single value from the list
 	conn.GenericCommand("BLPOP").Handle(redigomock.ResponseHandler(func(args []interface{}) (interface{}, error) {
-		fmt.Println(args)
 		if len(args) != 2 {
 			return nil, fmt.Errorf("unexpected number of arguments: expected 2, received %d", len(args))
 		}
@@ -41,11 +40,18 @@ func NewRedis() (*Redis, error) {
 
 	// Set up simulated call for popping multiple values from the list
 	conn.GenericCommand("LPOP").Handle(redigomock.ResponseHandler(func(args []interface{}) (interface{}, error) {
-		fmt.Println(args)
 		if len(args) != 2 {
 			return nil, fmt.Errorf("unexpected number of arguments: expected 2, received %d", len(args))
 		}
 		return []interface{}{args[0], []byte("testvalue"), []byte("testvalue2"), []byte("testvalue3")}, nil
+	}))
+
+	// Set up simulated call for counting items in a list list
+	conn.GenericCommand("LLEN").Handle(redigomock.ResponseHandler(func(args []interface{}) (interface{}, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("unexpected number of arguments: expected 1, received %d", len(args))
+		}
+		return int64(0), nil
 	}))
 
 	return &Redis{
@@ -124,6 +130,22 @@ func (queue *Redis) FetchMany(key string, count int) ([][]byte, error) {
 	}
 
 	return items, nil
+}
+
+// CountItems counts the amount of items in the given queue
+func (queue *Redis) CountItems(key string) (int, error) {
+	// LLEN returns the length of a list
+	// https://redis.io/commands/llen/
+	return redis.Int(queue.conn.Do("LLEN", key))
+}
+
+// Purge all items from the given queue
+func (queue *Redis) Purge(key string) error {
+	// DEL deletes the key and acts as a clear/purge operation
+	// https://redis.io/commands/del/
+	// DEL returns the amount of items deleted and an error where applicable
+	_, err := redis.Int(queue.conn.Do("DEL", key))
+	return err
 }
 
 // Disconnect from a Redis instance

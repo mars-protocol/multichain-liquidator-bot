@@ -14,6 +14,10 @@ type Queuer interface {
 	// FetchMany retrieves up to the specified count from the queue at key and
 	// returns a slive of byte slices
 	FetchMany(string, int) ([][]byte, error)
+	// CountItems counts the amount of items in the given queue
+	CountItems(string) (int, error)
+	// Purge all items from the given queue
+	Purge(string) error
 	// Disconnect from the queue
 	Disconnect() error
 }
