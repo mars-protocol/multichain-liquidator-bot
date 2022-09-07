@@ -1,5 +1,5 @@
-import { Asset } from '../types/asset.js'
-import { getLargestCollateral, getLargestDebt } from '../liquidation_generator'
+import { Asset } from '../src/types/asset.js'
+import { getLargestCollateral, getLargestDebt } from '../src/liquidation_generator'
 import { generateRandomAsset } from './test_helpers'
 
 describe("Liquidation Tx Generator Tests..", ()=>{

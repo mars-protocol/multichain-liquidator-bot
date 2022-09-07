@@ -1,5 +1,5 @@
-import { Asset } from "../types/asset"
-import { Position } from "../types/position"
+import { Asset } from "../src/types/asset"
+import { Position } from "../src/types/position"
 
 export const generateRandomAsset = () : Asset => {
     
