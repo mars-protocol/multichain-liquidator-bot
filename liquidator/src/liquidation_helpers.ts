@@ -7,6 +7,7 @@ import { LiquidationResult, LiquidationTx } from "./src/types/liquidation";
 import { Position } from "./src/types/position";
 import { osmosis } from 'osmojs'
 import { SwapAmountInRoute } from "osmojs/types/proto/osmosis/gamm/v1beta1/tx";
+import Long from "long";
 const {
     swapExactAmountIn
 } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
@@ -35,10 +36,13 @@ export class LiquidationHelper implements ILiquidationHelper {
     }
 
     // Find a pool Id where we can swap asset A with asset B.
-    // Note that this will only work for direct routes (i.e a pool of A:B or B:A).
+    // TODO - this will only work for direct routes (i.e a pool of A:B or B:A), update to handle multihop
     async findRoute(denomA : string, denomB: string) : Promise<SwapAmountInRoute[]> {
         const api = new OsmosisApiClient({ url: process.env.RPC_ENDPOINT! })
+
+        // TODO: Consider extracting getPools to a helper method - only use for that library is here.
         const lcdPools = await api.getPools();
+
         let poolId = ''
         lcdPools.pools.forEach((pool: LcdPool) => {
             const tokenA = pool.poolAssets[0].token
@@ -51,7 +55,9 @@ export class LiquidationHelper implements ILiquidationHelper {
             }
         })
 
-        // @ts-ignore
+        // @ts-ignore 
+        // osmo.js uses a custom version of Long from external package with additional features which causes type error.
+        // Will ignore for now as it should convert back to the osmo long just fine.
         return [{poolId:  Long.fromString(poolId), tokenOutDenom: denomB}]
     }
     
@@ -67,13 +73,14 @@ export class LiquidationHelper implements ILiquidationHelper {
     async swap(assetInDenom : string, assetOutDenom: string, assetInAmount: number): Promise<void> {
 
         const route = await this.findRoute(assetInDenom, assetOutDenom)
-    
+
+        // TODO create retry logic here? Swap succeeding is very important
         swapExactAmountIn({
             sender: this.liquidatorAddress,
             routes: route,
             tokenIn: coin(assetInAmount, assetInDenom),
 
-            // Should we have a min amount here? It is very important the swap succeds, but at the same time
+            // TODO: Should we have a min amount here? It is very important the swap succeds, but at the same time
             // this makes us vulnerable to slippage / low liquidity / frontrunning etc
             tokenOutMinAmount: '0' 
           })
@@ -113,7 +120,7 @@ export class LiquidationHelper implements ILiquidationHelper {
         }
 
         wasm.attributes.forEach((attribute: Attribute) => {
-        // find all parameters
+        // find all parameters we require
         switch(attribute.key) {
             case "collateral_denom":
                 result.collateralReceivedDenom = attribute.value

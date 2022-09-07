@@ -22,7 +22,8 @@ export const main = async () => {
     await redis.connect()
 
     const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(SEED, { prefix: PREFIX });
-    // ensure the account should always be the first under that seed
+
+    //The liquidator account should always be the first under that seed
     const liquidatorAddress = (await liquidator.getAccounts())[0].address
 
     const clientOption: SigningCosmWasmClientOptions = {
@@ -70,3 +71,6 @@ export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) 
             )
     })
 }
+
+
+await main()
