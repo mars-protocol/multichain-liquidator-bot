@@ -4,6 +4,7 @@
   "description": "Dispatches liquidation transactions for unhealthy positions on mars protocol",
   "main": "index.ts",
   "author": "MarkWatney",
+  "type": "module",
   "license": "MIT",
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.28.13",
@@ -13,12 +14,16 @@
     "osmojs": "^0.11.3",
     "redis": "^4.3.0",
     "request": "^2.88.2",
-    "requests": "^0.3.0"
+    "requests": "^0.3.0",
+    "ts-node": "^10.9.1"
   },
   "devDependencies": {
     "@types/jest": "^28.1.8",
     "jest": "^28.1.3",
     "ts-jest": "^28.0.8",
     "typescript": "^4.8.2"
+  },
+  "scripts": {
+    "test:integration": "node --loader ts-node/esm test/integration/liquidation_test.ts"
   }
 }
