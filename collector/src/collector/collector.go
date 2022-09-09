@@ -114,6 +114,35 @@ func (service *Collector) Run() error {
 		// progresses
 
 		// Push addresses to Redis
+		// SAMPLE PACKET
+		// {
+		// 	"address": "osmo1...",
+		// 	"debts": [
+		// 		{
+		// 			"token": "uosmo",
+		// 			"amount": 100000
+		// 		},
+		// 		{
+		// 			"token": "ibc/SAMPLEIBCHASH",
+		// 			"amount": 5000
+		// 		}
+		// 	],
+		// 	"collateral": [
+		// 		{
+		// 			"token": "uosmo",
+		// 			"amount": 200000
+		// 		},
+		// 		{
+		// 			"token": "uother",
+		// 			"amount": 12000
+		// 		}
+		// 	],
+		// 	"endpoints": {
+		// 		"hive": "https://example.com/graphql",
+		// 		"lcd": "https://lcd.example.com",
+		// 		"rpc": "https://rpc.example.com"
+		// 	}
+		// }
 		service.queue.PushMany(service.healthCheckQueueName, addresses)
 
 		service.logger.WithFields(logrus.Fields{

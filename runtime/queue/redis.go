@@ -116,6 +116,22 @@ func (queue *Redis) FetchMany(key string, count int) ([][]byte, error) {
 	return items, nil
 }
 
+// CountItems counts the amount of items in the given queue
+func (queue *Redis) CountItems(key string) (int, error) {
+	// LLEN returns the length of a list
+	// https://redis.io/commands/llen/
+	return redis.Int(queue.conn.Do("LLEN", key))
+}
+
+// Purge all items from the given queue
+func (queue *Redis) Purge(key string) error {
+	// DEL deletes the key and acts as a clear/purge operation
+	// https://redis.io/commands/del/
+	// DEL returns the amount of items deleted and an error where applicable
+	_, err := redis.Int(queue.conn.Do("DEL", key))
+	return err
+}
+
 // Disconnect from a Redis instance
 func (queue *Redis) Disconnect() error {
 	queue.conn.Flush()

@@ -19,9 +19,9 @@ FROM gcr.io/distroless/static:latest
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 
-COPY ./bin/monitor .
+COPY ./bin/manager .
 
 # Use an unprivileged user.
 USER appuser:appuser
 
-ENTRYPOINT ["/monitor"]
+ENTRYPOINT ["/manager"]
