@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/signal"
 	"strings"
@@ -50,6 +51,10 @@ type Config struct {
 	ScalingType string `envconfig:"SCALING_TYPE" required:"true"`
 
 	CollectorContract string `envconfig:"COLLECTOR_CONTRACT" required:"true"`
+
+	CollectorConfig     string `envconfig:"COLLECTOR_CONFIG" required:"true"`
+	HealthCheckerConfig string `envconfig:"HEALTH_CHECKER_CONFIG" required:"true"`
+	ExecutorConfig      string `envconfig:"EXECUTOR_CONFIG" required:"true"`
 }
 
 func main() {
@@ -112,15 +117,24 @@ func main() {
 	// and liquidator
 	switch strings.ToLower(config.DeployerType) {
 	case DeployerTypeDocker:
-		containerEnv := make(map[string]string)
+
+		serviceConfig, err := parseConfig(config.CollectorConfig)
+		if err != nil {
+			logger.Fatal(err)
+		}
 
 		// Set up the collector's deployer
 		collectorDeployer, err = deployer.NewDocker(
 			"collector",
 			config.CollectorImage,
-			containerEnv,
+			serviceConfig,
 			logger,
 		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		serviceConfig, err = parseConfig(config.HealthCheckerConfig)
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -129,9 +143,14 @@ func main() {
 		healthCheckerDeployer, err = deployer.NewDocker(
 			"health-checker",
 			config.HealthCheckerImage,
-			containerEnv,
+			serviceConfig,
 			logger,
 		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		serviceConfig, err = parseConfig(config.ExecutorConfig)
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -140,7 +159,7 @@ func main() {
 		executorDeployer, err = deployer.NewDocker(
 			"executor",
 			config.ExecutorImage,
-			containerEnv,
+			serviceConfig,
 			logger,
 		)
 		if err != nil {
@@ -238,4 +257,15 @@ func main() {
 
 	logger.Info("Shutdown")
 
+}
+
+// parseConfig parses the JSON environment variable into a map to be used
+// by other services
+func parseConfig(input string) (map[string]string, error) {
+	output := make(map[string]string)
+	err := json.Unmarshal([]byte(input), &output)
+	if err != nil {
+		return nil, err
+	}
+	return output, nil
 }

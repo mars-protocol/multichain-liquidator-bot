@@ -32,14 +32,14 @@ run: build .start_redis ## Build and run the service binary
 	SERVICE_NAME="bot-manager" \
 	CHAIN_ID="osmosis-1" \
 	HIVE_ENDPOINT="https://phoenix-hive.terra.dev/graphql" \
-	RPC_ENDPOINT="https://phoenix-rpc.terra.dev" \
+	RPC_ENDPOINT="https://phoenix-rpc.terra.dev:443" \
 	RPC_WEBSOCKET_ENDPOINT="wss://rpc.osmosis.zone/websocket" \
 	REDIS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
 	COLLECTOR_QUEUE_NAME="collector" \
 	HEALTH_CHECK_QUEUE_NAME="health_check" \
 	EXECUTOR_QUEUE_NAME="executor" \
-	DEPLOYER_TYPE="aws-ecs" \
+	DEPLOYER_TYPE="docker" \
 	COLLECTOR_IMAGE=redis:latest \
 	HEALTH_CHECKER_IMAGE=redis:latest \
 	EXECUTOR_IMAGE=redis:latest \
@@ -52,6 +52,9 @@ run: build .start_redis ## Build and run the service binary
 	AWS_SERVICE_MEMORY_MB=1024 \
 	AWS_SERVICE_SUBNETS="subnet-14ef644c" \
 	AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
+	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "pisco-1","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
+	HEALTH_CHECKER_CONFIG='{"REDIS_ENDPOINT":"127.0.0.1","REDIS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"https://phoenix-hive.terra.dev","REDBANK_ADDRESS":"osmo123","ADDRESS_PER_JOB":"5","JOBS_PER_WORKER":"2","BATCH_SIZE":"2"}' \
+	EXECUTOR_CONFIG='{"LIQUIDATION_QUEUE_NAME":"liquidator","PREFIX":"osmo","GAS_PRICE":"0.001osmo","RPC_ENDPOINT":"https://phoenix-rpc.terra.dev","LIQUIDATION_FILTERER_CONTRACT":"osmo12...32","SEED":"seed phrase here"}' \
 	./bin/${APP_NAME}
 
 run_race: .start_redis ## Run the service with race condition checking enabled

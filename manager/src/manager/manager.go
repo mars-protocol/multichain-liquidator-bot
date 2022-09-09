@@ -73,6 +73,7 @@ func New(
 	}
 
 	return &Manager{
+		rpcEndpoint:          rpcEndpoint,
 		rpcWebsocketEndpoint: rpcWebsocketEndpoint,
 		queue:                queue,
 		collectorQueueName:   collectorQueueName,
