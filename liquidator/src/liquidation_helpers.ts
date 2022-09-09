@@ -2,9 +2,9 @@ import { ExecuteResult, SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate"
 import { coin, Coin, logs } from "@cosmjs/stargate";
 import { Attribute, Event } from "@cosmjs/stargate/build/logs";
 import { LcdPool, OsmosisApiClient } from "cosmology";
-import { createLiquidationTx } from "./liquidation_generator";
-import { LiquidationResult, LiquidationTx } from "./src/types/liquidation";
-import { Position } from "./src/types/position";
+import { createLiquidationTx } from "./liquidation_generator.js";
+import { LiquidationResult, LiquidationTx } from "./types/liquidation";
+import { Position } from "./types/position";
 import { osmosis } from 'osmojs'
 import { SwapAmountInRoute } from "osmojs/types/proto/osmosis/gamm/v1beta1/tx";
 import Long from "long";
@@ -93,7 +93,7 @@ export class LiquidationHelper implements ILiquidationHelper {
               "liquidations" :txs
           }
         }
-      
+        
         const result = await this.client.execute(this.liquidatorAddress, this.liquidationFilterContract, msg, "auto", undefined, coins)
         return this.parseLiquidationResult(result)        
     }

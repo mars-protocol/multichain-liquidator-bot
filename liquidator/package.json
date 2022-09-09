@@ -24,6 +24,9 @@
     "typescript": "^4.8.2"
   },
   "scripts": {
-    "test:integration": "node --loader ts-node/esm test/integration/liquidation_test.ts"
+    "test:integration": "node --loader ts-node/esm test/integration/liquidation_test.ts",
+    "start" : "node --loader ts-node/esm src/index.ts"
   }
+
+  
 }

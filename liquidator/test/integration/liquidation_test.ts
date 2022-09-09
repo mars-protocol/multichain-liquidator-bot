@@ -13,21 +13,26 @@ import { ExecuteResult, SigningCosmWasmClient, SigningCosmWasmClientOptions } fr
 import { HdPath } from "@cosmjs/crypto";
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { GasPrice } from "@cosmjs/stargate";
+import { RedisClientType } from "redis";
+import { run } from "../../src/index.js";
+import { LiquidationHelper } from "../../src/liquidation_helpers.js";
+import { RedisInterface } from "../../src/redis.js";
+import { Position } from "../../src/types/position";
 
 const addresses = {
-  "redBankCodeId": 8,
-  "liquidationFilterCodeId": 9,
-  "addressProviderCodeId": 10,
-  "maTokenCodeId": 11,
-  "incentivesCodeId": 12,
-  "oracleCodeId": 13,
-  "protocolRewardsCollectorCodeId": 14,
-  "addressProviderContractAddress": "osmo1999u8suptza3rtxwk7lspve02m406xe7l622erg3np3aq05gawxsj2lrr5",
-  "liquidateFilterContractAddress": "osmo1g6kht9c5s4jwn4akfjt3zmsfh4nvguewaegjeavpz3f0q9uylrqscsp5xx",
-  "redBankContractAddress": "osmo1qmk0v725sdg5ecu6xfh5pt0fv0nfzrstarue2maum3snzk2zrt5qmj77re",
-  "incentivesContractAddress": "osmo1657pee2jhf4jk8pq6yq64e758ngvum45gl866knmjkd83w6jgn3s5fzut3",
-  "oracleContractAddress": "osmo1xhcxq4fvxth2hn3msmkpftkfpw73um7s4et3lh4r8cfmumk3qsms2tpuum",
-  "protocolRewardsCollectorContractAddress": "osmo1wr6vc3g4caz9aclgjacxewr0pjlre9wl2uhq73rp8mawwmqaczsqqzjacj",
+  "redBankCodeId": 2,
+  "liquidationFilterCodeId": 3,
+  "addressProviderCodeId": 4,
+  "maTokenCodeId": 5,
+  "incentivesCodeId": 6,
+  "oracleCodeId": 7,
+  "protocolRewardsCollectorCodeId": 8,
+  "addressProviderContractAddress": "osmo18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3qtcvtsz",
+  "liquidateFilterContractAddress": "osmo1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s0p34vn",
+  "redBankContractAddress": "osmo1xr3rq8yvd7qplsw5yx90ftsr2zdhg4e9z60h5duusgxpv72hud3sqcfmyp",
+  "incentivesContractAddress": "osmo1466nf3zuxpya8q9emxukd7vftaf6h4psr0a07srl5zw74zh84yjqkk0zfx",
+  "oracleContractAddress": "osmo13ehuhysn5mqjeaheeuew2gjs785f6k7jm8vfsqg3jhtpkwppcmzqg496z0",
+  "protocolRewardsCollectorContractAddress": "osmo1qum2tr7hh4y7ruzew68c64myjec0dq2s2njf6waja5t0w879lutq0rjkz5",
   "addressProviderUpdated": true,
   "uosmoRedBankMarketInitialised": true,
   "uatomRedBankMarketInitialised": true,
@@ -36,15 +41,20 @@ const addresses = {
 }
 const osmoDenom = 'uosmo'
 const atomDenom = 'uion'
-
+const redisQueueName = 'testQueue'
 const deployerSeed = "notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius"
 
 // preferentially run tests on local ososis
 const localOsmosisRPC = "http://localhost:26657"
 
+const redisInterface = new RedisInterface(redisQueueName)
+
 
   // run test
 const runTest = async() => {
+
+  // @ts-ignore
+  const redisClient: RedisClientType = await redisInterface.connect()
 
   // Create 100 wallets
   const accountNumbers: number[] = [];
@@ -59,40 +69,35 @@ const runTest = async() => {
   const wallet = await DirectSecp256k1HdWallet.fromMnemonic(deployerSeed, { hdPaths: hdPaths, prefix: 'osmo' });
   const accounts = await wallet.getAccounts()
   const clientOption: SigningCosmWasmClientOptions = {
-    gasPrice: GasPrice.fromString("0.09uosmo")
+    gasPrice: GasPrice.fromString("0.0uosmo")
   }
 
   const client = await SigningCosmWasmClient.connectWithSigner(localOsmosisRPC, wallet, clientOption);
+  const deployerAddress = accounts[0].address  
+
+  const liquidationHelper = new LiquidationHelper(client,deployerAddress, addresses.liquidateFilterContractAddress)
     
-  const deployerAddress = accounts[0].address
-  
-  // console.log(await client.getBalance(deployerAddress,osmoDenom))
-  // console.log(await client.getBalance(deployerAddress,atomDenom))
+  // seed addresses with value
+  const useableAddresses =   await seedAddresses(client, accounts)
+
+  // set prices, both at 1
+  console.log(`setting prices`)
+  await setPrice(client,deployerAddress,osmoDenom, "1")
+  await setPrice(client,deployerAddress,atomDenom, "1")
 
 
-  // // seed addresses with value
-  // const addressesWithMoney =   await seedAddresses(client, accounts) // getFirstAddresses(accounts)
-  // // const addressesWithMoney = getFirstAddresses(accounts)
-  // // set prices, both at 1
-  // console.log(`setting prices`)
-  // await setPrice(client,deployerAddress,osmoDenom, "1")
-  // await setPrice(client,deployerAddress,atomDenom, "1")
-
-  // console.log(`seeding redbank with intial deposit`)
+  console.log(`seeding redbank with intial deposit`)
   // // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
-  // await deposit(client, deployerAddress, osmoDenom, "100_000_000")
+  await deposit(client, deployerAddress, atomDenom, "100_000_000")
 
-  // for each address we seeded, we need to create a debt position
-
-  const addressesWithMoney = getFirstAddresses(accounts)
   console.log('Setting up positions')
-  const length = addressesWithMoney.length
+  const length = useableAddresses.length
   let index = 0
   while (index < length) {
     try {
-      const address = addressesWithMoney[index]
-      await deposit(client, address, atomDenom, "10000000")
-      await borrow(client, address, osmoDenom, "3000000")
+      const address = useableAddresses[index]
+      await deposit(client, address, osmoDenom, "10000000")
+      await borrow(client, address, atomDenom, "3000000")
       console.log(`created position for address ${address}`)
 
     } catch {}
@@ -100,26 +105,62 @@ const runTest = async() => {
     index += 1
   }
   
-  // TODO - Verify position has a reasonable health factor?
-  console.log(await queryHealth(client, addressesWithMoney[8]))
+  // use this when debugging tests to prevent messing up existing positions
+  // const addressesWithMoney = getFirstAddresses(accounts)
+
+  await pushPositionsToRedis(useableAddresses, redisClient)
+  
+  for(const index in useableAddresses) {
+    console.log(await queryHealth(client,useableAddresses[index]))
+  }
 
   // manipulate price
-  await setPrice(client, deployerAddress, osmoDenom, "3")
+  await setPrice(client, deployerAddress, atomDenom, "3")
+
+  // execute liquidations
+  await dispatchLiquidations(liquidationHelper)
 
   // TODO - Verify position has a reasonable health factor?
-  console.log(await queryHealth(client, addressesWithMoney[8]))
 
-  
+  console.log("Successfully completed liquidations :)")
+  process.exit(0)
 }
 
+const pushPositionsToRedis = async(addresses: string[], redisClient : RedisClientType) => {
+  for (const index in addresses) {
 
+    console.log(`pushing position to redis: ${addresses[index]}`)
+    const position : Position = {
+      address:addresses[index],
+      collaterals: [
+        {
+          amount:10000000,
+          denom:osmoDenom
+        }
+      ],
+      debts: [
+        {
+          amount:3000000,
+          denom:atomDenom
+        }
+      ]
+    }
+    
+    await redisClient.lPush(redisQueueName, JSON.stringify(position))
+  }
+}
 
+const dispatchLiquidations = async(liquidationHelper : LiquidationHelper) => {
+    await run(liquidationHelper,redisInterface)
+}
+
+// used for debugging tests
 const getFirstAddresses = (accounts : readonly AccountData[]) => {
 
   const seededAddresses : string[] = []
   let index = 1
 
-  while (index <= 10) {
+  while (index <= 4) {
     seededAddresses.push(accounts[index].address)
     index += 1
   }
@@ -215,4 +256,7 @@ const queryHealth = async(client : SigningCosmWasmClient, address: string) => {
   return await client.queryContractSmart(addresses.redBankContractAddress, msg)
 }
 
-runTest().catch(e => console.log(e))
+runTest().catch(e => {
+  console.log(e)
+  process.exit(1)
+})
