@@ -69,7 +69,7 @@ export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) 
     })
 
     const coins : Coin[] = []
-    debtsToRepay.forEach((amount, denom) => coins.push({denom, amount: (amount*1.1).toFixed(0)}))
+    debtsToRepay.forEach((amount, denom) => coins.push({denom, amount: amount.toFixed(0)}))
     
     // dispatch transactions - return object with results on it
     const results = await txHelper.sendLiquidationTxs(txs, coins)
