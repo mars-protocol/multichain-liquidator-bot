@@ -14,9 +14,8 @@ export class RedisInterface implements IRedisInterface {
     
 
     // We use a singleton but expose the client via connect()
-    private client : RedisClientType
+    private client : RedisClientType | undefined
     private key : string
-    private count : number
 
     /**
      * 
@@ -35,7 +34,12 @@ export class RedisInterface implements IRedisInterface {
      */
     async fetchUnhealthyPositions(): Promise<Position[]> {
 
-        const result =await this.client.lPopCount(this.key, 1000)
+        if (!this.client) {
+            console.log(`ERROR: redis client not connected`)
+            return []
+        }
+
+        const result =await this.client.lPopCount(this.key, 100)
         
         // Ignoring the Type error here because type is inferred to caller by the method signature
         // @ts-ignore 
