@@ -69,7 +69,7 @@ const runTest = async() => {
   const wallet = await DirectSecp256k1HdWallet.fromMnemonic(deployerSeed, { hdPaths: hdPaths, prefix: 'osmo' });
   const accounts = await wallet.getAccounts()
   const clientOption: SigningCosmWasmClientOptions = {
-    gasPrice: GasPrice.fromString("0.0uosmo")
+    gasPrice: GasPrice.fromString("0.1uosmo")
   }
 
   const client = await SigningCosmWasmClient.connectWithSigner(localOsmosisRPC, wallet, clientOption);
@@ -115,7 +115,7 @@ const runTest = async() => {
   }
 
   // manipulate price
-  await setPrice(client, deployerAddress, atomDenom, "3")
+  await setPrice(client, deployerAddress, atomDenom, "2.5")
 
   // execute liquidations
   await dispatchLiquidations(liquidationHelper)
