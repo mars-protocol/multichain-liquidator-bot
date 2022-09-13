@@ -17,28 +17,10 @@ import { RedisClientType } from "redis";
 import { run } from "../../src/index.js";
 import { LiquidationHelper } from "../../src/liquidation_helpers.js";
 import { RedisInterface } from "../../src/redis.js";
+import { readAddresses } from "../../src/test_helpers.js";
 import { Position } from "../../src/types/position";
 
-const addresses = {
-  "redBankCodeId": 2,
-  "liquidationFilterCodeId": 3,
-  "addressProviderCodeId": 4,
-  "maTokenCodeId": 5,
-  "incentivesCodeId": 6,
-  "oracleCodeId": 7,
-  "protocolRewardsCollectorCodeId": 8,
-  "addressProviderContractAddress": "osmo18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3qtcvtsz",
-  "liquidateFilterContractAddress": "osmo1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s0p34vn",
-  "redBankContractAddress": "osmo1xr3rq8yvd7qplsw5yx90ftsr2zdhg4e9z60h5duusgxpv72hud3sqcfmyp",
-  "incentivesContractAddress": "osmo1466nf3zuxpya8q9emxukd7vftaf6h4psr0a07srl5zw74zh84yjqkk0zfx",
-  "oracleContractAddress": "osmo13ehuhysn5mqjeaheeuew2gjs785f6k7jm8vfsqg3jhtpkwppcmzqg496z0",
-  "protocolRewardsCollectorContractAddress": "osmo1qum2tr7hh4y7ruzew68c64myjec0dq2s2njf6waja5t0w879lutq0rjkz5",
-  "addressProviderUpdated": true,
-  "uosmoRedBankMarketInitialised": true,
-  "uatomRedBankMarketInitialised": true,
-  "uosmoOraclePriceSet": true,
-  "uatomOraclePriceSet": true
-}
+const addresses = readAddresses()
 const osmoDenom = 'uosmo'
 const atomDenom = 'uion'
 const redisQueueName = 'testQueue'
@@ -80,6 +62,9 @@ const runTest = async() => {
   // seed addresses with value
   const useableAddresses =   await seedAddresses(client, accounts)
 
+  // TODO REMOVE ME ONCE CONTRACT UPDATED - have this here to be able to liquidate successfully
+  await client.sendTokens(deployerAddress, addresses.liquidateFilterContractAddress, [{"amount": "1000000000", "denom":atomDenom}], "auto")
+
   // set prices, both at 1
   console.log(`setting prices`)
   await setPrice(client,deployerAddress,osmoDenom, "1")
@@ -89,6 +74,8 @@ const runTest = async() => {
   console.log(`seeding redbank with intial deposit`)
   // // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
   await deposit(client, deployerAddress, atomDenom, "100_000_000")
+  await deposit(client, deployerAddress, osmoDenom, "100_000_000")
+
 
   console.log('Setting up positions')
   const length = useableAddresses.length
@@ -106,21 +93,29 @@ const runTest = async() => {
   }
   
   // use this when debugging tests to prevent messing up existing positions
-  // const addressesWithMoney = getFirstAddresses(accounts)
-
+  // const useableAddresses = [getFirstAddresses(accounts)[3], getFirstAddresses(accounts)[1]]
   await pushPositionsToRedis(useableAddresses, redisClient)
+  
   
   for(const index in useableAddresses) {
     console.log(await queryHealth(client,useableAddresses[index]))
   }
 
   // manipulate price
-  await setPrice(client, deployerAddress, atomDenom, "2.5")
+  await setPrice(client, deployerAddress, atomDenom, "3")
 
+  for(const index in useableAddresses) {
+    console.log(await queryHealth(client,useableAddresses[index]))
+  }
+
+  console.log(`================= executing liquidations =================`)
   // execute liquidations
   await dispatchLiquidations(liquidationHelper)
 
-  // TODO - Verify position has a reasonable health factor?
+  for(const index in useableAddresses) {
+    console.log(await queryHealth(client,useableAddresses[index]))
+  }
+
 
   console.log("Successfully completed liquidations :)")
   process.exit(0)
@@ -160,7 +155,7 @@ const getFirstAddresses = (accounts : readonly AccountData[]) => {
   const seededAddresses : string[] = []
   let index = 1
 
-  while (index <= 4) {
+  while (index <= 10) {
     seededAddresses.push(accounts[index].address)
     index += 1
   }
@@ -187,8 +182,8 @@ const setPrice = async(client: SigningCosmWasmClient, deployerAddress: string, a
 const seedAddresses = async(client : SigningCosmWasmClient, accounts : readonly AccountData[]) : Promise<string[]> => {
   
   const sender = accounts[0].address
-  const osmoToSend : Coin = coin(11000000, osmoDenom)
-  const atomToSend : Coin = coin(10000000, atomDenom)
+  const osmoToSend = {"amount": "11000000", "denom": osmoDenom}
+  const atomToSend = {"amount": "10000000", "denom": atomDenom}
 
   const seededAddresses : string[] = []
   let index = 1
@@ -197,10 +192,7 @@ const seedAddresses = async(client : SigningCosmWasmClient, accounts : readonly 
     const addressToSeed = accounts[index].address
     
     console.log(`sending to address: ${addressToSeed}`)
-
-    // For some reason sending both in the array here breaks it ???
-    await client.sendTokens(sender, addressToSeed,[osmoToSend], 'auto')
-    await client.sendTokens(sender, addressToSeed,[atomToSend], 'auto')
+    await client.sendTokens(sender, addressToSeed,[atomToSend, osmoToSend], 'auto')
 
     index += 1
     seededAddresses.push(addressToSeed)
@@ -255,6 +247,7 @@ const queryHealth = async(client : SigningCosmWasmClient, address: string) => {
   const msg = { "user_position": { "user_address": address } }
   return await client.queryContractSmart(addresses.redBankContractAddress, msg)
 }
+
 
 runTest().catch(e => {
   console.log(e)
