@@ -14,12 +14,14 @@ import (
 	lens "github.com/strangelove-ventures/lens/client"
 
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
 )
 
 // Collector implements the collection of accounts by querying the contract's
 // underlying storage directly
 type Collector struct {
 	queue                interfaces.Queuer
+	metricsCache         interfaces.Cacher
 	collectorQueueName   string
 	healthCheckQueueName string
 
@@ -32,6 +34,7 @@ type Collector struct {
 // when applicable
 func New(
 	queue interfaces.Queuer,
+	metricsCache interfaces.Cacher,
 	collectorQueueName string,
 	healthCheckQueueName string,
 	logger *logrus.Entry,
@@ -41,12 +44,17 @@ func New(
 		return nil, errors.New("queue must be set")
 	}
 
+	if metricsCache == nil {
+		return nil, errors.New("metricsCache must be set")
+	}
+
 	if collectorQueueName == "" || healthCheckQueueName == "" {
 		return nil, errors.New("collectorQueueName and healthCheckQueueName must not be blank")
 	}
 
 	return &Collector{
 		queue:                queue,
+		metricsCache:         metricsCache,
 		collectorQueueName:   collectorQueueName,
 		healthCheckQueueName: healthCheckQueueName,
 		logger:               logger,
@@ -87,7 +95,7 @@ func (service *Collector) Run() error {
 		}
 
 		start := time.Now()
-		var workItem WorkItem
+		var workItem types.WorkItem
 		err = json.Unmarshal(item, &workItem)
 		if err != nil {
 			service.logger.Error(err)
@@ -97,7 +105,7 @@ func (service *Collector) Run() error {
 		// Once we receive a piece of work to execute we need to query the
 		// contract's state and return the addresses contained for the
 		// given prefix
-		addresses, err := service.fetchContractItems(
+		addresses, scanned, err := service.fetchContractItems(
 			workItem.ContractAddress,
 			workItem.RPCEndpoint,
 			workItem.ContractItemPrefix,
@@ -107,6 +115,8 @@ func (service *Collector) Run() error {
 		if err != nil {
 			return err
 		}
+
+		service.metricsCache.IncrementBy("collector.contract_items.scanned", scanned)
 
 		// TODO Enrich the packet sent to the health check service
 		// to include endpoints / etc
@@ -145,6 +155,8 @@ func (service *Collector) Run() error {
 		// }
 		service.queue.PushMany(service.healthCheckQueueName, addresses)
 
+		// TODO: Log total scanned in cache for metrics
+
 		service.logger.WithFields(logrus.Fields{
 			"total":      len(addresses),
 			"elapsed_ms": time.Since(start).Milliseconds(),
@@ -161,16 +173,17 @@ func (service *Collector) fetchContractItems(
 	rpcEndpoint string,
 	prefix string,
 	offset uint64,
-	limit uint64) ([][]byte, error) {
+	limit uint64) ([][]byte, int64, error) {
 
 	start := time.Now()
 	var addresses [][]byte
+	var totalScanned int64
 
 	// Blocks are usually less than 6 seconds, we give ourselves an absolute
 	// maximum of 5 seconds to get the information. Ideally, it should be faster
 	client, err := lens.NewRPCClient(rpcEndpoint, time.Second*5)
 	if err != nil {
-		return addresses, err
+		return addresses, totalScanned, err
 	}
 
 	var stateRequest QueryAllContractStateRequest
@@ -184,7 +197,7 @@ func (service *Collector) fetchContractItems(
 	// as protobuf encoded content
 	rpcRequest, err := proto.Marshal(&stateRequest)
 	if err != nil {
-		return addresses, err
+		return addresses, totalScanned, err
 	}
 
 	rpcResponse, err := client.ABCIQuery(
@@ -194,7 +207,7 @@ func (service *Collector) fetchContractItems(
 		rpcRequest,
 	)
 	if err != nil {
-		return addresses, err
+		return addresses, totalScanned, err
 	}
 
 	// The value in the response also contains the contract state in
@@ -202,7 +215,7 @@ func (service *Collector) fetchContractItems(
 	var stateResponse QueryAllContractStateResponse
 	err = proto.Unmarshal(rpcResponse.Response.GetValue(), &stateResponse)
 	if err != nil {
-		return addresses, err
+		return addresses, totalScanned, err
 	}
 
 	// Structure of raw state we are querying
@@ -215,8 +228,10 @@ func (service *Collector) fetchContractItems(
 	for _, model := range stateResponse.Models {
 		key, err := hex.DecodeString(model.Key.String())
 		if err != nil {
-			return addresses, err
+			return addresses, totalScanned, err
 		}
+		// TODO: The first two bytes indicate the length of the key
+		// TODO: Parse correctly instead of doing cleanBytes
 		// The result from the raw contract state includes some null / other
 		// bytes used within cw-storage-plus, we can strip them out
 		// to get a usable key for our purposes
@@ -230,12 +245,13 @@ func (service *Collector) fetchContractItems(
 			// need to do some additional processing of the address here
 			addresses = append(addresses, []byte(address))
 		}
+		totalScanned++
 	}
 	service.logger.WithFields(logrus.Fields{
 		"total":      len(addresses),
 		"elapsed_ms": time.Since(start).Milliseconds(),
 	}).Debug("Fetched contract items")
-	return addresses, nil
+	return addresses, totalScanned, nil
 }
 
 // Stop the service gracefully
