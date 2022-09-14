@@ -150,3 +150,8 @@ func (qwm *QueueWatermark) ScaleToZero() error {
 	qwm.minimumServiceCount = 0
 	return qwm.deployer.RemoveAll()
 }
+
+// Count returns the amount of services deployed
+func (qwm *QueueWatermark) Count() (int, error) {
+	return qwm.deployer.Count()
+}
