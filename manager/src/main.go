@@ -15,6 +15,7 @@ import (
 	"github.com/mars-protocol/multichain-liquidator-bot/manager/src/manager"
 	"github.com/mars-protocol/multichain-liquidator-bot/manager/src/scaler"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/cache"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
 )
@@ -39,6 +40,7 @@ type Config struct {
 
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
 	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
+	RedisCacheDatabase   int    `envconfig:"REDIS_CACHE_DATABASE" required:"true"`
 	CollectorQueueName   string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
 	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
 	ExecutorQueueName    string `envconfig:"EXECUTOR_QUEUE_NAME" required:"true"`
@@ -97,6 +99,15 @@ func main() {
 		config.RedisEndpoint,
 		config.RedisDatabase,
 		5, // BLPOP timeout seconds
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	var cacheProvider interfaces.Cacher
+	cacheProvider, err = cache.NewRedis(
+		config.RedisEndpoint,
+		config.RedisCacheDatabase,
 	)
 	if err != nil {
 		logger.Fatal(err)
@@ -179,9 +190,9 @@ func main() {
 			queueProvider,
 			config.CollectorQueueName,
 			collectorDeployer,
-			0, // Scale down when we have no items in the queue
-			1, // Scale up when we have 1 or more items in the queue
-			1, // Minimum number of services
+			0,    // Scale down when we have no items in the queue
+			1000, // Scale up when we have 1 or more items in the queue
+			0,    // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -193,9 +204,9 @@ func main() {
 			queueProvider,
 			config.HealthCheckQueueName,
 			healthCheckerDeployer,
-			0,   // Scale down when we have no items in the queue
-			100, // Scale up when we have 100 or more items in the queue
-			1,   // Minimum number of services
+			0,    // Scale down when we have no items in the queue
+			1000, // Scale up when we have 100 or more items in the queue
+			0,    // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -207,9 +218,9 @@ func main() {
 			queueProvider,
 			config.ExecutorQueueName,
 			executorDeployer,
-			0,  // Scale down when we have no items in the queue
-			50, // Scale up when we have 50 or more items in the queue
-			1,  // Minimum number of services
+			0,    // Scale down when we have no items in the queue
+			1000, // Scale up when we have 50 or more items in the queue
+			0,    // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -224,9 +235,11 @@ func main() {
 	// blocks. It also needs to check whether the current amount of
 	// collectors are able to query all the possible positions
 	service, err := manager.New(
+		config.ChainID,
 		config.RPCEndpoint,
 		config.RPCWebsocketEndpoint,
 		queueProvider,
+		cacheProvider,
 		config.CollectorQueueName,
 		config.HealthCheckQueueName,
 		config.ExecutorQueueName,

@@ -19,8 +19,10 @@ import (
 // Manager implements the management service for the collection of services
 // for the liquidation bot
 type Manager struct {
+	chainID              string
 	rpcWebsocketEndpoint string
 	queue                interfaces.Queuer
+	cache                interfaces.Cacher
 	collectorQueueName   string
 	healthCheckQueueName string
 	executorQueueName    string
@@ -41,9 +43,11 @@ type Manager struct {
 // New creates a new instance of the manager and returns the instance and an
 // error if applicable
 func New(
+	chainID string,
 	rpcEndpoint string,
 	rpcWebsocketEndpoint string,
 	queue interfaces.Queuer,
+	cache interfaces.Cacher,
 	collectorQueueName string,
 	healthCheckQueueName string,
 	executorQueueName string,
@@ -60,6 +64,10 @@ func New(
 		return nil, errors.New("queue must be set")
 	}
 
+	if cache == nil {
+		return nil, errors.New("cache must be set")
+	}
+
 	if collectorQueueName == "" || healthCheckQueueName == "" || executorQueueName == "" {
 		return nil, errors.New("collectorQueueName, healthCheckQueueName and executorQueueName must not be blank")
 	}
@@ -73,9 +81,11 @@ func New(
 	}
 
 	return &Manager{
+		chainID:              chainID,
 		rpcEndpoint:          rpcEndpoint,
 		rpcWebsocketEndpoint: rpcWebsocketEndpoint,
 		queue:                queue,
+		cache:                cache,
 		collectorQueueName:   collectorQueueName,
 		healthCheckQueueName: healthCheckQueueName,
 		executorQueueName:    executorQueueName,
@@ -95,6 +105,12 @@ func (service *Manager) Run() error {
 		return err
 	}
 	defer service.queue.Disconnect()
+
+	err = service.cache.Connect()
+	if err != nil {
+		return err
+	}
+	defer service.cache.Disconnect()
 
 	// Set long running routines to run
 	atomic.StoreUint32(&service.continueRunning, 1)
@@ -140,6 +156,23 @@ func (service *Manager) Run() error {
 
 	// Read new blocks from the channel until the channel is closed
 	for newBlock := range newBlockReceiver {
+
+		// Collect current metrics for previous block of work
+		metrics, err := service.collectMetrics(0)
+		if err != nil {
+			service.logger.WithFields(logrus.Fields{
+				"height": newBlock.Result.Data.Value.Block.Header.Height,
+				"error":  err,
+			}).Error("Unable to collect metrics")
+		}
+
+		err = service.submitMetrics(metrics)
+		if err != nil {
+			service.logger.WithFields(logrus.Fields{
+				"height": newBlock.Result.Data.Value.Block.Header.Height,
+				"error":  err,
+			}).Error("Unable to submit metrics")
+		}
 
 		service.logger.WithFields(logrus.Fields{
 			"height":    newBlock.Result.Data.Value.Block.Header.Height,
@@ -187,6 +220,7 @@ func (service *Manager) Run() error {
 			"height":     newBlock.Result.Data.Value.Block.Header.Height,
 			"timestamp":  newBlock.Result.Data.Value.Block.Header.Time,
 			"block_time": blockTime,
+			"metric_key": "block_last_processed",
 		}).Info("Block processed")
 	}
 
@@ -275,8 +309,16 @@ func (service *Manager) monitorContractStorageSize(
 		}).Debug("Fetched contract items")
 
 		// TODO Compare total amount of items vs total collected by the collector
-		// TODO Store the total amount of items
 		// TODO This will be implemented after changes are completed by Red Bank
+
+		// Store the total amount of items
+		service.cache.Set("total_contract_items", float64(stateResponse.Pagination.Total))
+
+		service.logger.WithFields(logrus.Fields{
+			"metric_key": "contract_state_count",
+			"total":      stateResponse.Pagination.Total,
+			"elapsed_ms": time.Since(start).Milliseconds(),
+		}).Info("Fetched contract items")
 
 		// Check this every 10 seconds
 		time.Sleep(time.Second * 10)
