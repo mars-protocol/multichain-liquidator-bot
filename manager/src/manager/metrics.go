@@ -11,9 +11,10 @@ import (
 )
 
 // collectMetrics collects all service metrics to be reported to DataDog
-func (service *Manager) collectMetrics(height int) ([]Metric, error) {
+func (service *Manager) collectMetrics(height int64) ([]Metric, error) {
 
 	var metrics []Metric
+	var metricsToClear []string
 
 	// General
 	// Current height (Chain)
@@ -26,26 +27,29 @@ func (service *Manager) collectMetrics(height int) ([]Metric, error) {
 		Chain:     service.chainID,
 	})
 
-	// Lag between current and last processed (should be zero)
 	// TODO:
+	// Lag between current and last processed (should be zero)
 
 	// Manager
 	// Count of running collectors
 	// Count of running health checkers
 	// Count of running executors
 	for scalerName, scaler := range service.scalers {
+		metricName := fmt.Sprintf("manager.scaler.%s.count", scalerName)
+		metricsToClear = append(metricsToClear, metricName)
 		count, err := scaler.Count()
 		if err != nil {
 			service.logger.WithFields(logrus.Fields{
 				"height": height,
 				"scaler": scalerName,
+				"metric": metricName,
 				"error":  err,
 			}).Warning("Unable to get service count")
 			continue
 		}
 
 		metric := Metric{
-			Name:      fmt.Sprintf("manager.scaler.%s.count", scalerName),
+			Name:      metricName,
 			Value:     float64(count),
 			Timestamp: time.Now().Unix(),
 			Chain:     service.chainID,
@@ -60,17 +64,19 @@ func (service *Manager) collectMetrics(height int) ([]Metric, error) {
 	// Collector
 
 	// Total amount of contract items (collateral + debts) (per block)
-	value, err := service.cache.GetFloat64("total_contract_items")
+	// We don't clear this metric
+	metricName := "collector.contract_items.total"
+	total, err := service.metricsCache.GetFloat64(metricName)
 	if err != nil {
 		service.logger.WithFields(logrus.Fields{
 			"height": height,
-			"metric": "total_contract_items",
+			"metric": metricName,
 			"error":  err,
 		}).Warning("Unable to get metric from cache")
 	} else {
 		metric := Metric{
-			Name:      "collector.contract_items.total",
-			Value:     value,
+			Name:      metricName,
+			Value:     total,
 			Timestamp: time.Now().Unix(),
 			Chain:     service.chainID,
 		}
@@ -79,11 +85,51 @@ func (service *Manager) collectMetrics(height int) ([]Metric, error) {
 			"metric": metric.Name,
 			"value":  metric.Value,
 		}).Debug("Collected metric")
-
 	}
 
 	// Total amount of contract items scanned (collateral + debts) (per block)
+	metricName = "collector.contract_items.scanned"
+	metricsToClear = append(metricsToClear, metricName)
+	scanned, err := service.metricsCache.GetFloat64(metricName)
+	if err != nil {
+		service.logger.WithFields(logrus.Fields{
+			"height": height,
+			"metric": metricName,
+			"error":  err,
+		}).Warning("Unable to get metric from cache")
+	} else {
+		metric := Metric{
+			Name:      metricName,
+			Value:     float64(scanned),
+			Timestamp: time.Now().Unix(),
+			Chain:     service.chainID,
+		}
+		metrics = append(metrics, metric)
+		service.logger.WithFields(logrus.Fields{
+			"metric": metric.Name,
+			"value":  metric.Value,
+		}).Debug("Collected metric")
+	}
+
 	// Total amount of contract items missed (collateral + debts) (per block)
+	metricName = "collector.contract_items.missed"
+	metricsToClear = append(metricsToClear, metricName)
+	missed := total - scanned
+	if missed < 0 {
+		missed = 0
+	}
+	metric := Metric{
+		Name:      metricName,
+		Value:     float64(missed),
+		Timestamp: time.Now().Unix(),
+		Chain:     service.chainID,
+	}
+	metrics = append(metrics, metric)
+	service.logger.WithFields(logrus.Fields{
+		"metric": metric.Name,
+		"value":  metric.Value,
+	}).Debug("Collected metric")
+
 	// Health checker
 
 	// Total amount of health checks to perform (per block)
@@ -96,6 +142,13 @@ func (service *Manager) collectMetrics(height int) ([]Metric, error) {
 	// Total liquidations
 	// Total liquidations (per block)
 	// Total liquidations missed
+
+	// Clear metrics from cache
+	for _, metricName := range metricsToClear {
+		// Cache keys and metric names are the same
+		// Delete essentially sets them to zero
+		service.metricsCache.Delete(metricName)
+	}
 
 	return metrics, nil
 }
@@ -123,7 +176,7 @@ func (service *Manager) submitMetrics(metrics []Metric) error {
 					Resources: []datadogV2.MetricResource{
 						{
 							Name: datadog.PtrString(metric.Chain),
-							Type: datadog.PtrString("chain"),
+							Type: datadog.PtrString("host"),
 						},
 					},
 				},

@@ -2,8 +2,10 @@ package manager
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,6 +16,7 @@ import (
 
 	managerinterfaces "github.com/mars-protocol/multichain-liquidator-bot/manager/src/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
 )
 
 // Manager implements the management service for the collection of services
@@ -22,19 +25,21 @@ type Manager struct {
 	chainID              string
 	rpcWebsocketEndpoint string
 	queue                interfaces.Queuer
-	cache                interfaces.Cacher
+	metricsCache         interfaces.Cacher
 	collectorQueueName   string
 	healthCheckQueueName string
 	executorQueueName    string
 	scalers              map[string]managerinterfaces.Scaler
 
-	rpcEndpoint       string
-	collectorContract string
+	rpcEndpoint             string
+	collectorContract       string
+	collectorItemsPerPacket int
 
 	logger *logrus.Entry
 
-	lastBlockTime   time.Time
-	continueRunning uint32
+	lastBlockTime               time.Time
+	collectorTotalContractItems uint64
+	continueRunning             uint32
 
 	waitGroup   sync.WaitGroup
 	monitorLock sync.RWMutex
@@ -47,12 +52,13 @@ func New(
 	rpcEndpoint string,
 	rpcWebsocketEndpoint string,
 	queue interfaces.Queuer,
-	cache interfaces.Cacher,
+	metricsCache interfaces.Cacher,
 	collectorQueueName string,
 	healthCheckQueueName string,
 	executorQueueName string,
 	scalers map[string]managerinterfaces.Scaler,
 	collectorContract string,
+	collectorItemsPerPacket int,
 	logger *logrus.Entry,
 ) (*Manager, error) {
 
@@ -64,8 +70,8 @@ func New(
 		return nil, errors.New("queue must be set")
 	}
 
-	if cache == nil {
-		return nil, errors.New("cache must be set")
+	if metricsCache == nil {
+		return nil, errors.New("metricsCache must be set")
 	}
 
 	if collectorQueueName == "" || healthCheckQueueName == "" || executorQueueName == "" {
@@ -81,19 +87,20 @@ func New(
 	}
 
 	return &Manager{
-		chainID:              chainID,
-		rpcEndpoint:          rpcEndpoint,
-		rpcWebsocketEndpoint: rpcWebsocketEndpoint,
-		queue:                queue,
-		cache:                cache,
-		collectorQueueName:   collectorQueueName,
-		healthCheckQueueName: healthCheckQueueName,
-		executorQueueName:    executorQueueName,
-		scalers:              scalers,
-		collectorContract:    collectorContract,
-		logger:               logger,
-		lastBlockTime:        time.Now(),
-		continueRunning:      0,
+		chainID:                 chainID,
+		rpcEndpoint:             rpcEndpoint,
+		rpcWebsocketEndpoint:    rpcWebsocketEndpoint,
+		queue:                   queue,
+		metricsCache:            metricsCache,
+		collectorQueueName:      collectorQueueName,
+		healthCheckQueueName:    healthCheckQueueName,
+		executorQueueName:       executorQueueName,
+		scalers:                 scalers,
+		collectorContract:       collectorContract,
+		collectorItemsPerPacket: collectorItemsPerPacket,
+		logger:                  logger,
+		lastBlockTime:           time.Now(),
+		continueRunning:         0,
 	}, nil
 }
 
@@ -106,11 +113,11 @@ func (service *Manager) Run() error {
 	}
 	defer service.queue.Disconnect()
 
-	err = service.cache.Connect()
+	err = service.metricsCache.Connect()
 	if err != nil {
 		return err
 	}
-	defer service.cache.Disconnect()
+	defer service.metricsCache.Disconnect()
 
 	// Set long running routines to run
 	atomic.StoreUint32(&service.continueRunning, 1)
@@ -157,11 +164,19 @@ func (service *Manager) Run() error {
 	// Read new blocks from the channel until the channel is closed
 	for newBlock := range newBlockReceiver {
 
-		// Collect current metrics for previous block of work
-		metrics, err := service.collectMetrics(0)
+		height, err := strconv.ParseInt(newBlock.Result.Data.Value.Block.Header.Height, 10, 64)
 		if err != nil {
 			service.logger.WithFields(logrus.Fields{
 				"height": newBlock.Result.Data.Value.Block.Header.Height,
+				"error":  err,
+			}).Error("Unable to parse new height value")
+		}
+
+		// Collect current metrics for previous block of work
+		metrics, err := service.collectMetrics(height - 1)
+		if err != nil {
+			service.logger.WithFields(logrus.Fields{
+				"height": height,
 				"error":  err,
 			}).Error("Unable to collect metrics")
 		}
@@ -169,13 +184,13 @@ func (service *Manager) Run() error {
 		err = service.submitMetrics(metrics)
 		if err != nil {
 			service.logger.WithFields(logrus.Fields{
-				"height": newBlock.Result.Data.Value.Block.Header.Height,
+				"height": height,
 				"error":  err,
 			}).Error("Unable to submit metrics")
 		}
 
 		service.logger.WithFields(logrus.Fields{
-			"height":    newBlock.Result.Data.Value.Block.Header.Height,
+			"height":    height,
 			"timestamp": newBlock.Result.Data.Value.Block.Header.Time,
 		}).Debug("Processing new block")
 
@@ -200,7 +215,7 @@ func (service *Manager) Run() error {
 			if shouldScale {
 				service.logger.WithFields(logrus.Fields{
 					"scaler":    scalerName,
-					"height":    newBlock.Result.Data.Value.Block.Header.Height,
+					"height":    height,
 					"direction": scaleDirection,
 				}).Debug("Service is scaling")
 			}
@@ -213,14 +228,50 @@ func (service *Manager) Run() error {
 			return err
 		}
 
-		// TODO: Send out new work for the collector
-		// TODO: This will be added when changes to the Red Bank are completed
+		// Send out new work for the collector in batches of collectorItemsPerPacket
+		var offset uint64
+		for i := uint64(0); i <= service.collectorTotalContractItems; i += uint64(service.collectorItemsPerPacket) {
+			offset = i
+			limit := service.collectorItemsPerPacket
+
+			workItem := types.WorkItem{
+				RPCEndpoint:        service.rpcEndpoint,
+				ContractAddress:    service.collectorContract,
+				ContractItemPrefix: "balance",
+				ContractPageOffset: offset,
+				ContractPageLimit:  uint64(limit),
+			}
+
+			item, err := json.Marshal(workItem)
+			if err != nil {
+				service.logger.WithFields(logrus.Fields{
+					"error":  err,
+					"offset": workItem.ContractPageOffset,
+					"limit":  workItem.ContractPageLimit,
+				}).Error("Unable to marshal collector work item")
+				continue
+			}
+
+			err = service.queue.Push(service.collectorQueueName, item)
+			if err != nil {
+				service.logger.WithFields(logrus.Fields{
+					"error":  err,
+					"offset": workItem.ContractPageOffset,
+					"limit":  workItem.ContractPageLimit,
+				}).Error("Unable to push work to collector queue")
+				continue
+			}
+
+			service.logger.WithFields(logrus.Fields{
+				"offset": workItem.ContractPageOffset,
+				"limit":  workItem.ContractPageLimit,
+			}).Info("Submitted work to collector queue")
+		}
 
 		service.logger.WithFields(logrus.Fields{
-			"height":     newBlock.Result.Data.Value.Block.Header.Height,
+			"height":     height,
 			"timestamp":  newBlock.Result.Data.Value.Block.Header.Time,
 			"block_time": blockTime,
-			"metric_key": "block_last_processed",
 		}).Info("Block processed")
 	}
 
@@ -312,7 +363,11 @@ func (service *Manager) monitorContractStorageSize(
 		// TODO This will be implemented after changes are completed by Red Bank
 
 		// Store the total amount of items
-		service.cache.Set("total_contract_items", float64(stateResponse.Pagination.Total))
+		service.metricsCache.Set(
+			"collector.contract_items.total",
+			float64(stateResponse.Pagination.Total),
+		)
+		service.collectorTotalContractItems = stateResponse.Pagination.Total
 
 		service.logger.WithFields(logrus.Fields{
 			"metric_key": "contract_state_count",

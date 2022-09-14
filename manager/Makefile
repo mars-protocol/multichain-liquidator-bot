@@ -35,9 +35,10 @@ run: build .start_redis ## Build and run the service binary
 	RPC_ENDPOINT="https://rpc-terra-2.everstake.one:443" \
 	RPC_WEBSOCKET_ENDPOINT="wss://rpc.osmosis.zone/websocket" \
 	REDIS_DATABASE=0 \
-	REDIS_CACHE_DATABASE=0 \
+	REDIS_METRICS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
 	COLLECTOR_QUEUE_NAME="collector" \
+	COLLECTOR_ITEMS_PER_PACKET=4000 \
 	HEALTH_CHECK_QUEUE_NAME="health_check" \
 	EXECUTOR_QUEUE_NAME="executor" \
 	DEPLOYER_TYPE="docker" \

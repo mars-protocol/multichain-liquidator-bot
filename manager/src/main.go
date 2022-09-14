@@ -40,10 +40,12 @@ type Config struct {
 
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
 	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
-	RedisCacheDatabase   int    `envconfig:"REDIS_CACHE_DATABASE" required:"true"`
-	CollectorQueueName   string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
-	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
-	ExecutorQueueName    string `envconfig:"EXECUTOR_QUEUE_NAME" required:"true"`
+	RedisMetricsDatabase int    `envconfig:"REDIS_METRICS_DATABASE" required:"true"`
+
+	CollectorQueueName      string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
+	CollectorItemsPerPacket int    `envconfig:"COLLECTOR_ITEMS_PER_PACKET" required:"true"`
+	HealthCheckQueueName    string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
+	ExecutorQueueName       string `envconfig:"EXECUTOR_QUEUE_NAME" required:"true"`
 
 	DeployerType       string `envconfig:"DEPLOYER_TYPE" required:"true"`
 	CollectorImage     string `envconfig:"COLLECTOR_IMAGE" required:"true"`
@@ -104,10 +106,10 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	var cacheProvider interfaces.Cacher
-	cacheProvider, err = cache.NewRedis(
+	var metricsCacheProvider interfaces.Cacher
+	metricsCacheProvider, err = cache.NewRedis(
 		config.RedisEndpoint,
-		config.RedisCacheDatabase,
+		config.RedisMetricsDatabase,
 	)
 	if err != nil {
 		logger.Fatal(err)
@@ -190,9 +192,9 @@ func main() {
 			queueProvider,
 			config.CollectorQueueName,
 			collectorDeployer,
-			0,    // Scale down when we have no items in the queue
-			1000, // Scale up when we have 1 or more items in the queue
-			0,    // Minimum number of services
+			0,     // Scale down when we have no items in the queue
+			10000, // Scale up when we have 1 or more items in the queue
+			0,     // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -204,9 +206,9 @@ func main() {
 			queueProvider,
 			config.HealthCheckQueueName,
 			healthCheckerDeployer,
-			0,    // Scale down when we have no items in the queue
-			1000, // Scale up when we have 100 or more items in the queue
-			0,    // Minimum number of services
+			0,     // Scale down when we have no items in the queue
+			10000, // Scale up when we have 100 or more items in the queue
+			0,     // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -218,9 +220,9 @@ func main() {
 			queueProvider,
 			config.ExecutorQueueName,
 			executorDeployer,
-			0,    // Scale down when we have no items in the queue
-			1000, // Scale up when we have 50 or more items in the queue
-			0,    // Minimum number of services
+			0,     // Scale down when we have no items in the queue
+			10000, // Scale up when we have 50 or more items in the queue
+			0,     // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -239,12 +241,13 @@ func main() {
 		config.RPCEndpoint,
 		config.RPCWebsocketEndpoint,
 		queueProvider,
-		cacheProvider,
+		metricsCacheProvider,
 		config.CollectorQueueName,
 		config.HealthCheckQueueName,
 		config.ExecutorQueueName,
 		scalers,
 		config.CollectorContract,
+		config.CollectorItemsPerPacket,
 		logger,
 	)
 	if err != nil {
