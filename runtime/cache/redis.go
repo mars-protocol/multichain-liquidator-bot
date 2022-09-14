@@ -37,13 +37,22 @@ func (cache *Redis) Connect() error {
 
 // Set a float value at key
 func (cache *Redis) Set(key string, value interface{}) error {
+	// https://redis.io/commands/set/
 	_, err := cache.conn.Do("SET", key, value)
 	return err
 }
 
 // Get an float value at key
 func (cache *Redis) GetFloat64(key string) (float64, error) {
+	// https://redis.io/commands/get/
 	return redis.Float64(cache.conn.Do("GET", key))
+}
+
+// IncrementBy increments the value at key by the given value
+func (cache *Redis) IncrementBy(key string, value int64) error {
+	// https://redis.io/commands/incrby/
+	_, err := cache.conn.Do("INCRBY", key, value)
+	return err
 }
 
 // Delete a key

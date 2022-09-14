@@ -8,6 +8,8 @@ type Cacher interface {
 	Set(key string, value interface{}) error
 	// Get an float value at key
 	GetFloat64(key string) (float64, error)
+	// IncrementBy increments the value at key by the given value
+	IncrementBy(key string, value int64) error
 	// Delete a key
 	Delete(key string) error
 	// Disconnect from the queue
