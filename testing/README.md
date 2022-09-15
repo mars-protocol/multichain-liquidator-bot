@@ -11,7 +11,7 @@ The main components of a test are
 
 **Redbank deployment** 
   
-You will need to have redbank deployed. Use the deploy scripts located [here](www.test.com). Ensure that the correct assets are configured in the db
+You will need to have redbank deployed. Use the deploy scripts located [here](https://github.com/mars-protocol/outposts/tree/master/scripts/deploy). Ensure that the correct assets are configured in the db
 
 **Genesis file**
 
