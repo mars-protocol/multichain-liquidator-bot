@@ -1,0 +1,21 @@
+{
+  "redBankCodeId": 1,
+  "liquidationFilterCodeId": 2,
+  "addressProviderCodeId": 3,
+  "maTokenCodeId": 4,
+  "incentivesCodeId": 5,
+  "oracleCodeId": 6,
+  "protocolRewardsCollectorCodeId": 7,
+  "addressProviderContractAddress": "osmo1hrpna9v7vs3stzyd4z3xf00676kf78zpe2u5ksvljswn2vnjp3ysgnqrud",
+  "liquidateFilterContractAddress": "osmo1nc5tatafv6eyq7llkr2gv50ff9e22mnf70qgjlv737ktmt4eswrqvlx82r",
+  "redBankContractAddress": "osmo1yyca08xqdgvjz0psg56z67ejh9xms6l436u8y58m82npdqqhmmtqjmm4zk",
+  "incentivesContractAddress": "osmo1436kxs0w2es6xlqpp9rd35e3d0cjnw4sv8j3a7483sgks29jqwgsrdzxtj",
+  "oracleContractAddress": "osmo1mf6ptkssddfmxvhdx0ech0k03ktp6kf9yk59renau2gvht3nq2gqe6yq6m",
+  "protocolRewardsCollectorContractAddress": "osmo1wn625s4jcmvk0szpl85rj5azkfc6suyvf75q6vrddscjdphtve8sm5y37w",
+  "addressProviderUpdated": true,
+  "uosmoRedBankMarketInitialised": true,
+  "uatomRedBankMarketInitialised": true,
+  "umarsRedBankMarketInitialised": true,
+  "uosmoOraclePriceSet": true,
+  "uatomOraclePriceSet": true
+}
