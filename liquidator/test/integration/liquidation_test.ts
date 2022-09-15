@@ -17,7 +17,7 @@ import { RedisClientType } from "redis";
 import { run } from "../../src/index.js";
 import { LiquidationHelper } from "../../src/liquidation_helpers.js";
 import { RedisInterface } from "../../src/redis.js";
-import { readAddresses } from "../../src/test_helpers.js";
+import { borrow, deposit, queryHealth, readAddresses, seedAddresses, setPrice } from "../../src/test_helpers.js";
 import { Position } from "../../src/types/position";
 
 const addresses = readAddresses()
@@ -58,23 +58,26 @@ const runTest = async() => {
   const deployerAddress = accounts[0].address  
 
   const liquidationHelper = new LiquidationHelper(client,deployerAddress, addresses.liquidateFilterContractAddress)
-    
+  
+  const osmoToSend = {"amount": "11000000", "denom": osmoDenom}
+  const atomToSend = {"amount": "10000000", "denom": atomDenom}
+
   // seed addresses with value
-  const useableAddresses =   await seedAddresses(client, accounts)
+  const useableAddresses =  await seedAddresses(client, accounts, [atomToSend, osmoToSend])
 
   // TODO REMOVE ME ONCE CONTRACT UPDATED - have this here to be able to liquidate successfully
   await client.sendTokens(deployerAddress, addresses.liquidateFilterContractAddress, [{"amount": "1000000000", "denom":atomDenom}], "auto")
 
   // set prices, both at 1
   console.log(`setting prices`)
-  await setPrice(client,deployerAddress,osmoDenom, "1")
-  await setPrice(client,deployerAddress,atomDenom, "1")
+  await setPrice(client,deployerAddress,osmoDenom, "1", addresses)
+  await setPrice(client,deployerAddress,atomDenom, "1", addresses)
 
 
   console.log(`seeding redbank with intial deposit`)
   // // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
-  await deposit(client, deployerAddress, atomDenom, "100_000_000")
-  await deposit(client, deployerAddress, osmoDenom, "100_000_000")
+  await deposit(client, deployerAddress, atomDenom, "100_000_000", addresses)
+  await deposit(client, deployerAddress, osmoDenom, "100_000_000", addresses)
 
 
   console.log('Setting up positions')
@@ -83,8 +86,8 @@ const runTest = async() => {
   while (index < length) {
     try {
       const address = useableAddresses[index]
-      await deposit(client, address, osmoDenom, "10000000")
-      await borrow(client, address, atomDenom, "3000000")
+      await deposit(client, address, osmoDenom, "10000000", addresses)
+      await borrow(client, address, atomDenom, "3000000", addresses)
       console.log(`created position for address ${address}`)
 
     } catch {}
@@ -98,14 +101,14 @@ const runTest = async() => {
   
   
   for(const index in useableAddresses) {
-    console.log(await queryHealth(client,useableAddresses[index]))
+    console.log(await queryHealth(client,useableAddresses[index], addresses))
   }
 
   // manipulate price
-  await setPrice(client, deployerAddress, atomDenom, "3")
+  await setPrice(client, deployerAddress, atomDenom, "3", addresses)
 
   for(const index in useableAddresses) {
-    console.log(await queryHealth(client,useableAddresses[index]))
+    console.log(await queryHealth(client,useableAddresses[index], addresses))
   }
 
   console.log(`================= executing liquidations =================`)
@@ -113,7 +116,7 @@ const runTest = async() => {
   await dispatchLiquidations(liquidationHelper)
 
   for(const index in useableAddresses) {
-    console.log(await queryHealth(client,useableAddresses[index]))
+    console.log(await queryHealth(client,useableAddresses[index], addresses))
   }
 
 
@@ -163,90 +166,6 @@ const getFirstAddresses = (accounts : readonly AccountData[]) => {
   return seededAddresses
 }
 
-const setPrice = async(client: SigningCosmWasmClient, deployerAddress: string, assetDenom : string, price: string) => {
-  const msg = {
-    "set_price_source": {
-        "denom": assetDenom,
-        "price_source": {
-            "fixed": { "price":  price}
-        }
-    }
-  }
-
-  await client.execute(deployerAddress,addresses.oracleContractAddress,msg,'auto')
-}
-
-
-
-// send OSMO and ATOM to next 10 addresses under our seed
-const seedAddresses = async(client : SigningCosmWasmClient, accounts : readonly AccountData[]) : Promise<string[]> => {
-  
-  const sender = accounts[0].address
-  const osmoToSend = {"amount": "11000000", "denom": osmoDenom}
-  const atomToSend = {"amount": "10000000", "denom": atomDenom}
-
-  const seededAddresses : string[] = []
-  let index = 1
-
-  while (index <= 10) {
-    const addressToSeed = accounts[index].address
-    
-    console.log(`sending to address: ${addressToSeed}`)
-    await client.sendTokens(sender, addressToSeed,[atomToSend, osmoToSend], 'auto')
-
-    index += 1
-    seededAddresses.push(addressToSeed)
-  }
-
-  return seededAddresses
-}
-
-const withdraw = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string) => {
-  const msg = {
-    "withdraw": {
-      "denom": assetDenom,
-      "amount": amount
-    }
-  }
-
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto")
-}
-
-const borrow = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string) => {
-  const msg = {
-      "borrow": {
-        "denom": assetDenom,
-        "amount": amount
-    }
-  }
-
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto")
-}
-
-const deposit = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string) => {
-  const msg = { "deposit": { "denom": assetDenom } }
-  const coins = [{
-        "denom":assetDenom,
-        "amount": amount 
-    }]
-
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto", undefined, coins)
-}
-
-const repay = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string) => {
-  const msg = { "repay": { "denom": assetDenom } }
-  const coins = [{
-        "denom":assetDenom,
-        "amount": amount 
-    }]
-
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto", undefined, coins)
-}
-
-const queryHealth = async(client : SigningCosmWasmClient, address: string) => {
-  const msg = { "user_position": { "user_address": address } }
-  return await client.queryContractSmart(addresses.redBankContractAddress, msg)
-}
 
 
 runTest().catch(e => {

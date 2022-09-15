@@ -6,7 +6,7 @@ import { Position } from "./types/position"
 import { Coin, GasPrice } from "@cosmjs/stargate"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from "@cosmjs/cosmwasm-stargate"
-import { sleep } from "./helpers.js"
+import { sleep } from "./test_helpers.js"
 
 const PREFIX = process.env.PREFIX!
 const GAS_PRICE = process.env.GAS_PRICE!
