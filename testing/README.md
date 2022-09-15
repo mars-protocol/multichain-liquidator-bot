@@ -1,3 +1,5 @@
+# Liquidation Bot Testing
+
 This folder contains files to set up and orchestrate testing of the liquidation bot.
 
 The main components of a test are 
@@ -7,7 +9,7 @@ The main components of a test are
     - triggering liquidations
 
 
-##Prerequisites
+## Prerequisites
 
 **Redbank deployment** 
   
@@ -76,7 +78,7 @@ MAX_THREADS=20
 
 See the `.env.example` file in this directory for a default setting
 
-##Creating positions
+## Creating positions
 
 ```node
 
