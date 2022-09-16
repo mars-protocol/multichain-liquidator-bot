@@ -228,6 +228,16 @@ func (service *Manager) Run() error {
 			return err
 		}
 
+		err = service.queue.Purge(service.healthCheckQueueName)
+		if err != nil {
+			return err
+		}
+
+		err = service.queue.Purge(service.executorQueueName)
+		if err != nil {
+			return err
+		}
+
 		// Send out new work for the collector in batches of collectorItemsPerPacket
 		var offset uint64
 		for i := uint64(0); i <= service.collectorTotalContractItems; i += uint64(service.collectorItemsPerPacket) {
