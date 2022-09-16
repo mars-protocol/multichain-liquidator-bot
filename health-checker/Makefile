@@ -25,6 +25,7 @@ run: build ## Build and run the service binary
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
 	CHAIN_ID="pisco-1" \
+	REDIS_METRICS_DATABASE="0" \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled

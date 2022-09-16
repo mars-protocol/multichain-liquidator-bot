@@ -16,6 +16,7 @@ import (
 
 type HealthChecker struct {
 	queue                interfaces.Queuer
+	metricsCache         interfaces.Cacher
 	hive                 Hive
 	healthCheckQueueName string
 	liquidationQueueName string
@@ -44,6 +45,7 @@ type Asset struct {
 
 func New(
 	queue interfaces.Queuer,
+	metricsCache interfaces.Cacher,
 	hive Hive,
 	healthCheckQueueName string,
 	liquidationQueueName string,
@@ -58,11 +60,17 @@ func New(
 		return nil, errors.New("queue must be set")
 	}
 
+	if metricsCache == nil {
+		return nil, errors.New("metricsCache must be set")
+	}
+
 	if liquidationQueueName == "" || healthCheckQueueName == "" {
 		return nil, errors.New("HealthCheckQueue and liquidationQueue must be set")
 	}
 
 	return &HealthChecker{
+		queue:                queue,
+		metricsCache:         metricsCache,
 		healthCheckQueueName: healthCheckQueueName,
 		liquidationQueueName: liquidationQueueName,
 		logger:               logger,
@@ -189,6 +197,8 @@ func (s HealthChecker) Run() error {
 		jobs := s.generateJobs(positions, s.addressesPerJob)
 		userResults, success := s.RunWorkerPool(jobs)
 
+		s.metricsCache.IncrementBy("health_checker.accounts.scanned", int64(len(userResults)))
+
 		// A warning incase we do not successfully load data for all positions.
 		// This will likely not occur but it it does is important we notice.
 		if len(userResults) < len(positions) {
@@ -214,6 +224,7 @@ func (s HealthChecker) Run() error {
 				"total": len(unhealthyPositions),
 			}).Info("Found unhealthy positions")
 		}
+		s.metricsCache.IncrementBy("health_checker.unhealthy.total", int64(len(unhealthyPositions)))
 
 		s.logger.WithFields(logrus.Fields{
 			"total":      len(positions),

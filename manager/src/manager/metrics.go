@@ -64,7 +64,8 @@ func (service *Manager) collectMetrics(height int64) ([]Metric, error) {
 	// Collector
 
 	// Total amount of contract items (collateral + debts) (per block)
-	// We don't clear this metric
+	// We don't clear this metric as it is only updated at intervals and
+	// not every block
 	metricName := "collector.contract_items.total"
 	total, err := service.metricsCache.GetFloat64(metricName)
 	if err != nil {
@@ -131,14 +132,117 @@ func (service *Manager) collectMetrics(height int64) ([]Metric, error) {
 	}).Debug("Collected metric")
 
 	// Health checker
-
 	// Total amount of health checks to perform (per block)
-	// Total amount of health checks performed (per block)
-	// Total amount of health checks missed (per block)
-	// Total healthy positions (since last check)
-	// Total unhealthy positions (since last check)
-	// Executor
+	metricName = "health_checker.accounts.total"
+	metricsToClear = append(metricsToClear, metricName)
+	accountTotal, err := service.metricsCache.GetFloat64(metricName)
+	if err != nil {
+		service.logger.WithFields(logrus.Fields{
+			"height": height,
+			"metric": metricName,
+			"error":  err,
+		}).Warning("Unable to get metric from cache")
+	} else {
+		metric := Metric{
+			Name:      metricName,
+			Value:     accountTotal,
+			Timestamp: time.Now().Unix(),
+			Chain:     service.chainID,
+		}
+		metrics = append(metrics, metric)
+		service.logger.WithFields(logrus.Fields{
+			"metric": metric.Name,
+			"value":  metric.Value,
+		}).Debug("Collected metric")
+	}
 
+	// Total amount of health checks performed (per block)
+	metricName = "health_checker.accounts.scanned"
+	metricsToClear = append(metricsToClear, metricName)
+	scannedAccounts, err := service.metricsCache.GetFloat64(metricName)
+	if err != nil {
+		service.logger.WithFields(logrus.Fields{
+			"height": height,
+			"metric": metricName,
+			"error":  err,
+		}).Warning("Unable to get metric from cache")
+	} else {
+		metric := Metric{
+			Name:      metricName,
+			Value:     scannedAccounts,
+			Timestamp: time.Now().Unix(),
+			Chain:     service.chainID,
+		}
+		metrics = append(metrics, metric)
+		service.logger.WithFields(logrus.Fields{
+			"metric": metric.Name,
+			"value":  metric.Value,
+		}).Debug("Collected metric")
+	}
+
+	// Total amount of health checks missed (per block)
+	metricName = "health_checker.accounts.missed"
+	metricsToClear = append(metricsToClear, metricName)
+	missed = accountTotal - scannedAccounts
+	if missed < 0 {
+		missed = 0
+	}
+	metric = Metric{
+		Name:      metricName,
+		Value:     float64(missed),
+		Timestamp: time.Now().Unix(),
+		Chain:     service.chainID,
+	}
+	metrics = append(metrics, metric)
+	service.logger.WithFields(logrus.Fields{
+		"metric": metric.Name,
+		"value":  metric.Value,
+	}).Debug("Collected metric")
+
+	// Total healthy positions (since last check)
+	metricName = "health_checker.unhealthy.total"
+	metricsToClear = append(metricsToClear, metricName)
+	totalUnhealthy, err := service.metricsCache.GetFloat64(metricName)
+	if err != nil {
+		service.logger.WithFields(logrus.Fields{
+			"height": height,
+			"metric": metricName,
+			"error":  err,
+		}).Warning("Unable to get metric from cache")
+	} else {
+		metric := Metric{
+			Name:      metricName,
+			Value:     totalUnhealthy,
+			Timestamp: time.Now().Unix(),
+			Chain:     service.chainID,
+		}
+		metrics = append(metrics, metric)
+		service.logger.WithFields(logrus.Fields{
+			"metric": metric.Name,
+			"value":  metric.Value,
+		}).Debug("Collected metric")
+	}
+
+	// Total unhealthy positions (since last check)
+	metricName = "health_checker.accounts.healthy"
+	metricsToClear = append(metricsToClear, metricName)
+	healthy := scannedAccounts - totalUnhealthy
+	if healthy < 0 {
+		missed = 0
+	}
+	metric = Metric{
+		Name:      metricName,
+		Value:     float64(healthy),
+		Timestamp: time.Now().Unix(),
+		Chain:     service.chainID,
+	}
+	metrics = append(metrics, metric)
+	service.logger.WithFields(logrus.Fields{
+		"metric": metric.Name,
+		"value":  metric.Value,
+	}).Debug("Collected metric")
+
+	// Executor
 	// Total liquidations
 	// Total liquidations (per block)
 	// Total liquidations missed
