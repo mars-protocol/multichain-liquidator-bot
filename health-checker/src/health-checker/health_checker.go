@@ -215,6 +215,8 @@ func (s HealthChecker) Run() error {
 
 		if len(unhealthyPositions) > 0 {
 
+			// Log the amount of liquidations to be performed
+			s.metricsCache.IncrementBy("executor.liquidations.total", int64(len(unhealthyPositions)))
 			err := s.queue.PushMany(s.liquidationQueueName, unhealthyPositions)
 			if err != nil {
 				s.logger.Errorf("Failed to push unhealthy addresses to queue. Error : %v", err)
@@ -224,6 +226,7 @@ func (s HealthChecker) Run() error {
 				"total": len(unhealthyPositions),
 			}).Info("Found unhealthy positions")
 		}
+		// Log the total amount of unhealthy positions
 		s.metricsCache.IncrementBy("health_checker.unhealthy.total", int64(len(unhealthyPositions)))
 
 		s.logger.WithFields(logrus.Fields{

@@ -67,15 +67,36 @@ run_race: .start_redis ## Run the service with race condition checking enabled
 	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-manager" \
-	CHAIN_ID="osmosis-1" \
-	HIVE_ENDPOINT="https://phoenix-hive.terra.dev/graphql" \
-	RPC_ENDPOINT="https://phoenix-rpc.terra.dev" \
+	CHAIN_ID="phoenix-1" \
+	HIVE_ENDPOINT="https://terra2-delphi-1.simply-vc.com.mt/ZC79CHN02DSI/terra-hive/graphql " \
+	RPC_ENDPOINT="https://rpc-terra-2.everstake.one:443" \
 	RPC_WEBSOCKET_ENDPOINT="wss://rpc.osmosis.zone/websocket" \
 	REDIS_DATABASE=0 \
+	REDIS_METRICS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
 	COLLECTOR_QUEUE_NAME="collector" \
+	COLLECTOR_ITEMS_PER_PACKET=4000 \
 	HEALTH_CHECK_QUEUE_NAME="health_check" \
 	EXECUTOR_QUEUE_NAME="executor" \
+	DEPLOYER_TYPE="docker" \
+	COLLECTOR_IMAGE=redis:latest \
+	HEALTH_CHECKER_IMAGE=redis:latest \
+	EXECUTOR_IMAGE=redis:latest \
+	SCALING_TYPE="watermark" \
+	COLLECTOR_CONTRACT="terra1nsuqsk6kh58ulczatwev87ttq2z6r3pusulg9r24mfj2fvtzd4uq3exn26" \
+	AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
+	AWS_SECRET_ACCESS_KEY="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" \
+	AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
+	AWS_SERVICE_CPU_UNITS=512 \
+	AWS_SERVICE_MEMORY_MB=1024 \
+	AWS_SERVICE_SUBNETS="subnet-14ef644c" \
+	AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
+	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "pisco-1","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
+	HEALTH_CHECKER_CONFIG='{"REDIS_ENDPOINT":"127.0.0.1","REDIS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"https://phoenix-hive.terra.dev","REDBANK_ADDRESS":"osmo123","ADDRESS_PER_JOB":"5","JOBS_PER_WORKER":"2","BATCH_SIZE":"2"}' \
+	EXECUTOR_CONFIG='{"LIQUIDATION_QUEUE_NAME":"liquidator","PREFIX":"osmo","GAS_PRICE":"0.001osmo","RPC_ENDPOINT":"https://phoenix-rpc.terra.dev","LIQUIDATION_FILTERER_CONTRACT":"osmo12...32","SEED":"seed phrase here"}' \
+	DATADOG_ENABLED=true \
+	DD_SITE="us5.datadoghq.com" \
+	DD_API_KEY="f1ffedda9de19cf4cef2ae80f2b6e210" \
 	go run -race ./src/*.go
 
 docker_build: build ## Build the service Docker container

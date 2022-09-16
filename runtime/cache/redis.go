@@ -45,7 +45,14 @@ func (cache *Redis) Set(key string, value interface{}) error {
 // Get an float value at key
 func (cache *Redis) GetFloat64(key string) (float64, error) {
 	// https://redis.io/commands/get/
-	return redis.Float64(cache.conn.Do("GET", key))
+	value, err := redis.Float64(cache.conn.Do("GET", key))
+	if err != nil {
+		// Key not found, return 0
+		if err == redis.ErrNil {
+			return 0, nil
+		}
+	}
+	return value, err
 }
 
 // IncrementBy increments the value at key by the given value

@@ -228,7 +228,7 @@ func (service *Manager) collectMetrics(height int64) ([]Metric, error) {
 	metricsToClear = append(metricsToClear, metricName)
 	healthy := scannedAccounts - totalUnhealthy
 	if healthy < 0 {
-		missed = 0
+		healthy = 0
 	}
 	metric = Metric{
 		Name:      metricName,
@@ -244,8 +244,71 @@ func (service *Manager) collectMetrics(height int64) ([]Metric, error) {
 
 	// Executor
 	// Total liquidations
-	// Total liquidations (per block)
+	metricName = "executor.liquidations.total"
+	metricsToClear = append(metricsToClear, metricName)
+	totalLiquidations, err := service.metricsCache.GetFloat64(metricName)
+	if err != nil {
+		service.logger.WithFields(logrus.Fields{
+			"height": height,
+			"metric": metricName,
+			"error":  err,
+		}).Warning("Unable to get metric from cache")
+	} else {
+		metric := Metric{
+			Name:      metricName,
+			Value:     totalLiquidations,
+			Timestamp: time.Now().Unix(),
+			Chain:     service.chainID,
+		}
+		metrics = append(metrics, metric)
+		service.logger.WithFields(logrus.Fields{
+			"metric": metric.Name,
+			"value":  metric.Value,
+		}).Debug("Collected metric")
+	}
+
+	// Total liquidations executed (per block)
+	metricName = "executor.liquidations.executed"
+	metricsToClear = append(metricsToClear, metricName)
+	performedLiquidations, err := service.metricsCache.GetFloat64(metricName)
+	if err != nil {
+		service.logger.WithFields(logrus.Fields{
+			"height": height,
+			"metric": metricName,
+			"error":  err,
+		}).Warning("Unable to get metric from cache")
+	} else {
+		metric := Metric{
+			Name:      metricName,
+			Value:     performedLiquidations,
+			Timestamp: time.Now().Unix(),
+			Chain:     service.chainID,
+		}
+		metrics = append(metrics, metric)
+		service.logger.WithFields(logrus.Fields{
+			"metric": metric.Name,
+			"value":  metric.Value,
+		}).Debug("Collected metric")
+	}
+
 	// Total liquidations missed
+	metricName = "executor.liquidations.missed"
+	metricsToClear = append(metricsToClear, metricName)
+	missedLiquidations := totalLiquidations - performedLiquidations
+	if missedLiquidations < 0 {
+		missedLiquidations = 0
+	}
+	metric = Metric{
+		Name:      metricName,
+		Value:     float64(missedLiquidations),
+		Timestamp: time.Now().Unix(),
+		Chain:     service.chainID,
+	}
+	metrics = append(metrics, metric)
+	service.logger.WithFields(logrus.Fields{
+		"metric": metric.Name,
+		"value":  metric.Value,
+	}).Debug("Collected metric")
 
 	// Clear metrics from cache
 	for _, metricName := range metricsToClear {
