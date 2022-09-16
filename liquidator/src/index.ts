@@ -1,12 +1,12 @@
-import { IRedisInterface, RedisInterface } from "./redis"
-import { LiquidationHelper } from "./liquidation_helpers"
+import { IRedisInterface, RedisInterface } from "./redis.js"
+import { LiquidationHelper } from "./liquidation_helpers.js"
 import { Asset } from "./types/asset"
-import { LiquidationResult, LiquidationTx } from "./types/liquidation"
+import { LiquidationResult, LiquidationTx } from "./types/liquidation.js"
 import { Position } from "./types/position"
 import { Coin, GasPrice } from "@cosmjs/stargate"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from "@cosmjs/cosmwasm-stargate"
-import { sleep } from "./helpers"
+import { sleep } from "./helpers.js"
 
 const PREFIX = process.env.PREFIX!
 const GAS_PRICE = process.env.GAS_PRICE!
@@ -39,12 +39,14 @@ export const main = async () => {
     while (true) await run(liquidationHelper, redis)
 }
 
+
+
 // exported for testing
 export const run = async (txHelper: LiquidationHelper, redis: IRedisInterface) => {
-    const positions: Position[] = await redis.fetchUnhealthyPositions()
 
-    if (positions.length == 0) {
-
+    const positions : Position[] = await redis.fetchUnhealthyPositions()
+    if (positions.length == 0){
+       
         //sleep to avoid spamming redis db when empty
         sleep(200)
 
@@ -52,19 +54,23 @@ export const run = async (txHelper: LiquidationHelper, redis: IRedisInterface) =
     }
 
     const txs: LiquidationTx[] = []
-    const coins: Coin[] = []
-
+    const debtsToRepay = new Map<string, number>()
+    
     // for each address, send liquidate tx
     positions.forEach((position: Position) => {
         const tx = txHelper.produceLiquidationTx(position)
+        const debtDenom = tx.debt_denom
         txs.push(tx)
-        const amount: number = position.debts.find((debt: Asset) => debt.denom === tx.debt_denom)?.amount || 0
+        const amount : number = position.debts.find((debt: Asset) => debt.denom === debtDenom)?.amount || 0 
+        const debtAmount = debtsToRepay.get(tx.debt_denom) || 0 
+        debtsToRepay.set(tx.debt_denom, debtAmount + amount)
 
         // TODO handle not finding the asset in list above - this should never happen but we should handle regardless
-
-        coins.push({ denom: tx.debt_denom, amount: amount.toString() })
     })
 
+    const coins : Coin[] = []
+    debtsToRepay.forEach((amount, denom) => coins.push({denom, amount: amount.toFixed(0)}))
+    
     // dispatch transactions - return object with results on it
     const results = await txHelper.sendLiquidationTxs(txs, coins)
 
@@ -85,4 +91,4 @@ export const run = async (txHelper: LiquidationHelper, redis: IRedisInterface) =
 }
 
 
-await main()
+main().catch(e => console.log(e))
