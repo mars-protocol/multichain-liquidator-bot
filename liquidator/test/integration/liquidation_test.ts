@@ -17,10 +17,10 @@ import { RedisClientType } from "redis";
 import { run } from "../../src/index.js";
 import { LiquidationHelper } from "../../src/liquidation_helpers.js";
 import { RedisInterface } from "../../src/redis.js";
-import { borrow, deposit, queryHealth, readAddresses, seedAddresses, setPrice } from "../../src/test_helpers.js";
+import { borrow, deposit, ProtocolAddresses, queryHealth, readAddresses, seedAddresses, setPrice } from "../../src/test_helpers.js";
 import { Position } from "../../src/types/position";
 
-const addresses = readAddresses()
+const addresses : ProtocolAddresses = readAddresses()
 const osmoDenom = 'uosmo'
 const atomDenom = 'uion'
 const redisQueueName = 'testQueue'
@@ -40,7 +40,7 @@ const runTest = async() => {
 
   // Create 100 wallets
   const accountNumbers: number[] = [];
-  while (accountNumbers.length < 100) {
+  while (accountNumbers.length < 5) {
 
     accountNumbers.push(accountNumbers.length)
   }
@@ -50,6 +50,7 @@ const runTest = async() => {
   // Do init
   const wallet = await DirectSecp256k1HdWallet.fromMnemonic(deployerSeed, { hdPaths: hdPaths, prefix: 'osmo' });
   const accounts = await wallet.getAccounts()
+
   const clientOption: SigningCosmWasmClientOptions = {
     gasPrice: GasPrice.fromString("0.1uosmo")
   }
@@ -57,16 +58,13 @@ const runTest = async() => {
   const client = await SigningCosmWasmClient.connectWithSigner(localOsmosisRPC, wallet, clientOption);
   const deployerAddress = accounts[0].address  
 
-  const liquidationHelper = new LiquidationHelper(client,deployerAddress, addresses.liquidateFilterContractAddress)
+  const liquidationHelper = new LiquidationHelper(client,deployerAddress, addresses.filterer)
   
   const osmoToSend = {"amount": "11000000", "denom": osmoDenom}
   const atomToSend = {"amount": "10000000", "denom": atomDenom}
 
   // seed addresses with value
-  const useableAddresses =  await seedAddresses(client, accounts, [atomToSend, osmoToSend])
-
-  // TODO REMOVE ME ONCE CONTRACT UPDATED - have this here to be able to liquidate successfully
-  await client.sendTokens(deployerAddress, addresses.liquidateFilterContractAddress, [{"amount": "1000000000", "denom":atomDenom}], "auto")
+  const useableAddresses =  await seedAddresses(client, deployerAddress,accounts, [atomToSend, osmoToSend])
 
   // set prices, both at 1
   console.log(`setting prices`)

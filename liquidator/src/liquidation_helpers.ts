@@ -98,6 +98,10 @@ export class LiquidationHelper implements ILiquidationHelper {
         return this.parseLiquidationResult(result)        
     }
 
+    async withdrawRefunded(): Promise<ExecuteResult> {
+        return await this.client.execute(this.liquidatorAddress, this.liquidationFilterContract, {refund:{recipient:this.liquidatorAddress}}, "auto")
+    }
+
     parseLiquidationResult(result: ExecuteResult) : LiquidationResult[] {
 
         const liquidationResults : LiquidationResult[] = []

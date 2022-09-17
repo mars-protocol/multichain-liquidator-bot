@@ -16,7 +16,7 @@ export function readAddresses() : ProtocolAddresses {
     );
     return JSON.parse(data);
   } catch (e) {
-    console.error("Failed to load addresses.json - please ensure a valid address.json file is located under /testing")
+    console.error("Failed to load addresses.json - please ensure a valid address.json file is located under module root directory")
     process.exit(1)
   }
 }
@@ -33,7 +33,7 @@ const msg = {
     }
   }
 
-  await client.execute(deployerAddress,addresses.oracleContractAddress,msg,'auto')
+  await client.execute(deployerAddress,addresses.oracle,msg,'auto')
 }
 
 // send OSMO and ATOM to next n number of addresses under our seed
@@ -62,7 +62,6 @@ export const seedAddresses = async(
     }
 
     sendTokenMsgs.push(msg)
-
     seededAddresses.push(addressToSeed)
   }
 
@@ -83,7 +82,7 @@ export const withdraw = async(client: SigningCosmWasmClient, sender: string, ass
     }
   }
 
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto")
+  return await client.execute(sender, addresses.redBank, msg, "auto")
 }
 
 export const borrow = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string,addresses : ProtocolAddresses) => {
@@ -94,7 +93,7 @@ export const borrow = async(client: SigningCosmWasmClient, sender: string, asset
     }
   }
 
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto")
+  return await client.execute(sender, addresses.redBank, msg, "auto")
 }
 
 export const makeDepositMessage = (
@@ -142,7 +141,7 @@ export const deposit = async(client: SigningCosmWasmClient, sender: string, asse
         "amount": amount 
     }]
 
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto", undefined, coins)
+  return await client.execute(sender, addresses.redBank, msg, "auto", undefined, coins)
 }
 
 export const repay = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string, addresses : ProtocolAddresses) => {
@@ -152,21 +151,21 @@ export const repay = async(client: SigningCosmWasmClient, sender: string, assetD
         "amount": amount 
     }]
 
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto", undefined, coins)
+  return await client.execute(sender, addresses.redBank, msg, "auto", undefined, coins)
 }
 
 export const queryHealth = async(client : SigningCosmWasmClient, address: string, addresses : ProtocolAddresses) => {
-  const msg = { "user_position": { "user_address": address } }
-  return await client.queryContractSmart(addresses.redBankContractAddress, msg)
+  const msg = { "user_position": { "user": address } }
+  return await client.queryContractSmart(addresses.redBank, msg)
 }
 
-export interface ProtocolAddresses {
-  addressProviderContractAddress: string,
-  liquidateFilterContractAddress: string,
-  redBankContractAddress: string,
-  incentivesContractAddress: string,
-  oracleContractAddress: string,
-  protocolRewardsCollectorContractAddress: string,
+export interface ProtocolAddresses {  
+  addressProvider: string,
+  filterer: string,
+  redBank: string,
+  incentives: string,
+  oracle: string,
+  rewardsCollector: string,
 }
 
 // Reads json containing contract addresses located in /artifacts folder for specified network.

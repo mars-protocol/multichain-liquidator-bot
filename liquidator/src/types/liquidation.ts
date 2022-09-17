@@ -5,9 +5,8 @@ export interface LiquidationTx {
     debt_denom: string,
     /// The address of the borrower getting liquidated
     user_address: string,
-    /// Whether the liquidator gets liquidated collateral in maToken (true) or
-    /// the underlying collateral asset (false)
-    receive_ma_token: boolean,
+    // the amount of debt to be repaid
+    amount: string
 }
 
 export interface LiquidationResult {

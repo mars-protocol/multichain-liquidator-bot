@@ -16,11 +16,14 @@ import { LiquidationTx } from './types/liquidation.js'
  * @returns A liquidation transaction for the given position.
  */
 export const createLiquidationTx = (position : Position) : LiquidationTx => {
+    const debtAsset = getLargestDebt(position.debts)
+
     return {
         collateral_denom: getLargestCollateral(position.collaterals),
-        debt_denom : getLargestDebt(position.debts),
+        debt_denom : debtAsset.denom,
         user_address : position.address,
-        receive_ma_token : false
+        amount: debtAsset.amount.toFixed(0)
+        
     }
 }
 
@@ -35,6 +38,6 @@ export const getLargestCollateral = (collaterals : Asset[]) : string => {
    return sortAssetArrayByAmount(collaterals)[0].denom
 }
 
-export const getLargestDebt = (debts : Asset[]) : string => {
-    return sortAssetArrayByAmount(debts)[0].denom
+export const getLargestDebt = (debts : Asset[]) : Asset => {
+    return sortAssetArrayByAmount(debts)[0]
 }
