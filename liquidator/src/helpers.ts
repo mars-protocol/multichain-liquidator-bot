@@ -134,6 +134,33 @@ const executeContractMsg: MsgExecuteContractEncodeObject = {
 return executeContractMsg
 }
 
+export const makeWithdrawMessage = (
+  sender: string, 
+  amount: string,
+  assetDenom: string, 
+  redBankContractAddress: string,
+  recipient: string) : MsgExecuteContractEncodeObject => {
+
+  const executeContractMsg: MsgExecuteContractEncodeObject = {
+    typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+    value: {
+      sender: sender,
+      contract: redBankContractAddress,
+      msg: toUtf8(`
+      { 
+        "withdraw": { 
+          "denom": "${assetDenom}",
+          "amount": ${amount},
+          "recipient": "${recipient}" 
+        } 
+      }`),
+      funds: [],
+    },
+  };
+
+  return executeContractMsg
+}
+
 export const deposit = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string, addresses : ProtocolAddresses) => {
   const msg = { "deposit": { "denom": assetDenom } }
   const coins = [{
