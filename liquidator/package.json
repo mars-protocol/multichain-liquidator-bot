@@ -25,7 +25,8 @@
   },
   "scripts": {
     "test:integration": "node --loader ts-node/esm test/integration/liquidation_test.ts",
-    "start" : "node --loader ts-node/esm src/index.ts"
+    "start" : "node --loader ts-node/esm src/index.ts",
+    "test": "jest"
   }
 
   

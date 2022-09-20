@@ -4,9 +4,9 @@ import { Asset } from "./types/asset"
 import { LiquidationResult, LiquidationTx } from "./types/liquidation.js"
 import { Position } from "./types/position"
 import { Coin, GasPrice } from "@cosmjs/stargate"
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
+import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing"
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from "@cosmjs/cosmwasm-stargate"
-import { sleep } from "./test_helpers.js"
+import { makeWithdrawMessage, ProtocolAddresses, readAddresses, sleep } from "./helpers.js"
 
 const PREFIX = process.env.PREFIX!
 const GAS_PRICE = process.env.GAS_PRICE!
@@ -16,6 +16,7 @@ const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 // todo don't store in .env
 const SEED = process.env.SEED!
 
+const addresses : ProtocolAddresses = readAddresses()
 // Program entry
 export const main = async () => {
    
@@ -36,13 +37,21 @@ export const main = async () => {
     const liquidationHelper = new LiquidationHelper(client,liquidatorAddress, LIQUIDATION_FILTERER_CONTRACT)  
 
     // run
-    while (true) await run(liquidationHelper, redis)
+    while (true) await run(
+        liquidationHelper, 
+        redis, 
+        client, 
+        liquidatorAddress)
 }
 
 
 
 // exported for testing
-export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) => {
+export const run = async (
+    txHelper: LiquidationHelper, 
+    redis : IRedisInterface, 
+    client: SigningCosmWasmClient,
+    liquidatorAddress: string) => {
 
     const positions : Position[] = await redis.fetchUnhealthyPositions()
     if (positions.length == 0){
@@ -72,11 +81,22 @@ export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) 
     debtsToRepay.forEach((amount, denom) => coins.push({denom, amount: amount.toFixed(0)}))
     
     // dispatch transactions - return object with results on it
-    const results = await txHelper.sendLiquidationTxs(txs, coins)
+    const results = await txHelper.sendLiquidationsTx(txs, coins)
+    const withdrawlMsgs : EncodeObject[] = []
 
     // Swap collaterals to replace the debt that was repaid
     results.forEach(async (result: LiquidationResult) => {
         
+        // push withdrawl message to end so that we don't
+        withdrawlMsgs.push(makeWithdrawMessage(
+            liquidatorAddress, 
+            result.collateralReceivedDenom,
+            addresses.redBank,
+            liquidatorAddress
+        ))
+
+        // todo retry
+        // swap should probably take into account scaled amount?
         await txHelper.swap(
             result.collateralReceivedDenom, 
             result.debtRepaidDenom, 
@@ -84,7 +104,8 @@ export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) 
             )
     })
 
-
+    // execute withdrawls from msg
+    client.signAndBroadcast(liquidatorAddress,withdrawlMsgs,"auto")
 }
 
 

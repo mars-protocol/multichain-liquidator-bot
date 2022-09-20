@@ -136,7 +136,6 @@ return executeContractMsg
 
 export const makeWithdrawMessage = (
   sender: string, 
-  amount: string,
   assetDenom: string, 
   redBankContractAddress: string,
   recipient: string) : MsgExecuteContractEncodeObject => {
@@ -150,7 +149,6 @@ export const makeWithdrawMessage = (
       { 
         "withdraw": { 
           "denom": "${assetDenom}",
-          "amount": ${amount},
           "recipient": "${recipient}" 
         } 
       }`),
