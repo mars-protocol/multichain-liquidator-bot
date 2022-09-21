@@ -1,8 +1,0 @@
-{
-  "addressProvider": "osmo1d9m23r3ul6huszk5k2djz7a6gy9q05mkwxvqms4zsk0hlf8jg0xqew9gc4",
-  "redBank": "osmo1aj4khuq9descgr3r9ejs2t7gdqa83f3ufl8s8gwfeza8mgl238zsyvkfpw",
-  "incentives": "osmo1sj6j2jdn6ssu8yxjv7cae8gx4jg7rsvfftw773nfxana3vfl095setpkmw",
-  "oracle": "osmo1svaq4eymuu77rh57fx57uz6j7r0egwf2h3d92433dqzvreggrg9sduf8u7",
-  "rewardsCollector": "osmo1jlkcl8czu2zu40ptp38l04rvmdlj60rqljky6lka9nelrmmy3dlsecdzjh",
-  "filterer": "osmo1cxeguwvu2fgp6zvcmwulld3nwzsqj3yxum7qxd63hy6fa5r4d54q8m5yqr"
-  }
