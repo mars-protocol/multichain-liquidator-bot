@@ -13,7 +13,12 @@ The main components of a test are
 
 **Redbank deployment** 
   
-You will need to have redbank deployed. Use the deploy scripts located [here](https://github.com/mars-protocol/outposts/tree/master/scripts/deploy). Ensure that the correct assets are configured in the db
+Use the deploy scripts located [here](https://github.com/mars-protocol/outposts/tree/master/scripts/deploy). 
+Recommend cloning `outposts` directory as a sibling of `multichain-liquidator-bot`
+
+Notes:
+
+- Ensure that you configure the same asset denom for atom / osmo in the redbank deploy config files as you use in your environment file when testing.
 
 **Genesis file**
 
@@ -23,7 +28,7 @@ initialisation. Set this in the `genesis.json` file like:
 ```json
  "balances": [
         {
-          "address": "osmo1qwexv7c6sm95lwhzn9027vyu2ccneaqad4w8ka",
+          "address": "osmo1cyyzpxplxdzkeea7kwsydadg87357qnahakaks",
           "coins": [
             {
               "denom": "uion",
@@ -67,16 +72,25 @@ RPC_URL=http://localhost:26657
 // Name of the redis queue
 QUEUE_NAME=throughput_test
 
-// Denoms of atom and osmosis. Reccommend leaving these as is
+// Denoms of atom and osmosis. Reccommend leaving these as is, but ensure they match the denoms you deployed via osmosis
 ATOM_DENOM=uion
 OSMO_DENOM=uosmo
 
 // Maxmimum amount of wallets which we are building positions for at the same time. Increasing this
 // may increase the speed at which we produce positions
 MAX_THREADS=20
+
+// path to the artifacts directory in the outposts repo
+OUTPOST_ARTIFACTS_PATH="/Users/markwatney/crypto/outposts/artifacts/"
+
+// The chainId. Note that this should match the chain id you deployed to (usually either testnet, localosmosis), so that the scripts can find 
+// the correct deploy config
+CHAIN_ID="localosmosis"
 ```
 
 See the `.env.example` file in this directory for a default setting
+
+
 
 ## Creating positions
 
@@ -88,6 +102,7 @@ npm run test:createPositions
 
 *Note that if you already have positions this will not wipe your previous positions, meaning you may have some 'dirty data' which can interfere with your test*
 
+To do a fresh deploy, delete the relevant deploy file in OUTPOSTS_DIR/artifacts, and redeploy. This will create new contracts and a new deploy file under OUTPOST_DIR/artifacts
 
 
 **TODO** 
