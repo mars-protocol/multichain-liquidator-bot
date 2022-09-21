@@ -5,9 +5,10 @@ import { GasPrice } from "@cosmjs/stargate";
 import { RedisClientType } from "redis";
 import { Coin, makeCosmoshubPath } from "@cosmjs/amino";
 import { RedisInterface } from "../liquidator/src/redis.js"
-import { borrow, deposit, loadSeeds, makeBorrowMessage, makeDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../liquidator/src/test_helpers.js"
+import { borrow, deposit, loadSeeds, makeBorrowMessage, makeDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../liquidator/src/helpers.js"
 import { requiredEnvironmentVariables } from "./helpers.js";
 import 'dotenv/config.js'
+import path from 'path'
 
 requiredEnvironmentVariables([
     "DEPLOYER_SEED",
@@ -35,6 +36,8 @@ const OSMO_DENOM = process.env.OSMO_DENOM!
 // throttle with this
 const MAX_THREADS = Number(process.env.MAX_THREADS!)
 
+const deployDetailsPath = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
+
 // TODO set me via .env?
 const borrowAmount = "3000000"
 
@@ -49,7 +52,7 @@ export const main = async() => {
 
     // gather required data
     const seeds = loadSeeds() 
-    const protocolAddresses = readAddresses() 
+    const protocolAddresses = readAddresses(deployDetailsPath) 
 
     console.log(protocolAddresses)
     
@@ -133,7 +136,7 @@ const createClient = async(wallet : DirectSecp256k1HdWallet) : Promise<SigningCo
 const preFlightChecks = async(client: SigningCosmWasmClient, addresses: ProtocolAddresses, deployerAddress : string) => {
 
     // TODO REMOVE ME ONCE CONTRACT UPDATED - have this here to be able to liquidate successfully
-   await client.sendTokens(deployerAddress, addresses.liquidateFilterContractAddress, [{"amount": "1000000000", "denom":ATOM_DENOM}], "auto")
+   await client.sendTokens(deployerAddress, addresses.filterer, [{"amount": "1000000000", "denom":ATOM_DENOM}], "auto")
  
    // set prices, both at 1
    console.log(`setting prices @ $1`)
@@ -187,7 +190,7 @@ const createPositions = async(
         const depositMsg = makeDepositMessage(
             address,
             OSMO_DENOM,
-            addresses.redBankContractAddress,
+            addresses.redBank,
             [osmoToDeposit]
         )
 
@@ -195,7 +198,7 @@ const createPositions = async(
             address,
             ATOM_DENOM,
             borrowAmount,
-            addresses.redBankContractAddress
+            addresses.redBank
         )
 
         // Dispatch deposit and borrow as one asset

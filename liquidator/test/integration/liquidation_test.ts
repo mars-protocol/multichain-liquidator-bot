@@ -17,10 +17,17 @@ import { RedisClientType } from "redis";
 import { run } from "../../src/index.js";
 import { LiquidationHelper } from "../../src/liquidation_helpers.js";
 import { RedisInterface } from "../../src/redis.js";
-import { borrow, deposit, ProtocolAddresses, queryHealth, readAddresses, seedAddresses, setPrice } from "../../src/test_helpers.js";
+import { borrow, deposit, makeWithdrawMessage, ProtocolAddresses, queryHealth, readAddresses, seedAddresses, setPrice } from "../../src/helpers.js";
 import { Position } from "../../src/types/position";
+import path from 'path'
+import 'dotenv/config.js'
 
-const addresses : ProtocolAddresses = readAddresses()
+console.log(`${process.env.CHAIN_ID}.json`)
+console.log(process.env.OUTPOST_ARTIFACTS_PATH!)
+
+const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
+
+const addresses : ProtocolAddresses = readAddresses(deployDetails)
 const osmoDenom = 'uosmo'
 const atomDenom = 'uion'
 const redisQueueName = 'testQueue'
@@ -30,7 +37,6 @@ const deployerSeed = "notice oak worry limit wrap speak medal online prefer clus
 const localOsmosisRPC = "http://localhost:26657"
 
 const redisInterface = new RedisInterface(redisQueueName)
-
 
   // run test
 const runTest = async() => {
@@ -47,6 +53,9 @@ const runTest = async() => {
 
   const hdPaths : HdPath[] = accountNumbers.map((value) => makeCosmoshubPath(value));
 
+
+
+
   // Do init
   const wallet = await DirectSecp256k1HdWallet.fromMnemonic(deployerSeed, { hdPaths: hdPaths, prefix: 'osmo' });
   const accounts = await wallet.getAccounts()
@@ -59,7 +68,7 @@ const runTest = async() => {
   const deployerAddress = accounts[0].address  
 
   const liquidationHelper = new LiquidationHelper(client,deployerAddress, addresses.filterer)
-  
+
   const osmoToSend = {"amount": "11000000", "denom": osmoDenom}
   const atomToSend = {"amount": "10000000", "denom": atomDenom}
 
@@ -76,7 +85,6 @@ const runTest = async() => {
   // // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
   await deposit(client, deployerAddress, atomDenom, "100_000_000", addresses)
   await deposit(client, deployerAddress, osmoDenom, "100_000_000", addresses)
-
 
   console.log('Setting up positions')
   const length = useableAddresses.length
@@ -95,11 +103,12 @@ const runTest = async() => {
   
   // use this when debugging tests to prevent messing up existing positions
   // const useableAddresses = [getFirstAddresses(accounts)[3], getFirstAddresses(accounts)[1]]
+
   await pushPositionsToRedis(useableAddresses, redisClient)
   
   
   for(const index in useableAddresses) {
-    console.log(await queryHealth(client,useableAddresses[index], addresses))
+    console.log(await queryHealth(client, useableAddresses[index], addresses))
   }
 
   // manipulate price
@@ -109,16 +118,41 @@ const runTest = async() => {
     console.log(await queryHealth(client,useableAddresses[index], addresses))
   }
 
+  console.log("Initial liquidate balances")
+  const initialBalance = {
+    uosmo: await client.getBalance(deployerAddress, osmoDenom),
+    atom: await client.getBalance(deployerAddress, atomDenom)
+  }
+  console.log(initialBalance)
+
   console.log(`================= executing liquidations =================`)
   // execute liquidations
-  await dispatchLiquidations(liquidationHelper)
+  await dispatchLiquidations(liquidationHelper,client, deployerAddress)
 
   for(const index in useableAddresses) {
-    console.log(await queryHealth(client,useableAddresses[index], addresses))
+    const health = await queryHealth(client,useableAddresses[index], addresses)
+    if (Number(health.health_status.borrowing.liq_threshold_hf) < 1) {
+      console.log(`${useableAddresses[index]} is still unhealthy`)
+    } else {
+      console.log(`${useableAddresses[index]} is healthy`)
+    }
   }
 
+  console.log("Post liquidate balances")
+  const updatedBalance = {
+    uosmo: await client.getBalance(deployerAddress, osmoDenom),
+    atom: await client.getBalance(deployerAddress, atomDenom)
+  }
 
-  console.log("Successfully completed liquidations :)")
+  const gains = Number(updatedBalance.atom.amount) -  Number(initialBalance.atom.amount)
+
+  if (gains < 0) {
+    console.error("ERROR : Updated balance was smaller than initial balance. Asset")
+  } else {
+    console.log("Successfully completed liquidations :)")
+    console.log(`Gained ${gains}`)
+  }
+
   process.exit(0)
 }
 
@@ -146,8 +180,11 @@ const pushPositionsToRedis = async(addresses: string[], redisClient : RedisClien
   }
 }
 
-const dispatchLiquidations = async(liquidationHelper : LiquidationHelper) => {
-    await run(liquidationHelper,redisInterface)
+const dispatchLiquidations = async(
+  liquidationHelper : LiquidationHelper, 
+  client: SigningCosmWasmClient,
+  liquidatorAddress: string) => {
+    await run(liquidationHelper,redisInterface,client,liquidatorAddress)
 }
 
 // used for debugging tests

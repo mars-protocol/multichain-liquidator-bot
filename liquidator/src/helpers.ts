@@ -8,15 +8,16 @@ export async function sleep(timeout: number) {
   }
   
 // Reads json containing contract addresses located in /artifacts folder for specified network.
-export function readAddresses() : ProtocolAddresses {
+export function readAddresses(deployConfigPath: string) : ProtocolAddresses {
+ 
   try {
     const data = readFileSync(
-      `addresses.json`,
+      deployConfigPath,
       "utf8"
     );
-    return JSON.parse(data);
+    return JSON.parse(data).addresses;
   } catch (e) {
-    console.error("Failed to load addresses.json - please ensure a valid address.json file is located under module root directory")
+    console.error(`Failed to load artifacts path - could not find ${deployConfigPath}`)
     process.exit(1)
   }
 }
@@ -132,6 +133,31 @@ const executeContractMsg: MsgExecuteContractEncodeObject = {
 };
 
 return executeContractMsg
+}
+
+export const makeWithdrawMessage = (
+  sender: string, 
+  assetDenom: string, 
+  redBankContractAddress: string,
+  recipient: string) : MsgExecuteContractEncodeObject => {
+
+  const executeContractMsg: MsgExecuteContractEncodeObject = {
+    typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+    value: {
+      sender: sender,
+      contract: redBankContractAddress,
+      msg: toUtf8(`
+      { 
+        "withdraw": { 
+          "denom": "${assetDenom}",
+          "recipient": "${recipient}" 
+        } 
+      }`),
+      funds: [],
+    },
+  };
+
+  return executeContractMsg
 }
 
 export const deposit = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string, addresses : ProtocolAddresses) => {

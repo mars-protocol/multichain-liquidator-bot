@@ -4,9 +4,18 @@ import { Asset } from "./types/asset"
 import { LiquidationResult, LiquidationTx } from "./types/liquidation.js"
 import { Position } from "./types/position"
 import { Coin, GasPrice } from "@cosmjs/stargate"
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
+import { coin, DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing"
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from "@cosmjs/cosmwasm-stargate"
-import { sleep } from "./test_helpers.js"
+import { makeWithdrawMessage, ProtocolAddresses, readAddresses, sleep } from "./helpers.js"
+import { osmosis } from "osmojs"
+
+import path from 'path'
+import 'dotenv/config.js'
+
+const {
+    swapExactAmountIn
+} = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
+
 
 const PREFIX = process.env.PREFIX!
 const GAS_PRICE = process.env.GAS_PRICE!
@@ -15,6 +24,8 @@ const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 
 // todo don't store in .env
 const SEED = process.env.SEED!
+const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
+const addresses : ProtocolAddresses = readAddresses(deployDetails)
 
 // Program entry
 export const main = async () => {
@@ -36,13 +47,21 @@ export const main = async () => {
     const liquidationHelper = new LiquidationHelper(client,liquidatorAddress, LIQUIDATION_FILTERER_CONTRACT)  
 
     // run
-    while (true) await run(liquidationHelper, redis)
+    while (true) await run(
+        liquidationHelper, 
+        redis, 
+        client, 
+        liquidatorAddress)
 }
 
 
 
 // exported for testing
-export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) => {
+export const run = async (
+    liquidationHelper: LiquidationHelper, 
+    redis : IRedisInterface, 
+    client: SigningCosmWasmClient,
+    liquidatorAddress: string) => {
 
     const positions : Position[] = await redis.fetchUnhealthyPositions()
     if (positions.length == 0){
@@ -58,7 +77,7 @@ export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) 
     
     // for each address, send liquidate tx
     positions.forEach((position: Position) => {
-        const tx = txHelper.produceLiquidationTx(position)
+        const tx = liquidationHelper.produceLiquidationTx(position)
         const debtDenom = tx.debt_denom
         txs.push(tx)
         const amount : number = position.debts.find((debt: Asset) => debt.denom === debtDenom)?.amount || 0 
@@ -71,20 +90,50 @@ export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) 
     const coins : Coin[] = []
     debtsToRepay.forEach((amount, denom) => coins.push({denom, amount: amount.toFixed(0)}))
     
-    // dispatch transactions - return object with results on it
-    const results = await txHelper.sendLiquidationTxs(txs, coins)
+    // dispatch liquidation tx , and recieve and object with results on it
+    const results = await liquidationHelper.sendLiquidationsTx(txs, coins)
 
-    // Swap collaterals to replace the debt that was repaid
-    results.forEach(async (result: LiquidationResult) => {
-        
-        await txHelper.swap(
-            result.collateralReceivedDenom, 
-            result.debtRepaidDenom, 
-            Number(result.collateralReceivedAmount)
-            )
-    })
+    console.log(`results.length is `)
+    console.log(results.length)
+    // clean up stuff:
+    // 1) Liquidation bonus given as mToken, so we need to withdraw 
+    // 2) Swap withdrawn bonus to replace the debt we repaid to win liquidation.
+    // TODO move this to liuquidation helper
+    
+    // ensure that we have registered swap type for osmosis
+    const swapTypeUrl = "/osmosis.gamm.v1beta1.MsgSwapExactAmountIn"
+    client.registry.register(swapTypeUrl, osmosis.gamm.v1beta1.MsgSwapExactAmountIn)
 
+    for (const index in results) {
 
+        const liquidation: LiquidationResult = results[index]
+        const route = await liquidationHelper.findRoute(liquidation.collateralReceivedDenom, liquidation.debtRepaidDenom)
+        // Create messages
+        // withdraw message
+        // swap message
+        // 
+        const msgs = [
+            makeWithdrawMessage(
+                liquidatorAddress, 
+                liquidation.collateralReceivedDenom,
+                addresses.redBank,
+                liquidatorAddress
+            ),
+            swapExactAmountIn({
+                sender: liquidatorAddress,
+                routes: route,
+                tokenIn: coin(Number(liquidation.collateralReceivedAmount), liquidation.collateralReceivedDenom),
+    
+                // TODO: Should we have a min amount here? It is very important the swap succeds, but at the same time
+                // this makes us vulnerable to slippage / low liquidity / frontrunning etc
+                tokenOutMinAmount: '1' 
+              })
+        ]
+
+        console.log(liquidation.collateralReceivedAmount)
+            
+        await client.signAndBroadcast(liquidatorAddress,msgs,"auto")
+    }
 }
 
 
