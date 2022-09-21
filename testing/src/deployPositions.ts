@@ -4,11 +4,10 @@ import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { GasPrice } from "@cosmjs/stargate";
 import { RedisClientType } from "redis";
 import { Coin, makeCosmoshubPath } from "@cosmjs/amino";
-import { RedisInterface } from "../liquidator/src/redis.js"
-import { borrow, deposit, loadSeeds, makeBorrowMessage, makeDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../liquidator/src/helpers.js"
+import { RedisInterface } from "../../liquidator/src/redis.js"
+import { borrow, deposit, loadSeeds, makeBorrowMessage, makeDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../liquidator/src/test_helpers.js"
 import { requiredEnvironmentVariables } from "./helpers.js";
 import 'dotenv/config.js'
-import path from 'path'
 
 requiredEnvironmentVariables([
     "DEPLOYER_SEED",
@@ -36,8 +35,6 @@ const OSMO_DENOM = process.env.OSMO_DENOM!
 // throttle with this
 const MAX_THREADS = Number(process.env.MAX_THREADS!)
 
-const deployDetailsPath = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
-
 // TODO set me via .env?
 const borrowAmount = "3000000"
 
@@ -52,7 +49,7 @@ export const main = async() => {
 
     // gather required data
     const seeds = loadSeeds() 
-    const protocolAddresses = readAddresses(deployDetailsPath) 
+    const protocolAddresses = readAddresses() 
 
     console.log(protocolAddresses)
     
