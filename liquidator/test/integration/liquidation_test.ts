@@ -19,8 +19,15 @@ import { LiquidationHelper } from "../../src/liquidation_helpers.js";
 import { RedisInterface } from "../../src/redis.js";
 import { borrow, deposit, makeWithdrawMessage, ProtocolAddresses, queryHealth, readAddresses, seedAddresses, setPrice } from "../../src/helpers.js";
 import { Position } from "../../src/types/position";
+import path from 'path'
+import 'dotenv/config.js'
 
-const addresses : ProtocolAddresses = readAddresses()
+console.log(`${process.env.CHAIN_ID}.json`)
+console.log(process.env.OUTPOST_ARTIFACTS_PATH!)
+
+const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
+
+const addresses : ProtocolAddresses = readAddresses(deployDetails)
 const osmoDenom = 'uosmo'
 const atomDenom = 'uion'
 const redisQueueName = 'testQueue'
@@ -30,7 +37,6 @@ const deployerSeed = "notice oak worry limit wrap speak medal online prefer clus
 const localOsmosisRPC = "http://localhost:26657"
 
 const redisInterface = new RedisInterface(redisQueueName)
-
 
   // run test
 const runTest = async() => {
@@ -112,15 +118,41 @@ const runTest = async() => {
     console.log(await queryHealth(client,useableAddresses[index], addresses))
   }
 
+  console.log("Initial liquidate balances")
+  const initialBalance = {
+    uosmo: await client.getBalance(deployerAddress, osmoDenom),
+    atom: await client.getBalance(deployerAddress, atomDenom)
+  }
+  console.log(initialBalance)
+
   console.log(`================= executing liquidations =================`)
   // execute liquidations
   await dispatchLiquidations(liquidationHelper,client, deployerAddress)
 
   for(const index in useableAddresses) {
-    console.log(await queryHealth(client,useableAddresses[index], addresses))
+    const health = await queryHealth(client,useableAddresses[index], addresses)
+    if (Number(health.health_status.borrowing.liq_threshold_hf) < 1) {
+      console.log(`${useableAddresses[index]} is still unhealthy`)
+    } else {
+      console.log(`${useableAddresses[index]} is healthy`)
+    }
   }
 
-  console.log("Successfully completed liquidations :)")
+  console.log("Post liquidate balances")
+  const updatedBalance = {
+    uosmo: await client.getBalance(deployerAddress, osmoDenom),
+    atom: await client.getBalance(deployerAddress, atomDenom)
+  }
+
+  const gains = Number(updatedBalance.atom.amount) -  Number(initialBalance.atom.amount)
+
+  if (gains < 0) {
+    console.error("ERROR : Updated balance was smaller than initial balance. Asset")
+  } else {
+    console.log("Successfully completed liquidations :)")
+    console.log(`Gained ${gains}`)
+  }
+
   process.exit(0)
 }
 
