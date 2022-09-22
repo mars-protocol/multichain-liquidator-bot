@@ -81,11 +81,17 @@ OSMO_DENOM=uosmo
 MAX_THREADS=20
 
 // path to the artifacts directory in the outposts repo
-OUTPOST_ARTIFACTS_PATH="/Users/markwatney/crypto/outposts/artifacts/"
+OUTPOST_ARTIFACTS_PATH="/Users/<yourusername>/outposts/artifacts/"
 
 // The chainId. Note that this should match the chain id you deployed to (usually either testnet, localosmosis), so that the scripts can find 
 // the correct deploy config
 CHAIN_ID="localosmosis"
+
+// The price to set to make positions liquidatable. 
+UNHEALTHY_PRICE="3"
+
+// The default / starting price at which the created positions are healthy
+HEALTHY_PRICE="1"
 ```
 
 See the `.env.example` file in this directory for a default setting
@@ -96,13 +102,15 @@ See the `.env.example` file in this directory for a default setting
 
 ```node
 
-npm run test:createPositions
+npm run env:createPositions
 
 ```
 
 *Note that if you already have positions this will not wipe your previous positions, meaning you may have some 'dirty data' which can interfere with your test*
 
 To do a fresh deploy, delete the relevant deploy file in OUTPOSTS_DIR/artifacts, and redeploy. This will create new contracts and a new deploy file under OUTPOST_DIR/artifacts
+
+
 
 
 **TODO** 

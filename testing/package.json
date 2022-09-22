@@ -23,6 +23,8 @@
     "@types/node": "^18.7.18"
   },
   "scripts": {
-    "test:deployPositions": "node --loader ts-node/esm deployPositions.ts"
+    "env:deployPositions": "node --loader ts-node/esm src/deployPositions.ts",
+    "env:makeUnhealthy": "node --loader ts-node/esm src/makeUnhealthy.ts",
+    "env:makeHealthy": "node --loader ts-node/esm src/makeHealthy.ts"
   }
 }
