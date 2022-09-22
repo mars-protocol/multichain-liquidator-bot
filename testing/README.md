@@ -12,13 +12,64 @@ The main components of a test are
 ## Prerequisites
 
 **Redbank deployment** 
-  
-Use the deploy scripts located [here](https://github.com/mars-protocol/outposts/tree/master/scripts/deploy). 
-Recommend cloning `outposts` directory as a sibling of `multichain-liquidator-bot`
 
-Notes:
+1) Clone [Outposts](https://github.com/mars-protocol/outposts) repo to your working directory. Note the directory, as it will need to be configured in the `.env` file as the `OUTPOST_ARTIFACTS_PATH`. Recommend cloning `outposts` directory as a sibling of `multichain-liquidator-bot`.
+```
+git clone https://github.com/mars-protocol/outposts.git
+```
+2) Assuming your terminal path is `~/multichain-liquidator-bot/testing`, run the following:
+   
+  ```
+  cd ../../outposts/scripts
+  ```
+3) Set up yarn:
+  ```
+  yarn install 
+  ```
+4)  Create the build folder: 
+  ```
+  yarn build 
+  ```
+5)  Compile all contracts: 
+  ```
+  yarn compile 
+  ```
+6)  Deploy contracts. Ensure that you configure the same asset denom for atom / osmo in the redbank deploy config files as you use in your environment file when testing.
+  ```
+  yarn run deploy:osmosis
+  ```
 
-- Ensure that you configure the same asset denom for atom / osmo in the redbank deploy config files as you use in your environment file when testing.
+## Creating positions
+
+```node
+
+yarn run env:createPositions
+
+```
+
+*Note that if you already have positions this will not wipe your previous positions, meaning you may have some 'dirty data' which can interfere with your test*
+
+To do a fresh deploy, delete the relevant deploy file in OUTPOSTS_DIR/artifacts, and redeploy. This will create new contracts and a new deploy file under OUTPOST_DIR/artifacts
+
+## Position Health
+
+There are two commands related to setting the position health. Currently, all positions are created with the same LTV (0.3 LTV). You can configure 
+the healthy and unhealthy prices in `.env`. 
+
+To make positions liquidatable:
+
+```node
+
+yarn run env:makeUnhealthy
+
+```
+
+And to make healthy again:
+
+```node
+yarn run env:makeHealthy
+
+```
 
 **Genesis file**
 
@@ -72,7 +123,7 @@ RPC_URL=http://localhost:26657
 // Name of the redis queue
 QUEUE_NAME=throughput_test
 
-// Denoms of atom and osmosis. Reccommend leaving these as is, but ensure they match the denoms you deployed via osmosis
+// Denoms of atom and osmosis. Reccommend leaving these as is, but ensure they match the denoms you deployed to on the localosmosis outpost
 ATOM_DENOM=uion
 OSMO_DENOM=uosmo
 
@@ -96,26 +147,8 @@ HEALTHY_PRICE="1"
 
 See the `.env.example` file in this directory for a default setting
 
+**Potential Improvements** 
 
-
-## Creating positions
-
-```node
-
-npm run env:createPositions
-
-```
-
-*Note that if you already have positions this will not wipe your previous positions, meaning you may have some 'dirty data' which can interfere with your test*
-
-To do a fresh deploy, delete the relevant deploy file in OUTPOSTS_DIR/artifacts, and redeploy. This will create new contracts and a new deploy file under OUTPOST_DIR/artifacts
-
-
-
-
-**TODO** 
-
-- Trigger liquidations
 - Configure LTV's in .env
 - Increase speed of position creation
 
