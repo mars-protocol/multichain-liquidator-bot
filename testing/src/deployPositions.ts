@@ -35,6 +35,8 @@ const OSMO_DENOM = process.env.OSMO_DENOM!
 // throttle with this
 const MAX_THREADS = Number(process.env.MAX_THREADS!)
 
+const MAX_SEEDS = Number(process.env.MAX_SEEDS || '1000')
+
 // TODO set me via .env?
 const borrowAmount = "3000000"
 
@@ -81,7 +83,7 @@ const run = async(seeds : Seed[], protocolAddresses : ProtocolAddresses, deploye
     // seed 1000 `parents` (the first account under a seed)
     for (const seedIndex in seeds) {
         const seed = seeds[seedIndex]
-        if (Number(seedIndex) > 1000) break
+        if (Number(seedIndex) > MAX_SEEDS) break
         
         const msg = {
             typeUrl: "/cosmos.bank.v1beta1.MsgSend",
@@ -113,7 +115,7 @@ const run = async(seeds : Seed[], protocolAddresses : ProtocolAddresses, deploye
             console.log(`settling, batch size ${batchToProcess.length}`)
             await Promise.all(batchToProcess)
             batchToProcess = []
-            console.log(`Created ${index * ACCOUNTS_PER_SEED} positions`)
+            console.log(`Created ${index * ACCOUNTS_PER_SEED} total positions`)
         }
     }
 }

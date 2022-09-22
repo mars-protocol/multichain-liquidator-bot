@@ -143,6 +143,9 @@ UNHEALTHY_PRICE="3"
 
 // The default / starting price at which the created positions are healthy
 HEALTHY_PRICE="1"
+
+// Max number of seeds to use. Use this (and ACCOUNTS_PER_SEED) to control the amount of postions you want to create.
+MAX_SEEDS="1000"
 ```
 
 See the `.env.example` file in this directory for a default setting
