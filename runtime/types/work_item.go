@@ -1,4 +1,4 @@
-package collector
+package types
 
 // WorkItem defines the parameters for the collector to use when querying
 // the contract state

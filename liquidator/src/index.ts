@@ -18,8 +18,8 @@ const SEED = process.env.SEED!
 
 // Program entry
 export const main = async () => {
-   
-    const redis = new RedisInterface() 
+
+    const redis = new RedisInterface()
     await redis.connect()
 
     const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(SEED, { prefix: PREFIX });
@@ -30,10 +30,10 @@ export const main = async () => {
     const clientOption: SigningCosmWasmClientOptions = {
         gasPrice: GasPrice.fromString(GAS_PRICE)
     }
-      
+
     const client = await SigningCosmWasmClient.connectWithSigner(RPC_ENDPOINT, liquidator, clientOption);
 
-    const liquidationHelper = new LiquidationHelper(client,liquidatorAddress, LIQUIDATION_FILTERER_CONTRACT)  
+    const liquidationHelper = new LiquidationHelper(client, liquidatorAddress, LIQUIDATION_FILTERER_CONTRACT)
 
     // run
     while (true) await run(liquidationHelper, redis)
@@ -42,16 +42,16 @@ export const main = async () => {
 
 
 // exported for testing
-export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) => {
+export const run = async (txHelper: LiquidationHelper, redis: IRedisInterface) => {
 
     const positions : Position[] = await redis.fetchUnhealthyPositions()
     if (positions.length == 0){
-        
+       
         //sleep to avoid spamming redis db when empty
         sleep(200)
 
         return
-    } 
+    }
 
     const txs: LiquidationTx[] = []
     const debtsToRepay = new Map<string, number>()
@@ -74,14 +74,17 @@ export const run = async (txHelper: LiquidationHelper, redis : IRedisInterface) 
     // dispatch transactions - return object with results on it
     const results = await txHelper.sendLiquidationTxs(txs, coins)
 
+    // Log the amount of liquidations executed
+    redis.incrementBy("executor.liquidations.executed", results.length)
+
     // Swap collaterals to replace the debt that was repaid
     results.forEach(async (result: LiquidationResult) => {
-        
+
         await txHelper.swap(
-            result.collateralReceivedDenom, 
-            result.debtRepaidDenom, 
+            result.collateralReceivedDenom,
+            result.debtRepaidDenom,
             Number(result.collateralReceivedAmount)
-            )
+        )
     })
 
 

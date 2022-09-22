@@ -24,4 +24,5 @@ COPY ./bin/manager .
 # Use an unprivileged user.
 USER appuser:appuser
 
+LABEL "com.datadoghq.ad.logs"='[{"source": "liquidation-bot", "service": "manager", "chain": "osmosis"}]'
 ENTRYPOINT ["/manager"]

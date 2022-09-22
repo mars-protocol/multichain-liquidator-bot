@@ -12,7 +12,7 @@ import (
 
 func TestNewNoQueue(t *testing.T) {
 	logger := logrus.WithFields(logrus.Fields{})
-	_, err := New(nil, "", "", logger)
+	_, err := New(nil, nil, "", "", logger)
 	if err == nil {
 		t.Errorf("expected failure to create Collector due to missing queues")
 	}

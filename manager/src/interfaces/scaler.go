@@ -13,4 +13,6 @@ type Scaler interface {
 	ScaleDown() error
 	// ScaleToZero scales the service down to zero instances
 	ScaleToZero() error
+	// Count returns the amount of services deployed
+	Count() (int, error)
 }
