@@ -11,6 +11,7 @@ import (
 
 	"github.com/mars-protocol/multichain-liquidator-bot/collector/src/collector"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/cache"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
 )
@@ -23,6 +24,7 @@ type Config struct {
 
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
 	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
+	RedisMetricsDatabase int    `envconfig:"REDIS_METRICS_DATABASE" required:"true"`
 	CollectorQueueName   string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
 	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
 }
@@ -74,9 +76,19 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	var metricsCacheProvider interfaces.Cacher
+	metricsCacheProvider, err = cache.NewRedis(
+		config.RedisEndpoint,
+		config.RedisMetricsDatabase,
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	// Set up collector
 	service, err := collector.New(
 		queueProvider,
+		metricsCacheProvider,
 		config.CollectorQueueName,
 		config.HealthCheckQueueName,
 		logger,

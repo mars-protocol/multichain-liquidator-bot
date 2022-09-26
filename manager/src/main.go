@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/signal"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/mars-protocol/multichain-liquidator-bot/manager/src/manager"
 	"github.com/mars-protocol/multichain-liquidator-bot/manager/src/scaler"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/cache"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
 )
@@ -38,9 +40,12 @@ type Config struct {
 
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
 	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
-	CollectorQueueName   string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
-	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
-	ExecutorQueueName    string `envconfig:"EXECUTOR_QUEUE_NAME" required:"true"`
+	RedisMetricsDatabase int    `envconfig:"REDIS_METRICS_DATABASE" required:"true"`
+
+	CollectorQueueName      string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
+	CollectorItemsPerPacket int    `envconfig:"COLLECTOR_ITEMS_PER_PACKET" required:"true"`
+	HealthCheckQueueName    string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
+	ExecutorQueueName       string `envconfig:"EXECUTOR_QUEUE_NAME" required:"true"`
 
 	DeployerType       string `envconfig:"DEPLOYER_TYPE" required:"true"`
 	CollectorImage     string `envconfig:"COLLECTOR_IMAGE" required:"true"`
@@ -50,6 +55,10 @@ type Config struct {
 	ScalingType string `envconfig:"SCALING_TYPE" required:"true"`
 
 	CollectorContract string `envconfig:"COLLECTOR_CONTRACT" required:"true"`
+
+	CollectorConfig     string `envconfig:"COLLECTOR_CONFIG" required:"true"`
+	HealthCheckerConfig string `envconfig:"HEALTH_CHECKER_CONFIG" required:"true"`
+	ExecutorConfig      string `envconfig:"EXECUTOR_CONFIG" required:"true"`
 }
 
 func main() {
@@ -97,6 +106,15 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	var metricsCacheProvider interfaces.Cacher
+	metricsCacheProvider, err = cache.NewRedis(
+		config.RedisEndpoint,
+		config.RedisMetricsDatabase,
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	// Define all the deployers
 	var collectorDeployer managerinterfaces.Deployer
 	var healthCheckerDeployer managerinterfaces.Deployer
@@ -112,15 +130,24 @@ func main() {
 	// and liquidator
 	switch strings.ToLower(config.DeployerType) {
 	case DeployerTypeDocker:
-		containerEnv := make(map[string]string)
+
+		serviceConfig, err := parseConfig(config.CollectorConfig)
+		if err != nil {
+			logger.Fatal(err)
+		}
 
 		// Set up the collector's deployer
 		collectorDeployer, err = deployer.NewDocker(
 			"collector",
 			config.CollectorImage,
-			containerEnv,
+			serviceConfig,
 			logger,
 		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		serviceConfig, err = parseConfig(config.HealthCheckerConfig)
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -129,9 +156,14 @@ func main() {
 		healthCheckerDeployer, err = deployer.NewDocker(
 			"health-checker",
 			config.HealthCheckerImage,
-			containerEnv,
+			serviceConfig,
 			logger,
 		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		serviceConfig, err = parseConfig(config.ExecutorConfig)
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -140,7 +172,7 @@ func main() {
 		executorDeployer, err = deployer.NewDocker(
 			"executor",
 			config.ExecutorImage,
-			containerEnv,
+			serviceConfig,
 			logger,
 		)
 		if err != nil {
@@ -160,9 +192,9 @@ func main() {
 			queueProvider,
 			config.CollectorQueueName,
 			collectorDeployer,
-			0, // Scale down when we have no items in the queue
-			1, // Scale up when we have 1 or more items in the queue
-			1, // Minimum number of services
+			0,     // Scale down when we have no items in the queue
+			10000, // Scale up when we have 1 or more items in the queue
+			0,     // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -174,9 +206,9 @@ func main() {
 			queueProvider,
 			config.HealthCheckQueueName,
 			healthCheckerDeployer,
-			0,   // Scale down when we have no items in the queue
-			100, // Scale up when we have 100 or more items in the queue
-			1,   // Minimum number of services
+			0,     // Scale down when we have no items in the queue
+			10000, // Scale up when we have 100 or more items in the queue
+			0,     // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -188,9 +220,9 @@ func main() {
 			queueProvider,
 			config.ExecutorQueueName,
 			executorDeployer,
-			0,  // Scale down when we have no items in the queue
-			50, // Scale up when we have 50 or more items in the queue
-			1,  // Minimum number of services
+			0,     // Scale down when we have no items in the queue
+			10000, // Scale up when we have 50 or more items in the queue
+			0,     // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -205,14 +237,17 @@ func main() {
 	// blocks. It also needs to check whether the current amount of
 	// collectors are able to query all the possible positions
 	service, err := manager.New(
+		config.ChainID,
 		config.RPCEndpoint,
 		config.RPCWebsocketEndpoint,
 		queueProvider,
+		metricsCacheProvider,
 		config.CollectorQueueName,
 		config.HealthCheckQueueName,
 		config.ExecutorQueueName,
 		scalers,
 		config.CollectorContract,
+		config.CollectorItemsPerPacket,
 		logger,
 	)
 	if err != nil {
@@ -238,4 +273,15 @@ func main() {
 
 	logger.Info("Shutdown")
 
+}
+
+// parseConfig parses the JSON environment variable into a map to be used
+// by other services
+func parseConfig(input string) (map[string]string, error) {
+	output := make(map[string]string)
+	err := json.Unmarshal([]byte(input), &output)
+	if err != nil {
+		return nil, err
+	}
+	return output, nil
 }

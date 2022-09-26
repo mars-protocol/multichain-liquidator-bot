@@ -2,6 +2,14 @@ package manager
 
 import "time"
 
+// Metric contains a single metric to be reported
+type Metric struct {
+	Name      string
+	Value     float64
+	Timestamp int64
+	Chain     string
+}
+
 // RPCMethodRequest defines the JSON structure of requests via the RPC websocket
 type RPCMethodRequest struct {
 	JSONRPC string `json:"jsonrpc"`

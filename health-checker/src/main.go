@@ -10,6 +10,7 @@ import (
 	health_checker "github.com/mars-protocol/multichain-liquidator-bot/health-checker/src/health-checker"
 
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/cache"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
 	log "github.com/sirupsen/logrus"
@@ -19,6 +20,7 @@ type Config struct {
 	runtime.BaseConfig
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
 	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
+	RedisMetricsDatabase int    `envconfig:"REDIS_METRICS_DATABASE" required:"true"`
 	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
 	LiquidatorQueueName  string `envconfig:"LIQUIDATOR_QUEUE_NAME" required:"true"`
 	hiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
@@ -72,11 +74,21 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	var metricsCacheProvider interfaces.Cacher
+	metricsCacheProvider, err = cache.NewRedis(
+		config.RedisEndpoint,
+		config.RedisMetricsDatabase,
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	hive := health_checker.Hive{HiveEndpoint: config.hiveEndpoint}
 
 	// Set up health checker
 	healthCheckerService, err := health_checker.New(
 		instance,
+		metricsCacheProvider,
 		hive,
 		config.HealthCheckQueueName,
 		config.LiquidatorQueueName,

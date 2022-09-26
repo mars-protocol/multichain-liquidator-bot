@@ -32,6 +32,7 @@ run: build .start_redis ## Build and run the service binary
 	SERVICE_NAME="bot-collector" \
 	CHAIN_ID="pisco-1" \
 	REDIS_DATABASE=0 \
+	REDIS_METRICS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
 	COLLECTOR_QUEUE_NAME="collector" \
 	HEALTH_CHECK_QUEUE_NAME="health_check" \

@@ -29,8 +29,8 @@ const addresses : ProtocolAddresses = readAddresses(deployDetails)
 
 // Program entry
 export const main = async () => {
-   
-    const redis = new RedisInterface() 
+
+    const redis = new RedisInterface()
     await redis.connect()
 
     const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(SEED, { prefix: PREFIX });
@@ -41,10 +41,10 @@ export const main = async () => {
     const clientOption: SigningCosmWasmClientOptions = {
         gasPrice: GasPrice.fromString(GAS_PRICE)
     }
-      
+
     const client = await SigningCosmWasmClient.connectWithSigner(RPC_ENDPOINT, liquidator, clientOption);
 
-    const liquidationHelper = new LiquidationHelper(client,liquidatorAddress, LIQUIDATION_FILTERER_CONTRACT)  
+    const liquidationHelper = new LiquidationHelper(client, liquidatorAddress, LIQUIDATION_FILTERER_CONTRACT)
 
     // run
     while (true) await run(
@@ -57,20 +57,16 @@ export const main = async () => {
 
 
 // exported for testing
-export const run = async (
-    liquidationHelper: LiquidationHelper, 
-    redis : IRedisInterface, 
-    client: SigningCosmWasmClient,
-    liquidatorAddress: string) => {
+export const run = async (txHelper: LiquidationHelper, redis: IRedisInterface) => {
 
     const positions : Position[] = await redis.fetchUnhealthyPositions()
     if (positions.length == 0){
-        
+       
         //sleep to avoid spamming redis db when empty
         sleep(200)
 
         return
-    } 
+    }
 
     const txs: LiquidationTx[] = []
     const debtsToRepay = new Map<string, number>()
@@ -90,50 +86,23 @@ export const run = async (
     const coins : Coin[] = []
     debtsToRepay.forEach((amount, denom) => coins.push({denom, amount: amount.toFixed(0)}))
     
-    // dispatch liquidation tx , and recieve and object with results on it
-    const results = await liquidationHelper.sendLiquidationsTx(txs, coins)
+    // dispatch transactions - return object with results on it
+    const results = await txHelper.sendLiquidationTxs(txs, coins)
 
-    console.log(`results.length is `)
-    console.log(results.length)
-    // clean up stuff:
-    // 1) Liquidation bonus given as mToken, so we need to withdraw 
-    // 2) Swap withdrawn bonus to replace the debt we repaid to win liquidation.
-    // TODO move this to liuquidation helper
-    
-    // ensure that we have registered swap type for osmosis
-    const swapTypeUrl = "/osmosis.gamm.v1beta1.MsgSwapExactAmountIn"
-    client.registry.register(swapTypeUrl, osmosis.gamm.v1beta1.MsgSwapExactAmountIn)
+    // Log the amount of liquidations executed
+    redis.incrementBy("executor.liquidations.executed", results.length)
 
-    for (const index in results) {
+    // Swap collaterals to replace the debt that was repaid
+    results.forEach(async (result: LiquidationResult) => {
 
-        const liquidation: LiquidationResult = results[index]
-        const route = await liquidationHelper.findRoute(liquidation.collateralReceivedDenom, liquidation.debtRepaidDenom)
-        // Create messages
-        // withdraw message
-        // swap message
-        // 
-        const msgs = [
-            makeWithdrawMessage(
-                liquidatorAddress, 
-                liquidation.collateralReceivedDenom,
-                addresses.redBank,
-                liquidatorAddress
-            ),
-            swapExactAmountIn({
-                sender: liquidatorAddress,
-                routes: route,
-                tokenIn: coin(Number(liquidation.collateralReceivedAmount), liquidation.collateralReceivedDenom),
-    
-                // TODO: Should we have a min amount here? It is very important the swap succeds, but at the same time
-                // this makes us vulnerable to slippage / low liquidity / frontrunning etc
-                tokenOutMinAmount: '1' 
-              })
-        ]
+        await txHelper.swap(
+            result.collateralReceivedDenom,
+            result.debtRepaidDenom,
+            Number(result.collateralReceivedAmount)
+        )
+    })
 
-        console.log(liquidation.collateralReceivedAmount)
-            
-        await client.signAndBroadcast(liquidatorAddress,msgs,"auto")
-    }
+
 }
 
 

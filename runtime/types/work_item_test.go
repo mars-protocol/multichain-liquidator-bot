@@ -1,4 +1,4 @@
-package collector
+package types
 
 import (
 	"encoding/json"

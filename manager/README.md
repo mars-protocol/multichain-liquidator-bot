@@ -80,3 +80,46 @@ AWS_SERVICE_CPU_UNITS|int|The [CPU units](https://aws.amazon.com/premiumsupport/
 AWS_SERVICE_MEMORY_MB|int|The amount of memory in MB to assign to each instance|
 AWS_SERVICE_SUBNETS|string array|The comma-delimited network subnets to deploy to, ex "subnet-123,subnet-124"|
 AWS_SERVICE_SECURITY_GROUPS|string array|The comma-delimited security groups to deploy to, ex "sg-123,sg124"|
+
+### Monitoring
+
+Enable metrics export to DataDog by setting the environment variable 
+`DATADOG_ENABLED` to `true`. 
+
+The service will collect a bunch of metrics at the start of a new block
+and push it to DataDog, these include:
+
+General
+- Current height (Chain)
+- Last processed height (Bot)
+- Lag between current and last processed (should be zero)
+
+Manager
+- Count of running collectors
+- Count of running health checkers
+- Count of running executors
+
+Collector
+- Total amount of contract items (collateral + debts) (per block)
+- Total amount of contract items scanned (collateral + debts) (per block)
+- Total amount of contract items missed (collateral + debts) (per block)
+
+Health checker
+- Total amount of health checks to perform (per block)
+- Total amount of health checks performed (per block)
+- Total amount of health checks missed (per block)
+- Total healthy positions (since last check)
+- Total unhealthy positions (since last check)
+
+Executor
+- Total liquidations
+- Total liquidations (per block)
+- Total liquidations missed
+
+
+__DataDog required variables__
+
+|VARIABLE|TYPE|DESCRIPTION|
+|--------|----|-----------|
+|DD_SITE|string|The DataDog domain to use, ex. us1.datadoghq.com|
+|DD_API_KEY|string|Your DataDog API key|
