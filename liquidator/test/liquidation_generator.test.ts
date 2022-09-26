@@ -20,7 +20,7 @@ describe("Liquidation Tx Generator Tests..", ()=>{
 
         const assets = [debtA, debtB]
         const largestIndex = debtA.amount > debtB.amount ? 0 : 1
-        const largestCollateral = getLargestDebt(assets)
+        const largestCollateral = getLargestDebt(assets).denom
 
         expect(largestCollateral).toBe(assets[largestIndex].denom)
     })

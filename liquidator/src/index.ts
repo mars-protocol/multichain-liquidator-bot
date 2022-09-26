@@ -4,9 +4,18 @@ import { Asset } from "./types/asset"
 import { LiquidationResult, LiquidationTx } from "./types/liquidation.js"
 import { Position } from "./types/position"
 import { Coin, GasPrice } from "@cosmjs/stargate"
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
+import { coin, DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing"
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from "@cosmjs/cosmwasm-stargate"
-import { sleep } from "./helpers.js"
+import { makeWithdrawMessage, ProtocolAddresses, readAddresses, sleep } from "./helpers.js"
+import { osmosis } from "osmojs"
+
+import path from 'path'
+import 'dotenv/config.js'
+
+const {
+    swapExactAmountIn
+} = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
+
 
 const PREFIX = process.env.PREFIX!
 const GAS_PRICE = process.env.GAS_PRICE!
@@ -15,6 +24,8 @@ const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 
 // todo don't store in .env
 const SEED = process.env.SEED!
+const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
+const addresses : ProtocolAddresses = readAddresses(deployDetails)
 
 // Program entry
 export const main = async () => {
@@ -36,7 +47,11 @@ export const main = async () => {
     const liquidationHelper = new LiquidationHelper(client, liquidatorAddress, LIQUIDATION_FILTERER_CONTRACT)
 
     // run
-    while (true) await run(liquidationHelper, redis)
+    while (true) await run(
+        liquidationHelper, 
+        redis, 
+        client, 
+        liquidatorAddress)
 }
 
 
@@ -58,7 +73,7 @@ export const run = async (txHelper: LiquidationHelper, redis: IRedisInterface) =
     
     // for each address, send liquidate tx
     positions.forEach((position: Position) => {
-        const tx = txHelper.produceLiquidationTx(position)
+        const tx = liquidationHelper.produceLiquidationTx(position)
         const debtDenom = tx.debt_denom
         txs.push(tx)
         const amount : number = position.debts.find((debt: Asset) => debt.denom === debtDenom)?.amount || 0 

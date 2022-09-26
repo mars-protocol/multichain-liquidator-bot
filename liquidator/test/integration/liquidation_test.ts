@@ -17,28 +17,17 @@ import { RedisClientType } from "redis";
 import { run } from "../../src/index.js";
 import { LiquidationHelper } from "../../src/liquidation_helpers.js";
 import { RedisInterface } from "../../src/redis.js";
+import { borrow, deposit, makeWithdrawMessage, ProtocolAddresses, queryHealth, readAddresses, seedAddresses, setPrice } from "../../src/helpers.js";
 import { Position } from "../../src/types/position";
+import path from 'path'
+import 'dotenv/config.js'
 
-const addresses = {
-  "redBankCodeId": 2,
-  "liquidationFilterCodeId": 3,
-  "addressProviderCodeId": 4,
-  "maTokenCodeId": 5,
-  "incentivesCodeId": 6,
-  "oracleCodeId": 7,
-  "protocolRewardsCollectorCodeId": 8,
-  "addressProviderContractAddress": "osmo18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3qtcvtsz",
-  "liquidateFilterContractAddress": "osmo1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s0p34vn",
-  "redBankContractAddress": "osmo1xr3rq8yvd7qplsw5yx90ftsr2zdhg4e9z60h5duusgxpv72hud3sqcfmyp",
-  "incentivesContractAddress": "osmo1466nf3zuxpya8q9emxukd7vftaf6h4psr0a07srl5zw74zh84yjqkk0zfx",
-  "oracleContractAddress": "osmo13ehuhysn5mqjeaheeuew2gjs785f6k7jm8vfsqg3jhtpkwppcmzqg496z0",
-  "protocolRewardsCollectorContractAddress": "osmo1qum2tr7hh4y7ruzew68c64myjec0dq2s2njf6waja5t0w879lutq0rjkz5",
-  "addressProviderUpdated": true,
-  "uosmoRedBankMarketInitialised": true,
-  "uatomRedBankMarketInitialised": true,
-  "uosmoOraclePriceSet": true,
-  "uatomOraclePriceSet": true
-}
+console.log(`${process.env.CHAIN_ID}.json`)
+console.log(process.env.OUTPOST_ARTIFACTS_PATH!)
+
+const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
+
+const addresses : ProtocolAddresses = readAddresses(deployDetails)
 const osmoDenom = 'uosmo'
 const atomDenom = 'uion'
 const redisQueueName = 'testQueue'
@@ -49,7 +38,6 @@ const localOsmosisRPC = "http://localhost:26657"
 
 const redisInterface = new RedisInterface(redisQueueName)
 
-
   // run test
 const runTest = async() => {
 
@@ -58,37 +46,45 @@ const runTest = async() => {
 
   // Create 100 wallets
   const accountNumbers: number[] = [];
-  while (accountNumbers.length < 100) {
+  while (accountNumbers.length < 5) {
 
     accountNumbers.push(accountNumbers.length)
   }
 
   const hdPaths : HdPath[] = accountNumbers.map((value) => makeCosmoshubPath(value));
 
+
+
+
   // Do init
   const wallet = await DirectSecp256k1HdWallet.fromMnemonic(deployerSeed, { hdPaths: hdPaths, prefix: 'osmo' });
   const accounts = await wallet.getAccounts()
+
   const clientOption: SigningCosmWasmClientOptions = {
-    gasPrice: GasPrice.fromString("0.0uosmo")
+    gasPrice: GasPrice.fromString("0.1uosmo")
   }
 
   const client = await SigningCosmWasmClient.connectWithSigner(localOsmosisRPC, wallet, clientOption);
   const deployerAddress = accounts[0].address  
 
-  const liquidationHelper = new LiquidationHelper(client,deployerAddress, addresses.liquidateFilterContractAddress)
-    
+  const liquidationHelper = new LiquidationHelper(client,deployerAddress, addresses.filterer)
+
+  const osmoToSend = {"amount": "11000000", "denom": osmoDenom}
+  const atomToSend = {"amount": "10000000", "denom": atomDenom}
+
   // seed addresses with value
-  const useableAddresses =   await seedAddresses(client, accounts)
+  const useableAddresses =  await seedAddresses(client, deployerAddress,accounts, [atomToSend, osmoToSend])
 
   // set prices, both at 1
   console.log(`setting prices`)
-  await setPrice(client,deployerAddress,osmoDenom, "1")
-  await setPrice(client,deployerAddress,atomDenom, "1")
+  await setPrice(client,deployerAddress,osmoDenom, "1", addresses)
+  await setPrice(client,deployerAddress,atomDenom, "1", addresses)
 
 
   console.log(`seeding redbank with intial deposit`)
   // // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
-  await deposit(client, deployerAddress, atomDenom, "100_000_000")
+  await deposit(client, deployerAddress, atomDenom, "100_000_000", addresses)
+  await deposit(client, deployerAddress, osmoDenom, "100_000_000", addresses)
 
   console.log('Setting up positions')
   const length = useableAddresses.length
@@ -96,8 +92,8 @@ const runTest = async() => {
   while (index < length) {
     try {
       const address = useableAddresses[index]
-      await deposit(client, address, osmoDenom, "10000000")
-      await borrow(client, address, atomDenom, "3000000")
+      await deposit(client, address, osmoDenom, "10000000", addresses)
+      await borrow(client, address, atomDenom, "3000000", addresses)
       console.log(`created position for address ${address}`)
 
     } catch {}
@@ -106,23 +102,57 @@ const runTest = async() => {
   }
   
   // use this when debugging tests to prevent messing up existing positions
-  // const addressesWithMoney = getFirstAddresses(accounts)
+  // const useableAddresses = [getFirstAddresses(accounts)[3], getFirstAddresses(accounts)[1]]
 
   await pushPositionsToRedis(useableAddresses, redisClient)
   
+  
   for(const index in useableAddresses) {
-    console.log(await queryHealth(client,useableAddresses[index]))
+    console.log(await queryHealth(client, useableAddresses[index], addresses))
   }
 
   // manipulate price
-  await setPrice(client, deployerAddress, atomDenom, "3")
+  await setPrice(client, deployerAddress, atomDenom, "3", addresses)
 
+  for(const index in useableAddresses) {
+    console.log(await queryHealth(client,useableAddresses[index], addresses))
+  }
+
+  console.log("Initial liquidate balances")
+  const initialBalance = {
+    uosmo: await client.getBalance(deployerAddress, osmoDenom),
+    atom: await client.getBalance(deployerAddress, atomDenom)
+  }
+  console.log(initialBalance)
+
+  console.log(`================= executing liquidations =================`)
   // execute liquidations
-  await dispatchLiquidations(liquidationHelper)
+  await dispatchLiquidations(liquidationHelper,client, deployerAddress)
 
-  // TODO - Verify position has a reasonable health factor?
+  for(const index in useableAddresses) {
+    const health = await queryHealth(client,useableAddresses[index], addresses)
+    if (Number(health.health_status.borrowing.liq_threshold_hf) < 1) {
+      console.log(`${useableAddresses[index]} is still unhealthy`)
+    } else {
+      console.log(`${useableAddresses[index]} is healthy`)
+    }
+  }
 
-  console.log("Successfully completed liquidations :)")
+  console.log("Post liquidate balances")
+  const updatedBalance = {
+    uosmo: await client.getBalance(deployerAddress, osmoDenom),
+    atom: await client.getBalance(deployerAddress, atomDenom)
+  }
+
+  const gains = Number(updatedBalance.atom.amount) -  Number(initialBalance.atom.amount)
+
+  if (gains < 0) {
+    console.error("ERROR : Updated balance was smaller than initial balance. Asset")
+  } else {
+    console.log("Successfully completed liquidations :)")
+    console.log(`Gained ${gains}`)
+  }
+
   process.exit(0)
 }
 
@@ -150,8 +180,11 @@ const pushPositionsToRedis = async(addresses: string[], redisClient : RedisClien
   }
 }
 
-const dispatchLiquidations = async(liquidationHelper : LiquidationHelper) => {
-    await run(liquidationHelper,redisInterface)
+const dispatchLiquidations = async(
+  liquidationHelper : LiquidationHelper, 
+  client: SigningCosmWasmClient,
+  liquidatorAddress: string) => {
+    await run(liquidationHelper,redisInterface,client,liquidatorAddress)
 }
 
 // used for debugging tests
@@ -160,7 +193,7 @@ const getFirstAddresses = (accounts : readonly AccountData[]) => {
   const seededAddresses : string[] = []
   let index = 1
 
-  while (index <= 4) {
+  while (index <= 10) {
     seededAddresses.push(accounts[index].address)
     index += 1
   }
@@ -168,93 +201,7 @@ const getFirstAddresses = (accounts : readonly AccountData[]) => {
   return seededAddresses
 }
 
-const setPrice = async(client: SigningCosmWasmClient, deployerAddress: string, assetDenom : string, price: string) => {
-  const msg = {
-    "set_price_source": {
-        "denom": assetDenom,
-        "price_source": {
-            "fixed": { "price":  price}
-        }
-    }
-  }
 
-  await client.execute(deployerAddress,addresses.oracleContractAddress,msg,'auto')
-}
-
-
-
-// send OSMO and ATOM to next 10 addresses under our seed
-const seedAddresses = async(client : SigningCosmWasmClient, accounts : readonly AccountData[]) : Promise<string[]> => {
-  
-  const sender = accounts[0].address
-  const osmoToSend : Coin = coin(11000000, osmoDenom)
-  const atomToSend : Coin = coin(10000000, atomDenom)
-
-  const seededAddresses : string[] = []
-  let index = 1
-
-  while (index <= 10) {
-    const addressToSeed = accounts[index].address
-    
-    console.log(`sending to address: ${addressToSeed}`)
-
-    // For some reason sending both in the array here breaks it ???
-    await client.sendTokens(sender, addressToSeed,[osmoToSend], 'auto')
-    await client.sendTokens(sender, addressToSeed,[atomToSend], 'auto')
-
-    index += 1
-    seededAddresses.push(addressToSeed)
-  }
-
-  return seededAddresses
-}
-
-const withdraw = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string) => {
-  const msg = {
-    "withdraw": {
-      "denom": assetDenom,
-      "amount": amount
-    }
-  }
-
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto")
-}
-
-const borrow = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string) => {
-  const msg = {
-      "borrow": {
-        "denom": assetDenom,
-        "amount": amount
-    }
-  }
-
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto")
-}
-
-const deposit = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string) => {
-  const msg = { "deposit": { "denom": assetDenom } }
-  const coins = [{
-        "denom":assetDenom,
-        "amount": amount 
-    }]
-
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto", undefined, coins)
-}
-
-const repay = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string) => {
-  const msg = { "repay": { "denom": assetDenom } }
-  const coins = [{
-        "denom":assetDenom,
-        "amount": amount 
-    }]
-
-  return await client.execute(sender, addresses.redBankContractAddress, msg, "auto", undefined, coins)
-}
-
-const queryHealth = async(client : SigningCosmWasmClient, address: string) => {
-  const msg = { "user_position": { "user_address": address } }
-  return await client.queryContractSmart(addresses.redBankContractAddress, msg)
-}
 
 runTest().catch(e => {
   console.log(e)

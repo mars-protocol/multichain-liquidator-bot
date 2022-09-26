@@ -1,10 +1,9 @@
 
 import {run} from '../src/index'
-import jestConfig from '../jest.config'
 import { createLiquidationTx } from '../src/liquidation_generator'
 import { IRedisInterface, RedisInterface } from '../src/redis'
-import { LiquidationHelper } from '../liquidation_helpers'
-import { Position } from '../src/types/position'
+import { LiquidationHelper } from '../src/liquidation_helpers.js'
+
 
 describe('Testing Behaviour', () => {
 

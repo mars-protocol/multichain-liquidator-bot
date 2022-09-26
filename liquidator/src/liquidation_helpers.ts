@@ -1,13 +1,15 @@
 import { ExecuteResult, SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
-import { coin, Coin, logs } from "@cosmjs/stargate";
+import { coin, Coin, DeliverTxResponse, logs } from "@cosmjs/stargate";
 import { Attribute, Event } from "@cosmjs/stargate/build/logs";
 import { LcdPool, OsmosisApiClient } from "cosmology";
-import { createLiquidationTx } from "./liquidation_generator.js";
 import { LiquidationResult, LiquidationTx } from "./types/liquidation";
+import { createLiquidationTx } from "./liquidation_generator.js";
+
 import { Position } from "./types/position";
 import { osmosis } from 'osmojs'
 import { SwapAmountInRoute } from "osmojs/types/proto/osmosis/gamm/v1beta1/tx";
 import Long from "long";
+
 const {
     swapExactAmountIn
 } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
@@ -16,8 +18,8 @@ export interface ILiquidationHelper {
 
     // Produce the ts required to liquidate a position
     produceLiquidationTx(address: Position) : LiquidationTx
-    sendLiquidationTxs(txs: LiquidationTx[], coins: Coin[]) : Promise<LiquidationResult[]>
-    swap(assetInDenom : string, assetOutDenom: string, assetInAmount: number) : Promise<void> // todo need type?
+    sendLiquidationsTx(txs: LiquidationTx[], coins: Coin[]) : Promise<LiquidationResult[]>
+    swap(assetInDenom : string, assetOutDenom: string, assetInAmount: number) : Promise<DeliverTxResponse>
 }
 
 export class LiquidationHelper implements ILiquidationHelper {
@@ -60,22 +62,29 @@ export class LiquidationHelper implements ILiquidationHelper {
         // Will ignore for now as it should convert back to the osmo long just fine.
         return [{poolId:  Long.fromString(poolId), tokenOutDenom: denomB}]
     }
+
+   
+    
     
     /**
-     * Swap the collateral recieved to recover the asset we used to repay the debt
+     * Create a msg to swap the collateral recieved to recover the asset we used to repay the debt.
+     * 
+     * We return a msg instead of executing it, as this gives us the ability to easily change
+     * whether we dispatch swaps in a batch, or one at a time.
      * 
      * TODO make this chain agnostic
      * 
      * @param assetInDenom  The asset we offer
      * @param assetOutDenom The asset we want to to recieve. 
      * @param assetInAmount The amount we are offering
+     * 
      */
-    async swap(assetInDenom : string, assetOutDenom: string, assetInAmount: number): Promise<void> {
+    async swap(assetInDenom : string, assetOutDenom: string, assetInAmount: number): Promise<DeliverTxResponse> {
 
         const route = await this.findRoute(assetInDenom, assetOutDenom)
 
-        // TODO create retry logic here? Swap succeeding is very important
-        swapExactAmountIn({
+        // create the message
+        const msg = swapExactAmountIn({
             sender: this.liquidatorAddress,
             routes: route,
             tokenIn: coin(assetInAmount, assetInDenom),
@@ -84,9 +93,11 @@ export class LiquidationHelper implements ILiquidationHelper {
             // this makes us vulnerable to slippage / low liquidity / frontrunning etc
             tokenOutMinAmount: '0' 
           })
+        
+          return await this.client.signAndBroadcast(this.liquidatorAddress,[msg],"auto")
     }
 
-    async sendLiquidationTxs(txs: LiquidationTx[], coins: Coin[]): Promise<LiquidationResult[]> {
+    async sendLiquidationsTx(txs: LiquidationTx[], coins: Coin[]): Promise<LiquidationResult[]> {
         
         const msg = {
             "liquidate_many" : {
@@ -95,24 +106,28 @@ export class LiquidationHelper implements ILiquidationHelper {
         }
         
         const result = await this.client.execute(this.liquidatorAddress, this.liquidationFilterContract, msg, "auto", undefined, coins)
+
         return this.parseLiquidationResult(result)        
     }
 
     parseLiquidationResult(result: ExecuteResult) : LiquidationResult[] {
 
         const liquidationResults : LiquidationResult[] = []
-
+        
         result.logs[0].events.forEach((e) => {
             if (e.type === "wasm")
-                liquidationResults.push(this.parseLiquidationResultInner(e))
+                liquidationResults.push.apply(liquidationResults, this.parseLiquidationResultInner(e))
         })
 
         return liquidationResults
     }
 
-    parseLiquidationResultInner(wasm: Event) : LiquidationResult {
+    parseLiquidationResultInner(wasm: Event) : LiquidationResult[] {
 
-        const result : LiquidationResult = {
+
+        const results : LiquidationResult[] = []
+
+        let result : LiquidationResult = {
             collateralReceivedDenom : '',
             debtRepaidDenom: '',
             debtRepaidAmount: '',
@@ -120,24 +135,34 @@ export class LiquidationHelper implements ILiquidationHelper {
         }
 
         wasm.attributes.forEach((attribute: Attribute) => {
-        // find all parameters we require
-        switch(attribute.key) {
-            case "collateral_denom":
-                result.collateralReceivedDenom = attribute.value
-                break
-            case "debt_denom":
-                result.debtRepaidDenom = attribute.value
-                break
-            case "collateral_amount_liquidated":
-                result.collateralReceivedAmount = attribute.value
-                break
-            case "debt_amount_repaid":
-                result.debtRepaidAmount = attribute.value
-                break
-        }
+            // find all parameters we require
+            switch(attribute.key) {
+                case "collateral_denom":
+                    result.collateralReceivedDenom = attribute.value
+                    break
+                case "debt_denom":
+                    result.debtRepaidDenom = attribute.value
+                    break
+                case "collateral_amount_liquidated":
+                    result.collateralReceivedAmount = attribute.value
+                    break
+                case "debt_amount_repaid":
+                    result.debtRepaidAmount = attribute.value
+
+                    // Debt amount repaid is the last KV pair we index, so we push and make blank
+                    results.push({...result})
+                    result = {
+                        collateralReceivedDenom : '',
+                        debtRepaidDenom: '',
+                        debtRepaidAmount: '',
+                        collateralReceivedAmount: ''
+                    }
+
+                    break
+            }
         })
 
-         return result
+         return results
     }
     
     produceLiquidationTx(position: Position): LiquidationTx {
