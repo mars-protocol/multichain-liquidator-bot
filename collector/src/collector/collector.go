@@ -230,7 +230,7 @@ func (service *Collector) fetchContractItems(
 		// 00056465627473002B6F736D6F316379797A7078706C78647A6B656561376B777379646164673837333537716E6168616B616B7375696F6E
 		// The first two bytes "0005" indicate the length of the Map "name" -> 5 characters
 		// Followed by the map key "6465627473" -> 'debts'
-		// Then another two bytes indicating the length of the map key (address) "002B" -> 43 chatacters
+		// Then another two bytes indicating the length of the map key (address) "002B" -> 43 characters
 		// Followed by the rest of the key, denom in this case "uion"
 
 		hexKey := model.Key
