@@ -17,13 +17,10 @@ import { RedisClientType } from "redis";
 import { run } from "../../src/index.js";
 import { LiquidationHelper } from "../../src/liquidation_helpers.js";
 import { RedisInterface } from "../../src/redis.js";
-import { borrow, deposit, makeWithdrawMessage, ProtocolAddresses, queryHealth, readAddresses, seedAddresses, setPrice } from "../../src/helpers.js";
+import { borrow, deposit, ProtocolAddresses, queryHealth, readAddresses, seedAddresses, setPrice } from "../../src/helpers.js";
 import { Position } from "../../src/types/position";
 import path from 'path'
 import 'dotenv/config.js'
-
-console.log(`${process.env.CHAIN_ID}.json`)
-console.log(process.env.OUTPOST_ARTIFACTS_PATH!)
 
 const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
 
@@ -44,17 +41,13 @@ const runTest = async() => {
   // @ts-ignore
   const redisClient: RedisClientType = await redisInterface.connect()
 
-  // Create 100 wallets
+  // Create n number wallets
   const accountNumbers: number[] = [];
   while (accountNumbers.length < 5) {
-
     accountNumbers.push(accountNumbers.length)
   }
 
   const hdPaths : HdPath[] = accountNumbers.map((value) => makeCosmoshubPath(value));
-
-
-
 
   // Do init
   const wallet = await DirectSecp256k1HdWallet.fromMnemonic(deployerSeed, { hdPaths: hdPaths, prefix: 'osmo' });
@@ -80,11 +73,11 @@ const runTest = async() => {
   await setPrice(client,deployerAddress,osmoDenom, "1", addresses)
   await setPrice(client,deployerAddress,atomDenom, "1", addresses)
 
-
   console.log(`seeding redbank with intial deposit`)
-  // // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
+
+  // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
   await deposit(client, deployerAddress, atomDenom, "100_000_000", addresses)
-  await deposit(client, deployerAddress, osmoDenom, "100_000_000", addresses)
+  // await deposit(client, deployerAddress, osmoDenom, "100_000_000", addresses)
 
   console.log('Setting up positions')
   const length = useableAddresses.length
@@ -105,29 +98,17 @@ const runTest = async() => {
   // const useableAddresses = [getFirstAddresses(accounts)[3], getFirstAddresses(accounts)[1]]
 
   await pushPositionsToRedis(useableAddresses, redisClient)
-  
-  
-  for(const index in useableAddresses) {
-    console.log(await queryHealth(client, useableAddresses[index], addresses))
-  }
 
   // manipulate price
   await setPrice(client, deployerAddress, atomDenom, "3", addresses)
 
-  for(const index in useableAddresses) {
-    console.log(await queryHealth(client,useableAddresses[index], addresses))
-  }
-
-  console.log("Initial liquidate balances")
   const initialBalance = {
     uosmo: await client.getBalance(deployerAddress, osmoDenom),
     atom: await client.getBalance(deployerAddress, atomDenom)
   }
-  console.log(initialBalance)
-
   console.log(`================= executing liquidations =================`)
   // execute liquidations
-  await dispatchLiquidations(liquidationHelper,client, deployerAddress)
+  await dispatchLiquidations(liquidationHelper)
 
   for(const index in useableAddresses) {
     const health = await queryHealth(client,useableAddresses[index], addresses)
@@ -137,8 +118,7 @@ const runTest = async() => {
       console.log(`${useableAddresses[index]} is healthy`)
     }
   }
-
-  console.log("Post liquidate balances")
+  
   const updatedBalance = {
     uosmo: await client.getBalance(deployerAddress, osmoDenom),
     atom: await client.getBalance(deployerAddress, atomDenom)
@@ -181,10 +161,8 @@ const pushPositionsToRedis = async(addresses: string[], redisClient : RedisClien
 }
 
 const dispatchLiquidations = async(
-  liquidationHelper : LiquidationHelper, 
-  client: SigningCosmWasmClient,
-  liquidatorAddress: string) => {
-    await run(liquidationHelper,redisInterface,client,liquidatorAddress)
+  liquidationHelper : LiquidationHelper) => {
+    await run(liquidationHelper,redisInterface)
 }
 
 // used for debugging tests

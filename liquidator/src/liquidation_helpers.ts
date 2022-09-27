@@ -45,17 +45,21 @@ export class LiquidationHelper implements ILiquidationHelper {
         // TODO: Consider extracting getPools to a helper method - only use for that library is here.
         const lcdPools = await api.getPools();
 
-        let poolId = ''
-        lcdPools.pools.forEach((pool: LcdPool) => {
-            const tokenA = pool.poolAssets[0].token
-            const tokenB = pool.poolAssets[1].token
-            if (
-                tokenA.denom === denomA || tokenB.denom === denomA && 
-                tokenA.denom === denomB || tokenB.denom === denomB
-                ) {
-                    poolId = pool.id
-            }
-        })
+        let poolId = '1'
+        // lcdPools.pools.forEach((pool: LcdPool) => {
+        //     // stop once we find our pool
+        //     if (poolId.length > 0) return
+
+        //     const tokenA = pool.poolAssets[0].token
+        //     const tokenB = pool.poolAssets[1].token
+        //     if (
+        //         tokenA.denom === denomA || tokenB.denom === denomA && 
+        //         tokenA.denom === denomB || tokenB.denom === denomB
+        //         ) {
+        //             poolId = pool.id 
+        //             console.log(`found pool with id ${poolId}`)
+        //         }
+        // })
 
         // @ts-ignore 
         // osmo.js uses a custom version of Long from external package with additional features which causes type error.
@@ -91,7 +95,7 @@ export class LiquidationHelper implements ILiquidationHelper {
 
             // TODO: Should we have a min amount here? It is very important the swap succeds, but at the same time
             // this makes us vulnerable to slippage / low liquidity / frontrunning etc
-            tokenOutMinAmount: '0' 
+            tokenOutMinAmount: '1' 
           })
         
           return await this.client.signAndBroadcast(this.liquidatorAddress,[msg],"auto")
@@ -115,8 +119,10 @@ export class LiquidationHelper implements ILiquidationHelper {
         const liquidationResults : LiquidationResult[] = []
         
         result.logs[0].events.forEach((e) => {
-            if (e.type === "wasm")
+            if (e.type === "wasm") {
+                console.log(e)
                 liquidationResults.push.apply(liquidationResults, this.parseLiquidationResultInner(e))
+            }
         })
 
         return liquidationResults

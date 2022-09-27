@@ -160,7 +160,7 @@ export const makeWithdrawMessage = (
   return executeContractMsg
 }
 
-export const deposit = async(client: SigningCosmWasmClient, sender: string, assetDenom : string, amount : string, addresses : ProtocolAddresses) => {
+export const deposit = async(client: SigningCosmWasmClient, sender: string, assetDenom: string, amount: string, addresses : ProtocolAddresses) => {
   const msg = { "deposit": { "denom": assetDenom } }
   const coins = [{
         "denom":assetDenom,
