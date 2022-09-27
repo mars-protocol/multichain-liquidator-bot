@@ -46,20 +46,20 @@ export class LiquidationHelper implements ILiquidationHelper {
         const lcdPools = await api.getPools();
 
         let poolId = '1'
-        // lcdPools.pools.forEach((pool: LcdPool) => {
-        //     // stop once we find our pool
-        //     if (poolId.length > 0) return
+        lcdPools.pools.forEach((pool: LcdPool) => {
+            // stop once we find our pool
+            if (poolId.length > 0) return
 
-        //     const tokenA = pool.poolAssets[0].token
-        //     const tokenB = pool.poolAssets[1].token
-        //     if (
-        //         tokenA.denom === denomA || tokenB.denom === denomA && 
-        //         tokenA.denom === denomB || tokenB.denom === denomB
-        //         ) {
-        //             poolId = pool.id 
-        //             console.log(`found pool with id ${poolId}`)
-        //         }
-        // })
+            const tokenA = pool.poolAssets[0].token
+            const tokenB = pool.poolAssets[1].token
+            if (
+                tokenA.denom === denomA || tokenB.denom === denomA && 
+                tokenA.denom === denomB || tokenB.denom === denomB
+                ) {
+                    poolId = pool.id 
+                    console.log(`found pool with id ${poolId}`)
+                }
+        })
 
         // @ts-ignore 
         // osmo.js uses a custom version of Long from external package with additional features which causes type error.
@@ -118,10 +118,13 @@ export class LiquidationHelper implements ILiquidationHelper {
 
         const liquidationResults : LiquidationResult[] = []
         
+        console.log(result.logs[0].events)
         result.logs[0].events.forEach((e) => {
             if (e.type === "wasm") {
-                console.log(e)
-                liquidationResults.push.apply(liquidationResults, this.parseLiquidationResultInner(e))
+                console.log(`found wasm`)
+                const result = this.parseLiquidationResultInner(e)
+                console.log(result)
+                liquidationResults.push.apply(liquidationResults, result)
             }
         })
 
@@ -129,7 +132,6 @@ export class LiquidationHelper implements ILiquidationHelper {
     }
 
     parseLiquidationResultInner(wasm: Event) : LiquidationResult[] {
-
 
         const results : LiquidationResult[] = []
 
@@ -141,6 +143,7 @@ export class LiquidationHelper implements ILiquidationHelper {
         }
 
         wasm.attributes.forEach((attribute: Attribute) => {
+            console.log(attribute)
             // find all parameters we require
             switch(attribute.key) {
                 case "collateral_denom":
@@ -149,10 +152,10 @@ export class LiquidationHelper implements ILiquidationHelper {
                 case "debt_denom":
                     result.debtRepaidDenom = attribute.value
                     break
-                case "collateral_amount_liquidated":
+                case "collateral_amount":
                     result.collateralReceivedAmount = attribute.value
                     break
-                case "debt_amount_repaid":
+                case "debt_amount":
                     result.debtRepaidAmount = attribute.value
 
                     // Debt amount repaid is the last KV pair we index, so we push and make blank
@@ -163,7 +166,8 @@ export class LiquidationHelper implements ILiquidationHelper {
                         debtRepaidAmount: '',
                         collateralReceivedAmount: ''
                     }
-
+                    console.log(result)
+                    console.log(results.length)
                     break
             }
         })
