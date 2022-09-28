@@ -37,6 +37,7 @@ type Config struct {
 	HiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
 	RPCEndpoint          string `envconfig:"RPC_ENDPOINT" required:"true"`
 	RPCWebsocketEndpoint string `envconfig:"RPC_WEBSOCKET_ENDPOINT" required:"true"`
+	LCDEndpoint          string `envconfig:"LCD_ENDPOINT" required:"true"`
 
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
 	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
@@ -60,7 +61,7 @@ type Config struct {
 	HealthCheckerConfig string `envconfig:"HEALTH_CHECKER_CONFIG" required:"true"`
 	ExecutorConfig      string `envconfig:"EXECUTOR_CONFIG" required:"true"`
 
-	MetricsEnabled string `envconfig:"METRICS_ENABLED" required:"true"`
+	MetricsEnabled bool `envconfig:"METRICS_ENABLED" required:"true"`
 }
 
 func main() {
@@ -242,6 +243,8 @@ func main() {
 		config.ChainID,
 		config.RPCEndpoint,
 		config.RPCWebsocketEndpoint,
+		config.LCDEndpoint,
+		config.HiveEndpoint,
 		queueProvider,
 		metricsCacheProvider,
 		config.CollectorQueueName,
