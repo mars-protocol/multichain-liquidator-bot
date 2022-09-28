@@ -2,9 +2,9 @@ package collector
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -105,59 +105,20 @@ func (service *Collector) Run() error {
 		// Once we receive a piece of work to execute we need to query the
 		// contract's state and return the addresses contained for the
 		// given prefix
-		addresses, scanned, err := service.fetchContractItems(
-			workItem.ContractAddress,
-			workItem.RPCEndpoint,
-			workItem.ContractItemPrefix,
-			workItem.ContractPageOffset,
-			workItem.ContractPageLimit,
-		)
+		healthCheckItems, scanned, err := service.fetchContractItems(workItem)
 		if err != nil {
 			return err
 		}
 
 		service.metricsCache.IncrementBy("collector.contract_items.scanned", scanned)
-		service.metricsCache.IncrementBy("health_checker.accounts.total", int64(len(addresses)))
+		service.metricsCache.IncrementBy("health_checker.accounts.total", int64(len(healthCheckItems)))
 
-		// TODO Enrich the packet sent to the health check service
+		// Enrich the packet sent to the health check service
 		// to include endpoints / etc
-		// This will be updated as work on the health checker and liquidator
-		// progresses
-
-		// Push addresses to Redis
-		// SAMPLE PACKET
-		// {
-		// 	"address": "osmo1...",
-		// 	"debts": [
-		// 		{
-		// 			"token": "uosmo",
-		// 			"amount": 100000
-		// 		},
-		// 		{
-		// 			"token": "ibc/SAMPLEIBCHASH",
-		// 			"amount": 5000
-		// 		}
-		// 	],
-		// 	"collateral": [
-		// 		{
-		// 			"token": "uosmo",
-		// 			"amount": 200000
-		// 		},
-		// 		{
-		// 			"token": "uother",
-		// 			"amount": 12000
-		// 		}
-		// 	],
-		// 	"endpoints": {
-		// 		"hive": "https://example.com/graphql",
-		// 		"lcd": "https://lcd.example.com",
-		// 		"rpc": "https://rpc.example.com"
-		// 	}
-		// }
-		service.queue.PushMany(service.healthCheckQueueName, addresses)
+		service.queue.PushMany(service.healthCheckQueueName, healthCheckItems)
 
 		service.logger.WithFields(logrus.Fields{
-			"total":      len(addresses),
+			"total":      len(healthCheckItems),
 			"elapsed_ms": time.Since(start).Milliseconds(),
 		}).Info("Pushed addresses to Redis")
 	}
@@ -168,35 +129,32 @@ func (service *Collector) Run() error {
 // fetchContractItems retrieves a maximum of limit items from the contract
 // state starting at the given offset from contractAddress
 func (service *Collector) fetchContractItems(
-	contractAddress string,
-	rpcEndpoint string,
-	prefix string,
-	offset uint64,
-	limit uint64) ([][]byte, int64, error) {
+	workItem types.WorkItem,
+) ([][]byte, int64, error) {
 
 	start := time.Now()
-	var addresses [][]byte
+	var results [][]byte
 	var totalScanned int64
 
 	// Blocks are usually less than 6 seconds, we give ourselves an absolute
 	// maximum of 5 seconds to get the information. Ideally, it should be faster
-	client, err := lens.NewRPCClient(rpcEndpoint, time.Second*5)
+	client, err := lens.NewRPCClient(workItem.RPCEndpoint, time.Second*5)
 	if err != nil {
-		return addresses, totalScanned, err
+		return results, totalScanned, err
 	}
 
 	var stateRequest QueryAllContractStateRequest
-	stateRequest.Address = contractAddress
+	stateRequest.Address = workItem.ContractAddress
 	stateRequest.Pagination = &PageRequest{
-		Offset: offset,
-		Limit:  limit,
+		Offset: workItem.ContractPageOffset,
+		Limit:  workItem.ContractPageLimit,
 	}
 
 	// The structure of the request requires the query parameters to be passed
 	// as protobuf encoded content
 	rpcRequest, err := proto.Marshal(&stateRequest)
 	if err != nil {
-		return addresses, totalScanned, err
+		return results, totalScanned, err
 	}
 
 	rpcResponse, err := client.ABCIQuery(
@@ -206,7 +164,7 @@ func (service *Collector) fetchContractItems(
 		rpcRequest,
 	)
 	if err != nil {
-		return addresses, totalScanned, err
+		return results, totalScanned, err
 	}
 
 	// The value in the response also contains the contract state in
@@ -214,8 +172,12 @@ func (service *Collector) fetchContractItems(
 	var stateResponse QueryAllContractStateResponse
 	err = proto.Unmarshal(rpcResponse.Response.GetValue(), &stateResponse)
 	if err != nil {
-		return addresses, totalScanned, err
+		return results, totalScanned, err
 	}
+
+	// We need to combine all debts and collateral per account here
+	// So we add them to a map
+	accounts := make(map[string]types.HealthCheckWorkItem)
 
 	// Structure of raw state we are querying
 	// If a contract has a cw-storage-plus Map "balances" then the raw
@@ -225,32 +187,125 @@ func (service *Collector) fetchContractItems(
 	// Example: A contract Map "balances" containing MARS addresses as keys
 	// will have contract state keys returned as "balancesmars..."
 	for _, model := range stateResponse.Models {
-		key, err := hex.DecodeString(model.Key.String())
+
+		// Example of a key
+		// 00056465627473002B6F736D6F316379797A7078706C78647A6B656561376B777379646164673837333537716E6168616B616B7375696F6E
+		// The first two bytes "0005" indicate the length of the Map "name" -> 5 characters
+		// Followed by the map key "6465627473" -> 'debts'
+		// Then another two bytes indicating the length of the map key (address) "002B" -> 43 characters
+		// Followed by the rest of the key, denom in this case "uion"
+
+		hexKey := model.Key
+		if len(hexKey) < 50 {
+			// Anything shorter than 50 can't be a map
+			continue
+		}
+
+		lengthIndicator := hexKey[0:2]
+		length, err := strconv.ParseInt(lengthIndicator.String(), 16, 64)
 		if err != nil {
-			return addresses, totalScanned, err
+			service.logger.WithFields(logrus.Fields{
+				"err": err,
+				"key": hexKey.String(),
+			}).Warning("Unable to decode contract state key (map name)")
+			continue
 		}
-		// TODO: The first two bytes indicate the length of the key
-		// TODO: Parse correctly instead of doing cleanBytes
-		// The result from the raw contract state includes some null / other
-		// bytes used within cw-storage-plus, we can strip them out
-		// to get a usable key for our purposes
-		keyString := cleanBytes(key)
+		// Shift to next section
+		hexKey = hexKey[2:]
+		// Get the map name
+		mapName := hexKey[0:length]
+		// Shift to next section
+		hexKey = hexKey[length:]
 
-		// Only capture those with the correct prefix
-		if strings.HasPrefix(keyString, prefix) {
-			address := strings.TrimPrefix(keyString, prefix)
-
-			// TODO: Depending on the final contract Map key structure, we might
-			// need to do some additional processing of the address here
-			addresses = append(addresses, []byte(address))
+		// Check if we're interested in this key
+		if !strings.Contains(workItem.ContractItemPrefix, string(mapName)) {
+			continue
 		}
+
+		// Determine the length of the address
+		lengthIndicator = hexKey[0:2]
+		length, err = strconv.ParseInt(lengthIndicator.String(), 16, 64)
+		if err != nil {
+			service.logger.WithFields(logrus.Fields{
+				"err": err,
+				"key": hexKey.String(),
+			}).Warning("Unable to decode contract state key (address)")
+			continue
+		}
+		// Shift to next section
+		hexKey = hexKey[2:]
+		// Address is next
+		address := hexKey[0:length]
+		// Shift to next section
+		hexKey = hexKey[length:]
+		// Denom is all that's left
+		denom := hexKey
+
+		var value DebtCollateralMapValue
+		err = json.Unmarshal(model.Value, &value)
+		if err != nil {
+			service.logger.WithFields(logrus.Fields{
+				"err": err,
+				"key": hexKey.String(),
+				"map": mapName,
+			}).Warning("Unable to decode contract state value")
+			continue
+		}
+
+		// Track this account
+		if _, ok := accounts[string(address)]; !ok {
+			// Not added yet, init
+			accounts[string(address)] = types.HealthCheckWorkItem{
+				Address:    string(address),
+				Debts:      []types.Debts{},
+				Collateral: []types.Collateral{},
+				Endpoints: types.Endpoints{
+					RPC:  workItem.RPCEndpoint,
+					LCD:  workItem.LCDEndpoint,
+					Hive: workItem.HiveEndpoint,
+				},
+			}
+		}
+		current := accounts[string(address)]
+
+		// Append values for debts
+		if string(mapName) == "debts" {
+			current.Debts = append(accounts[string(address)].Debts, types.Debts{
+				Token:  string(denom),
+				Amount: value.AmountScaled,
+			})
+		}
+		// Append values for collateral
+		if string(mapName) == "collaterals" {
+			current.Collateral = append(accounts[string(address)].Collateral, types.Collateral{
+				Token:  string(denom),
+				Amount: value.AmountScaled,
+			})
+		}
+		accounts[string(address)] = current
+
+		// Track total scanned for metrics
 		totalScanned++
 	}
+
+	// Construct the resulting output by encoding to JSON
+	// and returning to the caller
+	for address, workItem := range accounts {
+		resultJSON, err := json.Marshal(workItem)
+		if err != nil {
+			service.logger.WithFields(logrus.Fields{
+				"err":     err,
+				"address": address,
+			}).Warning("Unable to encode contract state result")
+		}
+		results = append(results, resultJSON)
+	}
+
 	service.logger.WithFields(logrus.Fields{
-		"total":      len(addresses),
+		"total":      len(results),
 		"elapsed_ms": time.Since(start).Milliseconds(),
 	}).Debug("Fetched contract items")
-	return addresses, totalScanned, nil
+	return results, totalScanned, nil
 }
 
 // Stop the service gracefully

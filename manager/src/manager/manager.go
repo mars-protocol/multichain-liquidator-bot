@@ -32,8 +32,12 @@ type Manager struct {
 	scalers              map[string]managerinterfaces.Scaler
 
 	rpcEndpoint             string
+	lcdEndpoint             string
+	hiveEndpoint            string
 	collectorContract       string
 	collectorItemsPerPacket int
+
+	metricsEnabled bool
 
 	logger *logrus.Entry
 
@@ -51,6 +55,8 @@ func New(
 	chainID string,
 	rpcEndpoint string,
 	rpcWebsocketEndpoint string,
+	lcdEndpoint string,
+	hiveEndpoint string,
 	queue interfaces.Queuer,
 	metricsCache interfaces.Cacher,
 	collectorQueueName string,
@@ -59,6 +65,7 @@ func New(
 	scalers map[string]managerinterfaces.Scaler,
 	collectorContract string,
 	collectorItemsPerPacket int,
+	metricsEnabled bool,
 	logger *logrus.Entry,
 ) (*Manager, error) {
 
@@ -90,6 +97,8 @@ func New(
 		chainID:                 chainID,
 		rpcEndpoint:             rpcEndpoint,
 		rpcWebsocketEndpoint:    rpcWebsocketEndpoint,
+		lcdEndpoint:             lcdEndpoint,
+		hiveEndpoint:            hiveEndpoint,
 		queue:                   queue,
 		metricsCache:            metricsCache,
 		collectorQueueName:      collectorQueueName,
@@ -100,6 +109,7 @@ func New(
 		collectorItemsPerPacket: collectorItemsPerPacket,
 		logger:                  logger,
 		lastBlockTime:           time.Now(),
+		metricsEnabled:          metricsEnabled,
 		continueRunning:         0,
 	}, nil
 }
@@ -172,21 +182,23 @@ func (service *Manager) Run() error {
 			}).Error("Unable to parse new height value")
 		}
 
-		// Collect current metrics for previous block of work
-		metrics, err := service.collectMetrics(height - 1)
-		if err != nil {
-			service.logger.WithFields(logrus.Fields{
-				"height": height,
-				"error":  err,
-			}).Error("Unable to collect metrics")
-		}
+		if service.metricsEnabled {
+			// Collect current metrics for previous block of work
+			metrics, err := service.collectMetrics(height - 1)
+			if err != nil {
+				service.logger.WithFields(logrus.Fields{
+					"height": height,
+					"error":  err,
+				}).Error("Unable to collect metrics")
+			}
 
-		err = service.submitMetrics(metrics)
-		if err != nil {
-			service.logger.WithFields(logrus.Fields{
-				"height": height,
-				"error":  err,
-			}).Error("Unable to submit metrics")
+			err = service.submitMetrics(metrics)
+			if err != nil {
+				service.logger.WithFields(logrus.Fields{
+					"height": height,
+					"error":  err,
+				}).Error("Unable to submit metrics")
+			}
 		}
 
 		service.logger.WithFields(logrus.Fields{
@@ -246,8 +258,10 @@ func (service *Manager) Run() error {
 
 			workItem := types.WorkItem{
 				RPCEndpoint:        service.rpcEndpoint,
+				HiveEndpoint:       service.hiveEndpoint,
+				LCDEndpoint:        service.lcdEndpoint,
 				ContractAddress:    service.collectorContract,
-				ContractItemPrefix: "balance",
+				ContractItemPrefix: "debts,collaterals",
 				ContractPageOffset: offset,
 				ContractPageLimit:  uint64(limit),
 			}
