@@ -18,7 +18,7 @@ type Debts struct {
 // Debts denote the format for collateral
 type Collateral struct {
 	Token  string `json:"token"`
-	Amount int    `json:"amount"`
+	Amount string `json:"amount"`
 }
 
 // Endpoints denote the format for usable endpoints
