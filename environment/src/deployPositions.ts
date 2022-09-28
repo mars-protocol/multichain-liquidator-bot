@@ -5,9 +5,10 @@ import { GasPrice } from "@cosmjs/stargate";
 import { RedisClientType } from "redis";
 import { Coin, makeCosmoshubPath } from "@cosmjs/amino";
 import { RedisInterface } from "../../liquidator/src/redis.js"
-import { borrow, deposit, loadSeeds, makeBorrowMessage, makeDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../liquidator/src/test_helpers.js"
+import { borrow, deposit, loadSeeds, makeBorrowMessage, makeDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../liquidator/src/helpers.js"
 import { requiredEnvironmentVariables } from "./helpers.js";
 import 'dotenv/config.js'
+import path from "path";
 
 requiredEnvironmentVariables([
     "DEPLOYER_SEED",
@@ -36,6 +37,7 @@ const OSMO_DENOM = process.env.OSMO_DENOM!
 const MAX_THREADS = Number(process.env.MAX_THREADS!)
 
 const MAX_SEEDS = Number(process.env.MAX_SEEDS || '1000')
+const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
 
 // TODO set me via .env?
 const borrowAmount = "3000000"
@@ -51,7 +53,7 @@ export const main = async() => {
 
     // gather required data
     const seeds = loadSeeds() 
-    const protocolAddresses = readAddresses() 
+    const protocolAddresses = readAddresses(deployDetails) 
 
     console.log(protocolAddresses)
     

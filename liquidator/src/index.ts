@@ -6,7 +6,7 @@ import { Position } from "./types/position"
 import { Coin, GasPrice } from "@cosmjs/stargate"
 import { coin, DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing"
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from "@cosmjs/cosmwasm-stargate"
-import { makeWithdrawMessage, ProtocolAddresses, readAddresses, sleep } from "./helpers.js"
+import { makeWithdrawMessage, ProtocolAddresses, queryHealth, readAddresses, sleep } from "./helpers.js"
 import { osmosis } from "osmojs"
 
 import path from 'path'
@@ -43,21 +43,25 @@ export const main = async () => {
     }
 
     const client = await SigningCosmWasmClient.connectWithSigner(RPC_ENDPOINT, liquidator, clientOption);
-
+    
+    // add swap message
+    const swapTypeUrl = "/osmosis.gamm.v1beta1.MsgSwapExactAmountIn"
+    client.registry.register(swapTypeUrl, osmosis.gamm.v1beta1.MsgSwapExactAmountIn)
+    
     const liquidationHelper = new LiquidationHelper(client, liquidatorAddress, LIQUIDATION_FILTERER_CONTRACT)
 
     // run
     while (true) await run(
         liquidationHelper, 
-        redis, 
-        client, 
-        liquidatorAddress)
+        redis)
 }
 
 
 
 // exported for testing
-export const run = async (txHelper: LiquidationHelper, redis: IRedisInterface) => {
+export const run = async (
+    liquidationHelper: LiquidationHelper, 
+    redis: IRedisInterface) => {
 
     const positions : Position[] = await redis.fetchUnhealthyPositions()
     if (positions.length == 0){
@@ -84,25 +88,20 @@ export const run = async (txHelper: LiquidationHelper, redis: IRedisInterface) =
     })
 
     const coins : Coin[] = []
-    debtsToRepay.forEach((amount, denom) => coins.push({denom, amount: amount.toFixed(0)}))
-    
-    // dispatch transactions - return object with results on it
-    const results = await txHelper.sendLiquidationTxs(txs, coins)
 
-    // Log the amount of liquidations executed
+    debtsToRepay.forEach((amount, denom) => coins.push({denom, amount: amount.toFixed(0)}))
+
+    // dispatch liquidation tx , and recieve and object with results on it
+    const results = await liquidationHelper.sendLiquidationsTx(txs, coins)
+    
+     // Log the amount of liquidations executed
     redis.incrementBy("executor.liquidations.executed", results.length)
 
-    // Swap collaterals to replace the debt that was repaid
-    results.forEach(async (result: LiquidationResult) => {
-
-        await txHelper.swap(
-            result.collateralReceivedDenom,
-            result.debtRepaidDenom,
-            Number(result.collateralReceivedAmount)
-        )
-    })
-
-
+    console.log(`liquidated ${results.length} positions`)
+    for (const index in results) {
+        const liquidation: LiquidationResult = results[index]
+        await liquidationHelper.swap(liquidation.collateralReceivedDenom, liquidation.debtRepaidDenom, Number(liquidation.collateralReceivedAmount))            
+    }
 }
 
 
