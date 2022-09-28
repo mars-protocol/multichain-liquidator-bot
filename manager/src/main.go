@@ -59,6 +59,8 @@ type Config struct {
 	CollectorConfig     string `envconfig:"COLLECTOR_CONFIG" required:"true"`
 	HealthCheckerConfig string `envconfig:"HEALTH_CHECKER_CONFIG" required:"true"`
 	ExecutorConfig      string `envconfig:"EXECUTOR_CONFIG" required:"true"`
+
+	MetricsEnabled string `envconfig:"METRICS_ENABLED" required:"true"`
 }
 
 func main() {
@@ -248,6 +250,7 @@ func main() {
 		scalers,
 		config.CollectorContract,
 		config.CollectorItemsPerPacket,
+		config.MetricsEnabled,
 		logger,
 	)
 	if err != nil {

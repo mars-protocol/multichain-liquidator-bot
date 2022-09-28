@@ -2,9 +2,9 @@ package collector
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -175,14 +175,14 @@ func (service *Collector) fetchContractItems(
 	limit uint64) ([][]byte, int64, error) {
 
 	start := time.Now()
-	var addresses [][]byte
+	var results [][]byte
 	var totalScanned int64
 
 	// Blocks are usually less than 6 seconds, we give ourselves an absolute
 	// maximum of 5 seconds to get the information. Ideally, it should be faster
 	client, err := lens.NewRPCClient(rpcEndpoint, time.Second*5)
 	if err != nil {
-		return addresses, totalScanned, err
+		return results, totalScanned, err
 	}
 
 	var stateRequest QueryAllContractStateRequest
@@ -196,7 +196,7 @@ func (service *Collector) fetchContractItems(
 	// as protobuf encoded content
 	rpcRequest, err := proto.Marshal(&stateRequest)
 	if err != nil {
-		return addresses, totalScanned, err
+		return results, totalScanned, err
 	}
 
 	rpcResponse, err := client.ABCIQuery(
@@ -206,7 +206,7 @@ func (service *Collector) fetchContractItems(
 		rpcRequest,
 	)
 	if err != nil {
-		return addresses, totalScanned, err
+		return results, totalScanned, err
 	}
 
 	// The value in the response also contains the contract state in
@@ -214,7 +214,7 @@ func (service *Collector) fetchContractItems(
 	var stateResponse QueryAllContractStateResponse
 	err = proto.Unmarshal(rpcResponse.Response.GetValue(), &stateResponse)
 	if err != nil {
-		return addresses, totalScanned, err
+		return results, totalScanned, err
 	}
 
 	// Structure of raw state we are querying
@@ -225,32 +225,102 @@ func (service *Collector) fetchContractItems(
 	// Example: A contract Map "balances" containing MARS addresses as keys
 	// will have contract state keys returned as "balancesmars..."
 	for _, model := range stateResponse.Models {
-		key, err := hex.DecodeString(model.Key.String())
+
+		// Example of a key
+		// 00056465627473002B6F736D6F316379797A7078706C78647A6B656561376B777379646164673837333537716E6168616B616B7375696F6E
+		// The first two bytes "0005" indicate the length of the Map "name" -> 5 characters
+		// Followed by the map key "6465627473" -> 'debts'
+		// Then another two bytes indicating the length of the map key (address) "002B" -> 43 characters
+		// Followed by the rest of the key, denom in this case "uion"
+
+		hexKey := model.Key
+		if len(hexKey) < 50 {
+			// Anything shorter than 50 can't be a map
+			continue
+		}
+
+		lengthIndicator := hexKey[0:2]
+		length, err := strconv.ParseInt(lengthIndicator.String(), 16, 64)
 		if err != nil {
-			return addresses, totalScanned, err
+			service.logger.WithFields(logrus.Fields{
+				"err": err,
+				"key": hexKey.String(),
+			}).Warning("Unable to decode contract state key (map name)")
+			continue
 		}
-		// TODO: The first two bytes indicate the length of the key
-		// TODO: Parse correctly instead of doing cleanBytes
-		// The result from the raw contract state includes some null / other
-		// bytes used within cw-storage-plus, we can strip them out
-		// to get a usable key for our purposes
-		keyString := cleanBytes(key)
+		// Shift to next section
+		hexKey = hexKey[2:]
+		// Get the map name
+		mapName := hexKey[0:length]
+		// Shift to next section
+		hexKey = hexKey[length:]
 
-		// Only capture those with the correct prefix
-		if strings.HasPrefix(keyString, prefix) {
-			address := strings.TrimPrefix(keyString, prefix)
-
-			// TODO: Depending on the final contract Map key structure, we might
-			// need to do some additional processing of the address here
-			addresses = append(addresses, []byte(address))
+		// Check if we're interested in this key
+		if !strings.HasPrefix(string(mapName), prefix) {
+			continue
 		}
+
+		// Determine the length of the address
+		lengthIndicator = hexKey[0:2]
+		length, err = strconv.ParseInt(lengthIndicator.String(), 16, 64)
+		if err != nil {
+			service.logger.WithFields(logrus.Fields{
+				"err": err,
+				"key": hexKey.String(),
+			}).Warning("Unable to decode contract state key (address)")
+			continue
+		}
+		// Shift to next section
+		hexKey = hexKey[2:]
+		// Address is next
+		address := hexKey[0:length]
+		// Shift to next section
+		hexKey = hexKey[length:]
+		// Denom is all that's left
+		denom := hexKey
+
+		var debtValue DebtMapValue
+		err = json.Unmarshal(model.Value, &debtValue)
+		if err != nil {
+			service.logger.WithFields(logrus.Fields{
+				"err": err,
+				"key": hexKey.String(),
+				"map": mapName,
+			}).Warning("Unable to decode contract state value")
+			continue
+		}
+
+		// Contruct result
+		result := types.HealthCheckWorkItem{
+			Address: string(address),
+			Debts: []types.Debts{
+				{
+					Token:  string(denom),
+					Amount: debtValue.AmountScaled,
+				},
+			},
+			Collateral: []types.Collateral{},
+			Endpoints: types.Endpoints{
+				RPC: rpcEndpoint,
+			},
+		}
+		resultJSON, err := json.Marshal(result)
+		if err != nil {
+			service.logger.WithFields(logrus.Fields{
+				"err": err,
+				"key": hexKey.String(),
+				"map": mapName,
+			}).Warning("Unable to encode contract state result")
+		}
+
+		results = append(results, resultJSON)
 		totalScanned++
 	}
 	service.logger.WithFields(logrus.Fields{
-		"total":      len(addresses),
+		"total":      len(results),
 		"elapsed_ms": time.Since(start).Milliseconds(),
 	}).Debug("Fetched contract items")
-	return addresses, totalScanned, nil
+	return results, totalScanned, nil
 }
 
 // Stop the service gracefully
