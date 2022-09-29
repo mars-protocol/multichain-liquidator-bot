@@ -14,7 +14,7 @@ func TestNewQueueWaterMark(t *testing.T) {
 	logrus.SetOutput(ioutil.Discard)
 
 	mockDeployer := deployer.NewMock()
-	mockQueue, err := mock.NewRedis()
+	mockQueue, err := mock.NewRedisQueue()
 	if err != nil {
 		t.Errorf("unexpected failure to create mock Redis: %s", err)
 	}
@@ -38,7 +38,7 @@ func TestScaleUp(t *testing.T) {
 	logrus.SetOutput(ioutil.Discard)
 
 	mockDeployer := deployer.NewMock()
-	mockQueue, err := mock.NewRedis()
+	mockQueue, err := mock.NewRedisQueue()
 	if err != nil {
 		t.Errorf("unexpected failure to create mock Redis: %s", err)
 	}
@@ -67,7 +67,7 @@ func TestScaleDownWithoutMinimum(t *testing.T) {
 	logrus.SetOutput(ioutil.Discard)
 
 	mockDeployer := deployer.NewMock()
-	mockQueue, err := mock.NewRedis()
+	mockQueue, err := mock.NewRedisQueue()
 	if err != nil {
 		t.Errorf("unexpected failure to create mock Redis: %s", err)
 	}
@@ -101,7 +101,7 @@ func TestScaleDownWithMinimum(t *testing.T) {
 	logrus.SetOutput(ioutil.Discard)
 
 	mockDeployer := deployer.NewMock()
-	mockQueue, err := mock.NewRedis()
+	mockQueue, err := mock.NewRedisQueue()
 	if err != nil {
 		t.Errorf("unexpected failure to create mock Redis: %s", err)
 	}
@@ -135,7 +135,7 @@ func TestScaleAutomaticWithMinimum(t *testing.T) {
 	logrus.SetOutput(ioutil.Discard)
 
 	mockDeployer := deployer.NewMock()
-	mockQueue, err := mock.NewRedis()
+	mockQueue, err := mock.NewRedisQueue()
 	if err != nil {
 		t.Errorf("unexpected failure to create mock Redis: %s", err)
 	}
@@ -172,7 +172,7 @@ func TestScaleAutomaticWithoutMinimumNoScaling(t *testing.T) {
 	logrus.SetOutput(ioutil.Discard)
 
 	mockDeployer := deployer.NewMock()
-	mockQueue, err := mock.NewRedis()
+	mockQueue, err := mock.NewRedisQueue()
 	if err != nil {
 		t.Errorf("unexpected failure to create mock Redis: %s", err)
 	}

@@ -7,18 +7,18 @@ import (
 	redigomock "github.com/rafaeljusto/redigomock/v3"
 )
 
-// Redis implements a mock Redis queue using the LIST datastructure that match
+// RedisQueue implements a mock Redis queue using the LIST datastructure that match
 // the queuer inerface
-type Redis struct {
+type RedisQueue struct {
 	// conn holds the Redis connection
 	conn redis.Conn
 }
 
-// NewRedis creates a new instance of the Redis mock queue
+// NewRedisQueue creates a new instance of the Redis mock queue
 // endpoint is the full URL of the Redis endpoint
 // database is the Redis database to use
 // queue is the name of the Redis key to keep the list at
-func NewRedis() (*Redis, error) {
+func NewRedisQueue() (*RedisQueue, error) {
 
 	conn := redigomock.NewConn()
 
@@ -54,20 +54,20 @@ func NewRedis() (*Redis, error) {
 		return int64(0), nil
 	}))
 
-	return &Redis{
+	return &RedisQueue{
 		conn: conn,
 	}, nil
 }
 
 // Connect to a Redis instance
-func (queue *Redis) Connect() error {
+func (queue *RedisQueue) Connect() error {
 	// We already have a connection, this will error
 	// if the connection is not usable
 	return queue.conn.Err()
 }
 
 // Push pushes byte data onto the Redis list at key
-func (queue *Redis) Push(key string, data []byte) error {
+func (queue *RedisQueue) Push(key string, data []byte) error {
 	// RPUSH returns an integer of items pushed and possibly an error
 	// https://redis.io/commands/rpush/
 	_, err := redis.Int(queue.conn.Do("RPUSH", key, data))
@@ -75,7 +75,7 @@ func (queue *Redis) Push(key string, data []byte) error {
 }
 
 // PushMany pushes multiple items onto the queue at key
-func (queue *Redis) PushMany(key string, data [][]byte) error {
+func (queue *RedisQueue) PushMany(key string, data [][]byte) error {
 	// RPUSH returns an integer of items pushed and possibly an error
 	// https://redis.io/commands/rpush/
 	_, err := redis.Int(queue.conn.Do("RPUSH", redis.Args{}.Add(key).AddFlat(data)...))
@@ -84,7 +84,7 @@ func (queue *Redis) PushMany(key string, data [][]byte) error {
 
 // Fetch retrieves a single item from the Redis list at key and returns a byte
 // slice of data
-func (queue *Redis) Fetch(key string) ([]byte, error) {
+func (queue *RedisQueue) Fetch(key string) ([]byte, error) {
 	// BLPOP returns the first element from key by waiting up to popTimeout
 	// for an element to be available
 	// https://redis.io/commands/blpop/
@@ -107,7 +107,7 @@ func (queue *Redis) Fetch(key string) ([]byte, error) {
 
 // FetchMany retrieves multiple items from the Redis list at key
 // and returns a list of byte slices up to count
-func (queue *Redis) FetchMany(key string, count int) ([][]byte, error) {
+func (queue *RedisQueue) FetchMany(key string, count int) ([][]byte, error) {
 	var items [][]byte
 
 	// LPOP returns count number of elements from the key
@@ -133,14 +133,14 @@ func (queue *Redis) FetchMany(key string, count int) ([][]byte, error) {
 }
 
 // CountItems counts the amount of items in the given queue
-func (queue *Redis) CountItems(key string) (int, error) {
+func (queue *RedisQueue) CountItems(key string) (int, error) {
 	// LLEN returns the length of a list
 	// https://redis.io/commands/llen/
 	return redis.Int(queue.conn.Do("LLEN", key))
 }
 
 // Purge all items from the given queue
-func (queue *Redis) Purge(key string) error {
+func (queue *RedisQueue) Purge(key string) error {
 	// DEL deletes the key and acts as a clear/purge operation
 	// https://redis.io/commands/del/
 	// DEL returns the amount of items deleted and an error where applicable
@@ -149,7 +149,7 @@ func (queue *Redis) Purge(key string) error {
 }
 
 // Disconnect from a Redis instance
-func (queue *Redis) Disconnect() error {
+func (queue *RedisQueue) Disconnect() error {
 	queue.conn.Flush()
 	return queue.conn.Close()
 }
