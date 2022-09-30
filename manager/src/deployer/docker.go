@@ -68,6 +68,7 @@ func (dep *Docker) Increase() error {
 	var env []string
 	for key, value := range dep.containerEnv {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
+		fmt.Println(fmt.Sprintf("%s=%s", key, value))
 	}
 
 	containerName := fmt.Sprintf("%s.%s", dep.service, uuid.NewString())
@@ -83,6 +84,7 @@ func (dep *Docker) Increase() error {
 			RestartPolicy: container.RestartPolicy{
 				MaximumRetryCount: 0,
 			},
+			NetworkMode: "host",
 		},
 		&network.NetworkingConfig{},
 		&v1.Platform{},
@@ -95,6 +97,9 @@ func (dep *Docker) Increase() error {
 		context.Background(),
 		containerDetails.ID,
 		types.ContainerStartOptions{})
+	if err != nil {
+		return err
+	}
 
 	// TODO: A possible improvement here is to start a routine to check that the
 	// container actually starts correctly
