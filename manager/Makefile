@@ -45,7 +45,7 @@ run: build .start_redis ## Build and run the service binary
 	DEPLOYER_TYPE="docker" \
 	COLLECTOR_IMAGE=multichain-collector:latest \
 	HEALTH_CHECKER_IMAGE=multichain-health-checker:latest \
-	EXECUTOR_IMAGE=redis:latest \
+	EXECUTOR_IMAGE=multichain-liquidator:latest \
 	SCALING_TYPE="watermark" \
 	COLLECTOR_CONTRACT="osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6" \
 	AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
@@ -57,7 +57,7 @@ run: build .start_redis ## Build and run the service binary
 	AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
 	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "localosmosis","REDIS_DATABASE": "0", "REDIS_METRICS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
 	HEALTH_CHECKER_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-health-checker","CHAIN_ID": "localosmosis","REDIS_ENDPOINT":"127.0.0.1:6379","REDIS_DATABASE":"0","REDIS_METRICS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"http://127.0.0.1","REDBANK_ADDRESS":"osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6","ADDRESS_PER_JOB":"1","JOBS_PER_WORKER":"1","BATCH_SIZE":"1"}' \
-	EXECUTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-executor", "LIQUIDATION_QUEUE_NAME":"liquidator","PREFIX":"osmo","GAS_PRICE":"0.001osmo","RPC_ENDPOINT":"https://phoenix-rpc.terra.dev","LIQUIDATION_FILTERER_CONTRACT":"osmo12...32","SEED":"seed phrase here"}' \
+	EXECUTOR_CONFIG='{"ACCOUNTS_PER_SEED":100,"RPC_URL":"http://127.0.0.1:26657","QUEUE_NAME":"liquidator","ATOM_DENOM":"uion","OSMO_DENOM":"uosmo","MAX_THREADS":20,"OUTPOST_ARTIFACTS_PATH":"/Users/<username>/outposts/artifacts/","CHAIN_ID":"localosmosis","SEED":"notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius"}' \
 	METRICS_ENABLED=false \
 	DD_SITE="us5.datadoghq.com" \
 	DD_API_KEY="f1ffedda9de19cf4cef2ae80f2b6e210" \

@@ -26,6 +26,7 @@
   },
   "scripts": {
     "test:integration": "node --loader ts-node/esm test/integration/liquidation_test.ts",
+    "build": "tsc --project tsconfig.json",
     "start": "node --loader ts-node/esm src/index.ts",
     "test": "jest"
   }

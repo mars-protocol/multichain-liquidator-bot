@@ -9,13 +9,13 @@ default: build ## Build the binary
 build: ## Build all the services
 	cd collector && make
 	cd health-checker && make
-	# cd liquidator && make
+	cd liquidator && make
 	cd manager && make
 
 docker_build: build ## Build all the services' Docker images
 	cd collector && make docker_build
 	cd health-checker && make docker_build
-	# cd liquidator && make docker_build
+	cd liquidator && make docker_build
 	cd manager && make docker_build
 
 run: docker_build ## Build Docker images and start manager
@@ -30,7 +30,7 @@ test_cover: ## Run tests with a coverage report
 clean: ## Remove compiled binaries from bin/
 	cd collector && make clean
 	cd health-checker && make clean
-	# cd liquidator && make clean
+	cd liquidator && make clean
 	cd manager && make clean
 
 help: ## Display this help screen
