@@ -55,7 +55,7 @@ run: build .start_redis ## Build and run the service binary
 	AWS_SERVICE_MEMORY_MB=1024 \
 	AWS_SERVICE_SUBNETS="subnet-14ef644c" \
 	AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
-	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "pisco-1","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
+	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "localosmosis","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
 	HEALTH_CHECKER_CONFIG='{"REDIS_ENDPOINT":"127.0.0.1","REDIS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"https://phoenix-hive.terra.dev","REDBANK_ADDRESS":"osmo123","ADDRESS_PER_JOB":"5","JOBS_PER_WORKER":"2","BATCH_SIZE":"2"}' \
 	EXECUTOR_CONFIG='{"LIQUIDATION_QUEUE_NAME":"liquidator","PREFIX":"osmo","GAS_PRICE":"0.001osmo","RPC_ENDPOINT":"https://phoenix-rpc.terra.dev","LIQUIDATION_FILTERER_CONTRACT":"osmo12...32","SEED":"seed phrase here"}' \
 	METRICS_ENABLED=false \
@@ -70,8 +70,9 @@ run_race: .start_redis ## Run the service with race condition checking enabled
 	SERVICE_NAME="bot-manager" \
 	CHAIN_ID="phoenix-1" \
 	HIVE_ENDPOINT="https://terra2-delphi-1.simply-vc.com.mt/ZC79CHN02DSI/terra-hive/graphql " \
-	RPC_ENDPOINT="https://rpc-terra-2.everstake.one:443" \
-	RPC_WEBSOCKET_ENDPOINT="wss://rpc.osmosis.zone/websocket" \
+	LCD_ENDPOINT="http://127.0.0.1:12317" \
+	RPC_ENDPOINT="http://127.0.0.1:26657" \
+	RPC_WEBSOCKET_ENDPOINT="ws://127.0.0.1:26657/websocket" \
 	REDIS_DATABASE=0 \
 	REDIS_METRICS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
@@ -84,7 +85,7 @@ run_race: .start_redis ## Run the service with race condition checking enabled
 	HEALTH_CHECKER_IMAGE=redis:latest \
 	EXECUTOR_IMAGE=redis:latest \
 	SCALING_TYPE="watermark" \
-	COLLECTOR_CONTRACT="terra1nsuqsk6kh58ulczatwev87ttq2z6r3pusulg9r24mfj2fvtzd4uq3exn26" \
+	COLLECTOR_CONTRACT="osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6" \
 	AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
 	AWS_SECRET_ACCESS_KEY="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" \
 	AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
@@ -92,10 +93,10 @@ run_race: .start_redis ## Run the service with race condition checking enabled
 	AWS_SERVICE_MEMORY_MB=1024 \
 	AWS_SERVICE_SUBNETS="subnet-14ef644c" \
 	AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
-	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "pisco-1","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
+	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "localosmosis","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
 	HEALTH_CHECKER_CONFIG='{"REDIS_ENDPOINT":"127.0.0.1","REDIS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"https://phoenix-hive.terra.dev","REDBANK_ADDRESS":"osmo123","ADDRESS_PER_JOB":"5","JOBS_PER_WORKER":"2","BATCH_SIZE":"2"}' \
 	EXECUTOR_CONFIG='{"LIQUIDATION_QUEUE_NAME":"liquidator","PREFIX":"osmo","GAS_PRICE":"0.001osmo","RPC_ENDPOINT":"https://phoenix-rpc.terra.dev","LIQUIDATION_FILTERER_CONTRACT":"osmo12...32","SEED":"seed phrase here"}' \
-	DATADOG_ENABLED=true \
+	METRICS_ENABLED=false \
 	DD_SITE="us5.datadoghq.com" \
 	DD_API_KEY="f1ffedda9de19cf4cef2ae80f2b6e210" \
 	go run -race ./src/*.go
@@ -105,16 +106,20 @@ docker_build: build ## Build the service Docker container
 
 docker_run: ## Run the Docker container in interactive mode
 	docker run -it --rm --network="host" \
+		# Add your environment variable here
 		-e LOG_LEVEL=debug \
-		-e LOG_FORMAT=json \
+		-e LOG_FORMAT=text \
 		-e SERVICE_NAME="bot-manager" \
 		-e CHAIN_ID="phoenix-1" \
 		-e HIVE_ENDPOINT="https://terra2-delphi-1.simply-vc.com.mt/ZC79CHN02DSI/terra-hive/graphql " \
-		-e RPC_ENDPOINT="https://rpc-terra-2.everstake.one:443" \
-		-e RPC_WEBSOCKET_ENDPOINT="wss://rpc.osmosis.zone/websocket" \
+		-e LCD_ENDPOINT="http://127.0.0.1:12317" \
+		-e RPC_ENDPOINT="http://127.0.0.1:26657" \
+		-e RPC_WEBSOCKET_ENDPOINT="ws://127.0.0.1:26657/websocket" \
 		-e REDIS_DATABASE=0 \
+		-e REDIS_METRICS_DATABASE=0 \
 		-e REDIS_ENDPOINT="127.0.0.1:6379" \
 		-e COLLECTOR_QUEUE_NAME="collector" \
+		-e COLLECTOR_ITEMS_PER_PACKET=4000 \
 		-e HEALTH_CHECK_QUEUE_NAME="health_check" \
 		-e EXECUTOR_QUEUE_NAME="executor" \
 		-e DEPLOYER_TYPE="docker" \
@@ -122,7 +127,7 @@ docker_run: ## Run the Docker container in interactive mode
 		-e HEALTH_CHECKER_IMAGE=redis:latest \
 		-e EXECUTOR_IMAGE=redis:latest \
 		-e SCALING_TYPE="watermark" \
-		-e COLLECTOR_CONTRACT="terra1nsuqsk6kh58ulczatwev87ttq2z6r3pusulg9r24mfj2fvtzd4uq3exn26" \
+		-e COLLECTOR_CONTRACT="osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6" \
 		-e AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
 		-e AWS_SECRET_ACCESS_KEY="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" \
 		-e AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
@@ -130,9 +135,12 @@ docker_run: ## Run the Docker container in interactive mode
 		-e AWS_SERVICE_MEMORY_MB=1024 \
 		-e AWS_SERVICE_SUBNETS="subnet-14ef644c" \
 		-e AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
-		-e COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "pisco-1","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
+		-e COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "localosmosis","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
 		-e HEALTH_CHECKER_CONFIG='{"REDIS_ENDPOINT":"127.0.0.1","REDIS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"https://phoenix-hive.terra.dev","REDBANK_ADDRESS":"osmo123","ADDRESS_PER_JOB":"5","JOBS_PER_WORKER":"2","BATCH_SIZE":"2"}' \
 		-e EXECUTOR_CONFIG='{"LIQUIDATION_QUEUE_NAME":"liquidator","PREFIX":"osmo","GAS_PRICE":"0.001osmo","RPC_ENDPOINT":"https://phoenix-rpc.terra.dev","LIQUIDATION_FILTERER_CONTRACT":"osmo12...32","SEED":"seed phrase here"}' \
+		-e METRICS_ENABLED=false \
+		-e DD_SITE="us5.datadoghq.com" \
+		-e DD_API_KEY="f1ffedda9de19cf4cef2ae80f2b6e210" \
 		${IMAGE_NAME}
 
 docker_push: ## Push the Docker container to the registry
