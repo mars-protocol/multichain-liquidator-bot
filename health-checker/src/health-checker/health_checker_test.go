@@ -2,6 +2,8 @@ package health_checker
 
 import (
 	"testing"
+
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
 )
 
 var (
@@ -30,13 +32,13 @@ func initService() HealthChecker {
 
 func TestWeCanGenerateAndRunJobs(t *testing.T) {
 	batchSize := 200
-	mockPosition := Position{
+	mockPosition := types.HealthCheckWorkItem{
 		Address:    "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9",
-		Debts:      []Asset{},
-		Collateral: []Asset{},
+		Debts:      []types.Asset{},
+		Collateral: []types.Asset{},
 	}
 
-	positions := []Position{}
+	positions := []types.HealthCheckWorkItem{}
 
 	for i := 1; i <= batchSize; i++ {
 		positions = append(positions, mockPosition)

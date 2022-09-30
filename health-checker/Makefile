@@ -21,20 +21,20 @@ build: ## Build the binary for the service
 
 run: build ## Build and run the service binary
 	# Add your environment variable here
-	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
-	SERVICE_NAME="bot-health-checker" \
-	CHAIN_ID="localosmosis" \
+	SERVICE_NAME=bot-health-checker \
+	BATCH_SIZE=1 \
+	LOG_LEVEL=debug \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
-	REDIS_DATABASE=0 \
-	REDIS_METRICS_DATABASE=0 \
-	HEALTH_CHECK_QUEUE_NAME="health_check" \
-	LIQUIDATOR_QUEUE_NAME="executor" \
-	HIVE_ENDPOINT="http://127.0.0.1" \
-	REDBANK_ADDRESS="osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6" \
+	LIQUIDATOR_QUEUE_NAME=liquidator \
+	REDBANK_ADDRESS=osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6 \
 	ADDRESS_PER_JOB=1 \
 	JOBS_PER_WORKER=1 \
-	BATCH_SIZE=1 \
+	CHAIN_ID=localosmosis \
+	REDIS_DATABASE=0 \
+	REDIS_METRICS_DATABASE=0 \
+	HEALTH_CHECK_QUEUE_NAME=health_check \
+	HIVE_ENDPOINT=http://127.0.0.1 \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled
