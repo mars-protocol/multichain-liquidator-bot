@@ -73,6 +73,10 @@ func New(
 		metricsCache:         metricsCache,
 		healthCheckQueueName: healthCheckQueueName,
 		liquidationQueueName: liquidationQueueName,
+		jobsPerWorker:        jobsPerWorker,
+		batchSize:            batchSize,
+		addressesPerJob:      addressesPerJob,
+		redbankAddress:       redbankAddress,
 		logger:               logger,
 		continueRunning:      0,
 	}, nil
@@ -168,6 +172,10 @@ func (s HealthChecker) Run() error {
 	atomic.StoreUint32(&s.continueRunning, 1)
 
 	for atomic.LoadUint32(&s.continueRunning) == 1 {
+		s.logger.WithFields(logrus.Fields{
+			"queue":      s.healthCheckQueueName,
+			"batch_size": s.batchSize,
+		}).Debug("Fetching items from Redis")
 
 		// The queue will return a nil item but no error when no items were in the queue
 		items, err := s.queue.FetchMany(s.healthCheckQueueName, s.batchSize)
@@ -180,6 +188,10 @@ func (s HealthChecker) Run() error {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
+
+		s.logger.WithFields(logrus.Fields{
+			"count": len(items),
+		}).Debug("Fetched items from Redis")
 
 		start := time.Now()
 
