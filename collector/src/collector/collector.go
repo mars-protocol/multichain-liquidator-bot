@@ -257,8 +257,8 @@ func (service *Collector) fetchContractItems(
 			// Not added yet, init
 			accounts[string(address)] = types.HealthCheckWorkItem{
 				Address:    string(address),
-				Debts:      []types.Debts{},
-				Collateral: []types.Collateral{},
+				Debts:      []types.Asset{},
+				Collateral: []types.Asset{},
 				Endpoints: types.Endpoints{
 					RPC:  workItem.RPCEndpoint,
 					LCD:  workItem.LCDEndpoint,
@@ -270,14 +270,14 @@ func (service *Collector) fetchContractItems(
 
 		// Append values for debts
 		if string(mapName) == "debts" {
-			current.Debts = append(accounts[string(address)].Debts, types.Debts{
+			current.Debts = append(accounts[string(address)].Debts, types.Asset{
 				Token:  string(denom),
 				Amount: value.AmountScaled,
 			})
 		}
 		// Append values for collateral
 		if string(mapName) == "collaterals" {
-			current.Collateral = append(accounts[string(address)].Collateral, types.Collateral{
+			current.Collateral = append(accounts[string(address)].Collateral, types.Asset{
 				Token:  string(denom),
 				Amount: value.AmountScaled,
 			})
