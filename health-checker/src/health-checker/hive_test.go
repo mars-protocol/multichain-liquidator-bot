@@ -3,6 +3,8 @@ package health_checker
 import (
 	"fmt"
 	"testing"
+
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
 )
 
 // TODO : Do setup here, not rely on deploy scripts
@@ -12,13 +14,13 @@ func Test_weCanQueryMultipleUsers(t *testing.T) {
 	redbankAddress := "osmo1mx2redehm4dtmwkfq3399k8ly2skfyqzfzg9clelw4enuuhtfeeq3dk9kj"
 	batchSize := 200
 
-	mockPosition := Position{
+	mockPosition := types.HealthCheckWorkItem{
 		Address:    "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9",
-		Debts:      []Asset{},
-		Collateral: []Asset{},
+		Debts:      []types.Asset{},
+		Collateral: []types.Asset{},
 	}
 
-	positions := []Position{}
+	positions := []types.HealthCheckWorkItem{}
 
 	for i := 1; i <= batchSize; i++ {
 		positions = append(positions, mockPosition)

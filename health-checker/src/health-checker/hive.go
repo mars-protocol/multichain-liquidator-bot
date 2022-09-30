@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
 )
 
 // BatchQuery defines the format for a Hive batch query
@@ -45,22 +47,22 @@ type UserPosition struct {
 type UserResult struct {
 	Address       string
 	ContractQuery ContractQuery
-	Debts         []Asset
-	Collateral    []Asset
+	Debts         []types.Asset
+	Collateral    []types.Asset
 }
 
 // BatchEventsResponse defines the format for batch position responses
 type BatchEventsResponse []UserPosition
 
 // fetchHiveEvents fetches events from Hive for the given block numbers
-func (hive Hive) FetchBatch(
+func (hive *Hive) FetchBatch(
 	contractAddress string,
-	positions []Position,
+	positions []types.HealthCheckWorkItem,
 ) ([]UserResult, error) {
 
 	var userResults []UserResult
 	var batchEvents BatchEventsResponse
-	positonMap := make(map[string]Position)
+	positonMap := make(map[string]types.HealthCheckWorkItem)
 
 	var queries []BatchQuery
 	for _, position := range positions {
