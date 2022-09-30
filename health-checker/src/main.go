@@ -23,11 +23,11 @@ type Config struct {
 	RedisMetricsDatabase int    `envconfig:"REDIS_METRICS_DATABASE" required:"true"`
 	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
 	LiquidatorQueueName  string `envconfig:"LIQUIDATOR_QUEUE_NAME" required:"true"`
-	hiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
-	redbankAddress       string `envconfig:"REDBANK_ADDRESS" required:"true"`
-	addressesPerJob      int    `envconfig:"ADDRESS_PER_JOB" required:"true"`
-	jobsPerWoker         int    `envconfig:"JOBS_PER_WORKER" required:"true"`
-	batchSize            int    `envconfig:"BATCH_SIZE" required:"true"`
+	HiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
+	RedbankAddress       string `envconfig:"REDBANK_ADDRESS" required:"true"`
+	AddressesPerJob      int    `envconfig:"ADDRESS_PER_JOB" required:"true"`
+	JobsPerWoker         int    `envconfig:"JOBS_PER_WORKER" required:"true"`
+	BatchSize            int    `envconfig:"BATCH_SIZE" required:"true"`
 }
 
 func main() {
@@ -83,7 +83,7 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	hive := health_checker.Hive{HiveEndpoint: config.hiveEndpoint}
+	hive := health_checker.Hive{HiveEndpoint: config.HiveEndpoint}
 
 	// Set up health checker
 	healthCheckerService, err := health_checker.New(
@@ -92,10 +92,10 @@ func main() {
 		hive,
 		config.HealthCheckQueueName,
 		config.LiquidatorQueueName,
-		config.jobsPerWoker,
-		config.batchSize,
-		config.addressesPerJob,
-		config.redbankAddress,
+		config.JobsPerWoker,
+		config.BatchSize,
+		config.AddressesPerJob,
+		config.RedbankAddress,
 		logger,
 	)
 
