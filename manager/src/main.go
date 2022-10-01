@@ -197,7 +197,7 @@ func main() {
 			collectorDeployer,
 			0, // Scale down when we have no items in the queue
 			1, // Scale up when we have 1 or more items in the queue
-			0, // Minimum number of services
+			1, // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -210,8 +210,8 @@ func main() {
 			config.HealthCheckQueueName,
 			healthCheckerDeployer,
 			0, // Scale down when we have no items in the queue
-			1, // Scale up when we have 100 or more items in the queue
-			0, // Minimum number of services
+			1, // Scale up when we have 1 or more items in the queue
+			1, // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -223,9 +223,9 @@ func main() {
 			queueProvider,
 			config.ExecutorQueueName,
 			executorDeployer,
-			0,     // Scale down when we have no items in the queue
-			10000, // Scale up when we have 50 or more items in the queue
-			0,     // Minimum number of services
+			0, // Scale down when we have no items in the queue
+			1, // Scale up when we have 1 or more items in the queue
+			1, // Minimum number of services
 			logger,
 		)
 		if err != nil {

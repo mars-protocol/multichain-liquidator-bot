@@ -30,14 +30,17 @@ docker_build: build ## Build the service Docker container
 
 docker_run: ## Run the Docker container in interactive mode
 	docker run -it --rm --network="host" \
+		-e GAS_PRICE="1uosmo" \
+		-e RPC_ENDPOINT="http://localhost:26657" \
 		-e SEED='notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius' \
 		-e ACCOUNTS_PER_SEED=100 \
 		-e RPC_URL=http://localhost:26657 \
 		-e QUEUE_NAME=throughput_test \
+		-e LIQUIDATION_QUEUE_NAME="executor" \
 		-e ATOM_DENOM=uion \
 		-e OSMO_DENOM=uosmo \
 		-e MAX_THREADS=20 \
-		-e OUTPOST_ARTIFACTS_PATH="/Users/<usernamezz>/outposts/artifacts/" \
+		-e OUTPOST_ARTIFACTS_PATH="path/to/deployment/details.json" \
 		-e CHAIN_ID="localosmosis" \
 		${IMAGE_NAME}
 

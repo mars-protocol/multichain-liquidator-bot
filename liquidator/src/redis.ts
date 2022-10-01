@@ -41,6 +41,9 @@ export class RedisInterface implements IRedisInterface {
         }
 
         const result = await this.client.lPopCount(this.key, 100)
+        if (!result) {
+            return []
+        }
 
         // Ignoring the Type error here because type is inferred to caller by the method signature
         // @ts-ignore 

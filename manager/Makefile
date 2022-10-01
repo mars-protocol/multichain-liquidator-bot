@@ -31,7 +31,7 @@ run: build .start_redis ## Build and run the service binary
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-manager" \
 	CHAIN_ID="localosmosis" \
-	HIVE_ENDPOINT="https://terra2-delphi-1.simply-vc.com.mt/ZC79CHN02DSI/terra-hive/graphql " \
+	HIVE_ENDPOINT="http://127.0.0.1:8080/graphql " \
 	LCD_ENDPOINT="http://127.0.0.1:12317" \
 	RPC_ENDPOINT="http://127.0.0.1:26657" \
 	RPC_WEBSOCKET_ENDPOINT="ws://127.0.0.1:26657/websocket" \
@@ -56,8 +56,8 @@ run: build .start_redis ## Build and run the service binary
 	AWS_SERVICE_SUBNETS="subnet-14ef644c" \
 	AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
 	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "localosmosis","REDIS_DATABASE": "0", "REDIS_METRICS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
-	HEALTH_CHECKER_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-health-checker","CHAIN_ID": "localosmosis","REDIS_ENDPOINT":"127.0.0.1:6379","REDIS_DATABASE":"0","REDIS_METRICS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"http://127.0.0.1","REDBANK_ADDRESS":"osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6","ADDRESS_PER_JOB":"1","JOBS_PER_WORKER":"1","BATCH_SIZE":"1"}' \
-	EXECUTOR_CONFIG='{"ACCOUNTS_PER_SEED":"100","RPC_URL":"http://127.0.0.1:26657","QUEUE_NAME":"liquidator","ATOM_DENOM":"uion","OSMO_DENOM":"uosmo","MAX_THREADS":"20","OUTPOST_ARTIFACTS_PATH":"/Users/<username>/outposts/artifacts/","CHAIN_ID":"localosmosis","SEED":"notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius"}' \
+	HEALTH_CHECKER_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-health-checker","CHAIN_ID": "localosmosis","REDIS_ENDPOINT":"127.0.0.1:6379","REDIS_DATABASE":"0","REDIS_METRICS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"http://127.0.0.1:8080/graphql","REDBANK_ADDRESS":"osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6","ADDRESS_PER_JOB":"1","JOBS_PER_WORKER":"1","BATCH_SIZE":"1"}' \
+	EXECUTOR_CONFIG='{"GAS_PRICE": "1uosmo","RPC_ENDPOINT": "http://localhost:26657","SEED": "notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer rew genius","ACCOUNTS_PER_SEED": "100","RPC_URL": "http://localhost:26657","QUEUE_NAME": "throughput_test","LIQUIDATION_QUEUE_NAME": "executor","ATOM_DENOM": "uion","OSMO_DENOM": "uosmo","MAX_THREADS": "20","OUTPOST_ARTIFACTS_PATH": "/Users/<usernamezz>/outposts/artifacts/","CHAIN_ID": "localosmosis"}' \
 	METRICS_ENABLED=false \
 	DD_SITE="us5.datadoghq.com" \
 	DD_API_KEY="f1ffedda9de19cf4cef2ae80f2b6e210" \

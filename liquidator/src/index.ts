@@ -24,6 +24,7 @@ const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 
 // todo don't store in .env
 const SEED = process.env.SEED!
+
 const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
 const addresses: ProtocolAddresses = readAddresses(deployDetails)
 
@@ -67,8 +68,7 @@ export const run = async (
     if (positions.length == 0) {
 
         //sleep to avoid spamming redis db when empty
-        sleep(200)
-
+        await sleep(200)
         return
     }
 

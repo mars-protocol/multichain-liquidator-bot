@@ -68,7 +68,6 @@ func (dep *Docker) Increase() error {
 	var env []string
 	for key, value := range dep.containerEnv {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
-		fmt.Println(fmt.Sprintf("%s=%s", key, value))
 	}
 
 	containerName := fmt.Sprintf("%s.%s", dep.service, uuid.NewString())
