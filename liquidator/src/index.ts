@@ -22,11 +22,21 @@ const GAS_PRICE = process.env.GAS_PRICE!
 const RPC_ENDPOINT = process.env.RPC_ENDPOINT!
 const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 
+
 // todo don't store in .env
 const SEED = process.env.SEED!
 
-const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
-const addresses: ProtocolAddresses = readAddresses(deployDetails)
+// const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
+// const addresses: ProtocolAddresses = readAddresses(deployDetails)
+
+const addresses: ProtocolAddresses = {
+    oracle: process.env.CONTRACT_ORACLE_ADDRESS as string,
+    redBank: process.env.CONTRACT_REDBANK_ADDRESS as string,
+    addressProvider: "",
+    filterer: "",
+    incentives: "",
+    rewardsCollector: ""
+}
 
 // Program entry
 export const main = async () => {

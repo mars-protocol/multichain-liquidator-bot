@@ -42,6 +42,8 @@ docker_run: ## Run the Docker container in interactive mode
 		-e MAX_THREADS=20 \
 		-e OUTPOST_ARTIFACTS_PATH="path/to/deployment/details.json" \
 		-e CHAIN_ID="localosmosis" \
+		-e CONTRACT_REDBANK_ADDRESS="osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6" \
+		-e CONTRACT_ORACLE_ADDRESS="osmo1vhndln95yd7rngslzvf6sax6axcshkxqpmpr886ntelh28p9ghuqqgjjmc" \
 		${IMAGE_NAME}
 
 docker_push: ## Push the Docker container to the registry
