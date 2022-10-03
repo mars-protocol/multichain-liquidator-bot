@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,11 +23,12 @@ type HealthChecker struct {
 	healthCheckQueueName string
 	liquidationQueueName string
 	jobsPerWorker        int
-	redbankAddress       string
 	addressesPerJob      int
-	batchSize            int
-	logger               *logrus.Entry
-	continueRunning      uint32
+	redbankAddress       string
+
+	batchSize       int
+	logger          *logrus.Entry
+	continueRunning uint32
 }
 
 var (
@@ -68,12 +71,19 @@ func New(
 		return nil, errors.New("HealthCheckQueue and liquidationQueue must be set")
 	}
 
+	if addressesPerJob == 0 {
+
+		return nil, errors.New("AddressesPerJob cannot be 0")
+	}
+
 	return &HealthChecker{
 		queue:                queue,
 		metricsCache:         metricsCache,
 		healthCheckQueueName: healthCheckQueueName,
 		liquidationQueueName: liquidationQueueName,
 		logger:               logger,
+		batchSize:            batchSize,
+		addressesPerJob:      addressesPerJob,
 		continueRunning:      0,
 	}, nil
 }
@@ -83,8 +93,9 @@ func (s HealthChecker) getExeuteFunction(redbankAddress string) func(ctx context
 	execute := func(
 		ctx context.Context,
 		args interface{}) (interface{}, error) {
-		positions, ok := args.([]Position)
+		positions, ok := args.([]types.HealthCheckWorkItem)
 		if !ok {
+			s.logger.Error("Failed to load positions")
 			return nil, errDefault
 		}
 
@@ -102,14 +113,12 @@ func (s HealthChecker) getExeuteFunction(redbankAddress string) func(ctx context
 
 // Generate a list of jobs. Each job represents a batch of requests for N number
 // of address health status'
-func (s HealthChecker) generateJobs(positionList []Position, addressesPerJob int) []Job {
+func (s HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, addressesPerJob int) []Job {
 
 	numberOfAddresses := len(positionList)
-
 	jobs := []Job{}
 	// Slice our address into jobs, each job fetching N number of addresses
 	for i := 0; i < len(positionList); i += addressesPerJob {
-
 		remainingAddresses := float64(numberOfAddresses - i)
 		maxAddresses := float64(addressesPerJob)
 		sliceEnd := i + int(math.Min(remainingAddresses, maxAddresses))
@@ -161,6 +170,7 @@ func (s HealthChecker) Run() error {
 	if err != nil {
 		return err
 	}
+
 	// cleanup
 	defer s.queue.Disconnect()
 
@@ -170,22 +180,26 @@ func (s HealthChecker) Run() error {
 	for atomic.LoadUint32(&s.continueRunning) == 1 {
 
 		// The queue will return a nil item but no error when no items were in the queue
+
 		items, err := s.queue.FetchMany(s.healthCheckQueueName, s.batchSize)
 		if err != nil {
 			return err
 		}
 
 		if items == nil {
+			s.logger.Info("no items yet")
 			// No items yet, sleep to prevent spam of fetch many
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 			continue
 		}
 
 		start := time.Now()
 
-		var positions []Position
+		var positions []types.HealthCheckWorkItem
+		var positionType types.HealthCheckWorkItem
 		for _, item := range items {
-			err = json.Unmarshal(item, &positions)
+			err = json.Unmarshal(item, &positionType)
+			positions = append(positions, positionType)
 		}
 
 		if err != nil {
@@ -196,7 +210,6 @@ func (s HealthChecker) Run() error {
 		// Dispatch workers to fetch position statuses
 		jobs := s.generateJobs(positions, s.addressesPerJob)
 		userResults, success := s.RunWorkerPool(jobs)
-
 		s.metricsCache.IncrementBy("health_checker.accounts.scanned", int64(len(userResults)))
 
 		// A warning incase we do not successfully load data for all positions.
@@ -282,5 +295,6 @@ func (s HealthChecker) RunWorkerPool(jobs []Job) ([]UserResult, bool) {
 func (s *HealthChecker) Stop() error {
 	// Block long running routines from continuing
 	atomic.StoreUint32(&s.continueRunning, 0)
+	s.logger.Info("Stopping")
 	return nil
 }
