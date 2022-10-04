@@ -42,7 +42,7 @@ func InitiatePool(wcount int) WorkerPool {
 	}
 }
 
-func (wp WorkerPool) Run(ctx context.Context) {
+func (wp *WorkerPool) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	for i := 0; i < wp.workersCount; i++ {
 		wg.Add(1)
@@ -57,12 +57,12 @@ func (wp WorkerPool) Run(ctx context.Context) {
 	close(wp.results)
 }
 
-func (wp WorkerPool) Results() <-chan Result {
+func (wp *WorkerPool) Results() <-chan Result {
 	return wp.results
 }
 
 // Push jobs to jobs channel
-func (wp WorkerPool) GenerateFrom(jobsBulk []Job) {
+func (wp *WorkerPool) GenerateFrom(jobsBulk []Job) {
 	for i, _ := range jobsBulk {
 		wp.jobs <- jobsBulk[i]
 	}

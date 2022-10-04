@@ -32,6 +32,8 @@ type Manager struct {
 	scalers              map[string]managerinterfaces.Scaler
 
 	rpcEndpoint             string
+	lcdEndpoint             string
+	hiveEndpoint            string
 	collectorContract       string
 	collectorItemsPerPacket int
 
@@ -53,6 +55,8 @@ func New(
 	chainID string,
 	rpcEndpoint string,
 	rpcWebsocketEndpoint string,
+	lcdEndpoint string,
+	hiveEndpoint string,
 	queue interfaces.Queuer,
 	metricsCache interfaces.Cacher,
 	collectorQueueName string,
@@ -93,6 +97,8 @@ func New(
 		chainID:                 chainID,
 		rpcEndpoint:             rpcEndpoint,
 		rpcWebsocketEndpoint:    rpcWebsocketEndpoint,
+		lcdEndpoint:             lcdEndpoint,
+		hiveEndpoint:            hiveEndpoint,
 		queue:                   queue,
 		metricsCache:            metricsCache,
 		collectorQueueName:      collectorQueueName,
@@ -252,8 +258,10 @@ func (service *Manager) Run() error {
 
 			workItem := types.WorkItem{
 				RPCEndpoint:        service.rpcEndpoint,
+				HiveEndpoint:       service.hiveEndpoint,
+				LCDEndpoint:        service.lcdEndpoint,
 				ContractAddress:    service.collectorContract,
-				ContractItemPrefix: "debts",
+				ContractItemPrefix: "debts,collaterals",
 				ContractPageOffset: offset,
 				ContractPageLimit:  uint64(limit),
 			}

@@ -37,6 +37,7 @@ type Config struct {
 	HiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
 	RPCEndpoint          string `envconfig:"RPC_ENDPOINT" required:"true"`
 	RPCWebsocketEndpoint string `envconfig:"RPC_WEBSOCKET_ENDPOINT" required:"true"`
+	LCDEndpoint          string `envconfig:"LCD_ENDPOINT" required:"true"`
 
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
 	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
@@ -60,7 +61,7 @@ type Config struct {
 	HealthCheckerConfig string `envconfig:"HEALTH_CHECKER_CONFIG" required:"true"`
 	ExecutorConfig      string `envconfig:"EXECUTOR_CONFIG" required:"true"`
 
-	MetricsEnabled string `envconfig:"METRICS_ENABLED" required:"true"`
+	MetricsEnabled bool `envconfig:"METRICS_ENABLED" required:"true"`
 }
 
 func main() {
@@ -194,9 +195,9 @@ func main() {
 			queueProvider,
 			config.CollectorQueueName,
 			collectorDeployer,
-			0,     // Scale down when we have no items in the queue
-			10000, // Scale up when we have 1 or more items in the queue
-			0,     // Minimum number of services
+			0, // Scale down when we have no items in the queue
+			1, // Scale up when we have 1 or more items in the queue
+			1, // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -208,9 +209,9 @@ func main() {
 			queueProvider,
 			config.HealthCheckQueueName,
 			healthCheckerDeployer,
-			0,     // Scale down when we have no items in the queue
-			10000, // Scale up when we have 100 or more items in the queue
-			0,     // Minimum number of services
+			0, // Scale down when we have no items in the queue
+			1, // Scale up when we have 1 or more items in the queue
+			1, // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -222,9 +223,9 @@ func main() {
 			queueProvider,
 			config.ExecutorQueueName,
 			executorDeployer,
-			0,     // Scale down when we have no items in the queue
-			10000, // Scale up when we have 50 or more items in the queue
-			0,     // Minimum number of services
+			0, // Scale down when we have no items in the queue
+			1, // Scale up when we have 1 or more items in the queue
+			1, // Minimum number of services
 			logger,
 		)
 		if err != nil {
@@ -242,6 +243,8 @@ func main() {
 		config.ChainID,
 		config.RPCEndpoint,
 		config.RPCWebsocketEndpoint,
+		config.LCDEndpoint,
+		config.HiveEndpoint,
 		queueProvider,
 		metricsCacheProvider,
 		config.CollectorQueueName,

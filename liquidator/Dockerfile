@@ -8,6 +8,6 @@ COPY . /app
 
 RUN npm install
 
-RUN npx tsc
+RUN npx tsc --project tsconfig.json
 
-CMD node src/index.js
+CMD node ./build/src/index.js

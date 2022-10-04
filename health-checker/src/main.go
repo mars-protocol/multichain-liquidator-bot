@@ -27,7 +27,7 @@ type Config struct {
 	LiquidatorQueueName  string `envconfig:"LIQUIDATOR_QUEUE_NAME" required:"true"`
 	HiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
 	RedbankAddress       string `envconfig:"REDBANK_ADDRESS" required:"true"`
-	AddressesPerJob      int    `envconfig:"ADDRESSES_PER_JOB" required:"true"`
+	AddressesPerJob      int    `envconfig:"ADDRESS_PER_JOB" required:"true"`
 	JobsPerWoker         int    `envconfig:"JOBS_PER_WORKER" required:"true"`
 	BatchSize            int    `envconfig:"BATCH_SIZE" required:"true"`
 }

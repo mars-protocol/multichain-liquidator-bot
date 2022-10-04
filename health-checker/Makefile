@@ -4,7 +4,7 @@
 
 .PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean
 
-IMAGE_NAME := "multichain-collector:latest"
+IMAGE_NAME := "multichain-health-checker:latest"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
 
 # This makes the APP_NAME be the name of the current directory
@@ -21,21 +21,20 @@ build: ## Build the binary for the service
 
 run: build ## Build and run the service binary
 	# Add your environment variable here
-	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
-	SERVICE_NAME="bot-health-checker" \
+	SERVICE_NAME=bot-health-checker \
+	BATCH_SIZE=1 \
+	LOG_LEVEL=debug \
+	REDIS_ENDPOINT="127.0.0.1:6379" \
+	LIQUIDATOR_QUEUE_NAME=liquidator \
+	REDBANK_ADDRESS=osmo1utjx3594tlvfw4375esgu72wa4sdgf0q7x4ye27husf5kvuzp5rsqhpcl3 \
+	ADDRESS_PER_JOB=1 \
+	JOBS_PER_WORKER=1 \
+	CHAIN_ID=localosmosis \
 	REDIS_DATABASE=0 \
 	REDIS_METRICS_DATABASE=0 \
-	REDIS_ENDPOINT="127.0.0.1:6379" \
-	COLLECTOR_QUEUE_NAME="collector2" \
-	ADDRESSES_PER_JOB="500" \
-	JOBS_PER_WORKER=10 \
-	BATCH_SIZE=10 \
-	HIVE_ENDPOINT="http://localhost:8085/graphql" \
-	HEALTH_CHECK_QUEUE_NAME="health_check" \
-	LIQUIDATOR_QUEUE_NAME="executor2" \
-	REDBANK_ADDRESS="osmo1utjx3594tlvfw4375esgu72wa4sdgf0q7x4ye27husf5kvuzp5rsqhpcl3" \
-	CHAIN_ID="localosmosis" \
+	HEALTH_CHECK_QUEUE_NAME=health_check \
+	HIVE_ENDPOINT=http://127.0.0.1 \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled
