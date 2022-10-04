@@ -4,7 +4,7 @@
 
 .PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean
 
-IMAGE_NAME := "multichain-collector:latest"
+IMAGE_NAME := "multichain-health-checker:latest"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
 
 # This makes the APP_NAME be the name of the current directory
@@ -21,11 +21,20 @@ build: ## Build the binary for the service
 
 run: build ## Build and run the service binary
 	# Add your environment variable here
-	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
-	SERVICE_NAME="bot-collector" \
-	CHAIN_ID="pisco-1" \
-	REDIS_METRICS_DATABASE="0" \
+	SERVICE_NAME=bot-health-checker \
+	BATCH_SIZE=1 \
+	LOG_LEVEL=debug \
+	REDIS_ENDPOINT="127.0.0.1:6379" \
+	LIQUIDATOR_QUEUE_NAME=liquidator \
+	REDBANK_ADDRESS=osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6 \
+	ADDRESS_PER_JOB=1 \
+	JOBS_PER_WORKER=1 \
+	CHAIN_ID=localosmosis \
+	REDIS_DATABASE=0 \
+	REDIS_METRICS_DATABASE=0 \
+	HEALTH_CHECK_QUEUE_NAME=health_check \
+	HIVE_ENDPOINT=http://127.0.0.1 \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled

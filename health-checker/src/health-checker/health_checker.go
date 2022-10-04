@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,17 +32,6 @@ type HealthChecker struct {
 var (
 	errDefault = errors.New("wrong argument type")
 )
-
-type Position struct {
-	Address    string  `json:"address"`
-	Debts      []Asset `json:"debts"`
-	Collateral []Asset `json:"collateral"`
-}
-
-type Asset struct {
-	Token  string  `json:"token"`
-	Amount float64 `json:"amount"`
-}
 
 func New(
 	queue interfaces.Queuer,
@@ -73,17 +63,21 @@ func New(
 		metricsCache:         metricsCache,
 		healthCheckQueueName: healthCheckQueueName,
 		liquidationQueueName: liquidationQueueName,
+		jobsPerWorker:        jobsPerWorker,
+		batchSize:            batchSize,
+		addressesPerJob:      addressesPerJob,
+		redbankAddress:       redbankAddress,
 		logger:               logger,
 		continueRunning:      0,
 	}, nil
 }
 
 // Generate an execute function for our Jobs
-func (s HealthChecker) getExeuteFunction(redbankAddress string) func(ctx context.Context, args interface{}) (interface{}, error) {
+func (s *HealthChecker) getExecuteFunction(redbankAddress string) func(ctx context.Context, args interface{}) (interface{}, error) {
 	execute := func(
 		ctx context.Context,
 		args interface{}) (interface{}, error) {
-		positions, ok := args.([]Position)
+		positions, ok := args.([]types.HealthCheckWorkItem)
 		if !ok {
 			return nil, errDefault
 		}
@@ -102,7 +96,7 @@ func (s HealthChecker) getExeuteFunction(redbankAddress string) func(ctx context
 
 // Generate a list of jobs. Each job represents a batch of requests for N number
 // of address health status'
-func (s HealthChecker) generateJobs(positionList []Position, addressesPerJob int) []Job {
+func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, addressesPerJob int) []Job {
 
 	numberOfAddresses := len(positionList)
 
@@ -125,7 +119,7 @@ func (s HealthChecker) generateJobs(positionList []Position, addressesPerJob int
 					JType:    "HealthStatusBatch",
 					Metadata: nil,
 				},
-				ExecFn: s.getExeuteFunction(s.redbankAddress),
+				ExecFn: s.getExecuteFunction(s.redbankAddress),
 				Args:   positionsSubSlice,
 			})
 		}
@@ -135,7 +129,7 @@ func (s HealthChecker) generateJobs(positionList []Position, addressesPerJob int
 
 // Filter unhealthy positions into array of byte arrays.
 // TODO handle different liquidation types (e.g redbank, rover). Currently we only store address
-func (s HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte {
+func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte {
 	var unhealthyPositions [][]byte
 	for _, userResult := range results {
 		ltv, err := strconv.ParseFloat(userResult.ContractQuery.HealthStatus.Borrowing, 32)
@@ -156,7 +150,7 @@ func (s HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte 
 }
 
 // Runs until interrupted
-func (s HealthChecker) Run() error {
+func (s *HealthChecker) Run() error {
 	err := s.queue.Connect()
 	if err != nil {
 		return err
@@ -168,6 +162,10 @@ func (s HealthChecker) Run() error {
 	atomic.StoreUint32(&s.continueRunning, 1)
 
 	for atomic.LoadUint32(&s.continueRunning) == 1 {
+		s.logger.WithFields(logrus.Fields{
+			"queue":      s.healthCheckQueueName,
+			"batch_size": s.batchSize,
+		}).Debug("Fetching items from Redis")
 
 		// The queue will return a nil item but no error when no items were in the queue
 		items, err := s.queue.FetchMany(s.healthCheckQueueName, s.batchSize)
@@ -181,11 +179,21 @@ func (s HealthChecker) Run() error {
 			continue
 		}
 
+		s.logger.WithFields(logrus.Fields{
+			"count": len(items),
+		}).Debug("Fetched items from Redis")
+
 		start := time.Now()
 
-		var positions []Position
+		var positions []types.HealthCheckWorkItem
 		for _, item := range items {
-			err = json.Unmarshal(item, &positions)
+			var position types.HealthCheckWorkItem
+			err = json.Unmarshal(item, &position)
+			if err != nil {
+				s.logger.Error(err)
+				continue // To next position
+			}
+			positions = append(positions, position)
 		}
 
 		if err != nil {
@@ -239,7 +247,7 @@ func (s HealthChecker) Run() error {
 	return nil
 }
 
-func (s HealthChecker) RunWorkerPool(jobs []Job) ([]UserResult, bool) {
+func (s *HealthChecker) RunWorkerPool(jobs []Job) ([]UserResult, bool) {
 	wp := InitiatePool(s.jobsPerWorker)
 
 	// prevent unneccesary work
@@ -259,6 +267,13 @@ func (s HealthChecker) RunWorkerPool(jobs []Job) ([]UserResult, bool) {
 
 			if !ok {
 				fmt.Println(fmt.Errorf("An unknown error occurred fetching data."))
+				continue
+			}
+
+			if r.Err != nil {
+				s.logger.WithFields(logrus.Fields{
+					"error": r.Err,
+				}).Error("Unable to fetch data")
 				continue
 			}
 

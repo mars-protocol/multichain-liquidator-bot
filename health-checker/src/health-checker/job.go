@@ -28,7 +28,7 @@ type Job struct {
 	Args       interface{}
 }
 
-func (j Job) execute(ctx context.Context) Result {
+func (j *Job) execute(ctx context.Context) Result {
 
 	value, err := j.ExecFn(ctx, j.Args)
 	if err != nil {

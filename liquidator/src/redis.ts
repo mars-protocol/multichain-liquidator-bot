@@ -15,8 +15,8 @@ export class RedisInterface implements IRedisInterface {
 
 
     // We use a singleton but expose the client via connect()
-    private client : RedisClientType | undefined
-    private key : string
+    private client: RedisClientType | undefined
+    private key: string
 
     /**
      * 
@@ -40,8 +40,11 @@ export class RedisInterface implements IRedisInterface {
             return []
         }
 
-        const result =await this.client.lPopCount(this.key, 100)
-        
+        const result = await this.client.lPopCount(this.key, 100)
+        if (!result) {
+            return []
+        }
+
         // Ignoring the Type error here because type is inferred to caller by the method signature
         // @ts-ignore 
         return result?.map((positionString: string) => JSON.parse(positionString))
@@ -53,8 +56,12 @@ export class RedisInterface implements IRedisInterface {
      * @param value The value to increment by
      */
     async incrementBy(key: string, value: number): Promise<number> {
-        const result = await this.client.incrementBy(key, value)
-        return parseInt(result)
+        if (!this.client) {
+            console.log(`ERROR: redis client not connected`)
+            return 0
+        }
+
+        return await this.client.incrBy(key, value)
     }
 
     /**
