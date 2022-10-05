@@ -19,8 +19,13 @@ type Hive struct {
 	HiveEndpoint string
 }
 
+type Borrowing struct {
+	MaxLtvHf               string `json:"max_ltv_hf"`
+	LiquidationThresholdHf string `json:"liq_threshold_hf"`
+}
+
 type HealthStatus struct {
-	Borrowing string `json:"borrowing"`
+	Borrowing Borrowing `json:"borrowing"`
 }
 type ContractQuery struct {
 	TotalCollateralInBaseAsset string       `json:"total_collateral_in_base_asset"`
@@ -59,7 +64,6 @@ func (hive *Hive) FetchBatch(
 	contractAddress string,
 	positions []types.HealthCheckWorkItem,
 ) ([]UserResult, error) {
-
 	var userResults []UserResult
 	var batchEvents BatchEventsResponse
 	positonMap := make(map[string]types.HealthCheckWorkItem)
@@ -72,7 +76,7 @@ func (hive *Hive) FetchBatch(
 		batchQuery := BatchQuery{
 			Query: fmt.Sprintf(`query($contractAddress: String! $userAddress: String!) {
                         %s:wasm {
-							contractQuery(contractAddress: $contractAddress, query: { user_position : { user_address: $userAddress } })
+							contractQuery(contractAddress: $contractAddress, query: { user_position : { user: $userAddress } })
 						}
                     }`, position.Address),
 			Variables: map[string]interface{}{
@@ -107,8 +111,8 @@ func (hive *Hive) FetchBatch(
 
 	for _, event := range batchEvents {
 		// event.Data is now the address[contractQuery] map
-		for address, data := range event.Data {
 
+		for address, data := range event.Data {
 			position := positonMap[address]
 			userResults = append(userResults, UserResult{
 				Address:       address,

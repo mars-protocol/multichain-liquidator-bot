@@ -67,6 +67,7 @@ func New(
 	return &HealthChecker{
 		queue:                queue,
 		metricsCache:         metricsCache,
+		hive:                 hive,
 		healthCheckQueueName: healthCheckQueueName,
 		liquidationQueueName: liquidationQueueName,
 		jobsPerWorker:        jobsPerWorker,
@@ -74,8 +75,6 @@ func New(
 		addressesPerJob:      addressesPerJob,
 		redbankAddress:       redbankAddress,
 		logger:               logger,
-		batchSize:            batchSize,
-		addressesPerJob:      addressesPerJob,
 		continueRunning:      0,
 	}, nil
 }
@@ -139,7 +138,7 @@ func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, a
 func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte {
 	var unhealthyPositions [][]byte
 	for _, userResult := range results {
-		ltv, err := strconv.ParseFloat(userResult.ContractQuery.HealthStatus.Borrowing, 32)
+		ltv, err := strconv.ParseFloat(userResult.ContractQuery.HealthStatus.Borrowing.LiquidationThresholdHf, 32)
 		if err != nil {
 			s.logger.Errorf("An Error Occurred decoding health status. %v", err)
 		} else if ltv < 1 {
