@@ -114,7 +114,6 @@ const run = async(seeds : Seed[], protocolAddresses : ProtocolAddresses, deploye
 
         batchToProcess.push(createPositions(ACCOUNTS_PER_SEED, seeds[seedIndex], protocolAddresses))
         if (index > 0 && index % MAX_THREADS === 0) {
-            console.log(`settling, batch size ${batchToProcess.length}`)
             await Promise.all(batchToProcess)
             batchToProcess = []
             console.log(`Created ${index * ACCOUNTS_PER_SEED} total positions`)
@@ -186,8 +185,6 @@ const createPositions = async(
      try {
         const address = useableAddresses[index]
 
-        process.stdout.clearLine(0);
-        console.log(`creating positions #${index} for ${seed.address}`)
         const depositMsg = makeDepositMessage(
             address,
             OSMO_DENOM,
