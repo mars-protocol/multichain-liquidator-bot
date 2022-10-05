@@ -4,24 +4,18 @@ import { Asset } from './types/asset'
 import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
 import { Position } from './types/position'
 import { Coin, GasPrice } from '@cosmjs/stargate'
-import { coin, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
+import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from '@cosmjs/cosmwasm-stargate'
 import {
-  makeWithdrawMessage,
-  ProtocolAddresses,
-  queryHealth,
-  readAddresses,
+  // ProtocolAddresses,
   sleep,
 } from './helpers.js'
 import { osmosis } from 'osmojs'
 
-import path from 'path'
 import 'dotenv/config.js'
 
-const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
-
 const PREFIX = process.env.PREFIX!
-const GAS_PRICE = process.env.GAS_PRICE!
+const GAS_PRICE = process.env.GAS_PRICE || '0.0001uosmo'
 const RPC_ENDPOINT = process.env.RPC_ENDPOINT!
 const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 
@@ -32,14 +26,14 @@ const SEED = process.env.SEED!
 // const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
 // const addresses: ProtocolAddresses = readAddresses(deployDetails)
 
-const addresses: ProtocolAddresses = {
-    oracle: process.env.CONTRACT_ORACLE_ADDRESS as string,
-    redBank: process.env.CONTRACT_REDBANK_ADDRESS as string,
-    addressProvider: "",
-    filterer: "",
-    incentives: "",
-    rewardsCollector: ""
-}
+// const addresses: ProtocolAddresses = {
+//     oracle: process.env.CONTRACT_ORACLE_ADDRESS as string,
+//     redBank: process.env.CONTRACT_REDBANK_ADDRESS as string,
+//     addressProvider: "",
+//     filterer: "",
+//     incentives: "",
+//     rewardsCollector: ""
+// }
 
 // Program entry
 export const main = async () => {
@@ -80,8 +74,8 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
   const positions: Position[] = await redis.fetchUnhealthyPositions()
   if (positions.length == 0) {
     //sleep to avoid spamming redis db when empty
-    sleep(200)
-
+    await sleep(200)
+    console.log("No items for liquidation yet")
     return
   }
 
@@ -122,4 +116,7 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
   }
 }
 
-main().catch((e) => console.log(e))
+main().catch((e) => {
+  console.log(e)
+  process.exit(1)
+})
