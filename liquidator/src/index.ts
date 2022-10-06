@@ -7,6 +7,7 @@ import { Coin, GasPrice } from '@cosmjs/stargate'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from '@cosmjs/cosmwasm-stargate'
 import {
+  ProtocolAddresses,
   // ProtocolAddresses,
   sleep,
 } from './helpers.js'
@@ -28,16 +29,23 @@ const SEED = process.env.SEED!
 // const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
 // const addresses: ProtocolAddresses = readAddresses(deployDetails)
 
-// const addresses: ProtocolAddresses = {
-//     oracle: process.env.CONTRACT_ORACLE_ADDRESS as string,
-//     redBank: process.env.CONTRACT_REDBANK_ADDRESS as string,
-//     addressProvider: "",
-//     filterer: "",
-//     incentives: "",
-//     rewardsCollector: ""
-// }
+const addresses: ProtocolAddresses = {
+    oracle: process.env.CONTRACT_ORACLE_ADDRESS as string,
+    redBank: process.env.CONTRACT_REDBANK_ADDRESS as string,
+    addressProvider: "",
+    filterer: "",
+    incentives: "",
+    rewardsCollector: ""
+}
 
 const balances : Map<string, number> = new Map()
+
+enum QueryType {
+  DEBTS,
+  COLLATERALS
+}
+const DEBTS = 'debts'
+const COLLATERALS = 'collaterals'
 
 // Program entry
 export const main = async () => {
@@ -84,6 +92,30 @@ const setBalances = async(client : SigningCosmWasmClient, liquidatorAddress: str
   }
 }
 
+const getTypeString = (queryType : QueryType): string => {
+  return queryType == QueryType.COLLATERALS ? COLLATERALS : DEBTS
+}
+
+
+const produceUserPositionQuery = (user: string, redbankAddress: string) : string => {
+  return `{
+    ${user}:wasm {
+      ${producePositionQuerySection(user, QueryType.DEBTS, redbankAddress)},
+      ${producePositionQuerySection(user, QueryType.COLLATERALS, redbankAddress)}
+    }
+  }`
+}
+
+const producePositionQuerySection = (user: string, queryType : QueryType, redbankAddress: string) => {
+  const typeString = getTypeString(queryType)
+  return `
+      ${typeString}:contractQuery(
+        contractAddress: "${redbankAddress}"
+        query: { user_${typeString}: { user: "${user}" } }
+      )
+  `
+}
+
 // exported for testing
 export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInterface) => {
   const positions: Position[] = await redis.fetchUnhealthyPositions()
@@ -96,17 +128,12 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
 
   const txs: LiquidationTx[] = []
   const debtsToRepay = new Map<string, number>()
+  
+  const queries : string[] = positions.map((position) => produceUserPositionQuery(position.Address,addresses.redBank))
 
-  // get debts for unhealthy positions?
-  // what do we need?
-  // collateral to claim
-  // debt to repay
+  // dispatch queries, get back an array of objects
+  // query
 
-  // create a hive query for each position
-
-
-  // first, we get the healthy and unhealthy debts for each position
-  // I need the debt and the 
   // for each address, send liquidate tx
   positions.forEach((position: Position) => {
     // we can only liquidate what we have in our wallet
