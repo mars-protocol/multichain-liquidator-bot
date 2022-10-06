@@ -1,7 +1,7 @@
 import { Asset } from './asset'
 
 export interface Position {
-  address: string
-  debts: Asset[]
+  Address: string
+  Debts: Asset[]
   collaterals: Asset[]
 }

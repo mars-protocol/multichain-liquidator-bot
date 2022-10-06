@@ -15,10 +15,12 @@ import { osmosis } from 'osmojs'
 import 'dotenv/config.js'
 
 const PREFIX = process.env.PREFIX!
-const GAS_PRICE = process.env.GAS_PRICE || '0.0001uosmo'
+const GAS_PRICE = process.env.GAS_PRICE || '0.01uosmo'
 const RPC_ENDPOINT = process.env.RPC_ENDPOINT!
 const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
-
+const LIQUIDATABLE_ASSETS : string[]= JSON.parse(
+  process.env.LIQUIDATABLE_ASSETS!
+)
 
 // todo don't store in .env
 const SEED = process.env.SEED!
@@ -34,6 +36,8 @@ const SEED = process.env.SEED!
 //     incentives: "",
 //     rewardsCollector: ""
 // }
+
+const balances : Map<string, number> = new Map()
 
 // Program entry
 export const main = async () => {
@@ -65,8 +69,19 @@ export const main = async () => {
     LIQUIDATION_FILTERER_CONTRACT,
   )
 
+  await setBalances(client, liquidatorAddress)
+
+  console.log(balances)
   // run
   while (true) await run(liquidationHelper, redis)
+}
+
+
+const setBalances = async(client : SigningCosmWasmClient, liquidatorAddress: string) => {
+  for (const denom in LIQUIDATABLE_ASSETS) {
+    const balance = await client.getBalance(liquidatorAddress, LIQUIDATABLE_ASSETS[denom])
+    balances.set(LIQUIDATABLE_ASSETS[denom], Number(balance.amount))
+  }
 }
 
 // exported for testing
@@ -82,23 +97,46 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
   const txs: LiquidationTx[] = []
   const debtsToRepay = new Map<string, number>()
 
+  // get debts for unhealthy positions?
+  // what do we need?
+  // collateral to claim
+  // debt to repay
+
+  // create a hive query for each position
+
+
+  // first, we get the healthy and unhealthy debts for each position
+  // I need the debt and the 
   // for each address, send liquidate tx
   positions.forEach((position: Position) => {
+    // we can only liquidate what we have in our wallet
+    console.log(position.Address)
+    console.log(position)
     const tx = liquidationHelper.produceLiquidationTx(position)
     const debtDenom = tx.debt_denom
-    txs.push(tx)
+    console.log({tx})
     const amount: number =
-      position.debts.find((debt: Asset) => debt.denom === debtDenom)?.amount || 0
-    const debtAmount = debtsToRepay.get(tx.debt_denom) || 0
-    debtsToRepay.set(tx.debt_denom, debtAmount + amount)
+      Number(position.Debts.find((debt: Asset) => debt.token === debtDenom)?.amount || 0)
 
-    // TODO handle not finding the asset in list above - this should never happen but we should handle regardless
+    const debtAmount = debtsToRepay.get(tx.debt_denom) || 0
+
+    const totalNewDebt = debtAmount + amount
+
+    const walletBalance = balances.get(tx.debt_denom) || 0
+    if (walletBalance > totalNewDebt) {
+      txs.push(tx)
+      debtsToRepay.set(tx.debt_denom, totalNewDebt)
+    } else{
+      console.log(`cannot liquidate liquidatable position because we do not have enough assets`)
+    }
   })
 
   const coins: Coin[] = []
 
   debtsToRepay.forEach((amount, denom) => coins.push({ denom, amount: amount.toFixed(0) }))
 
+  console.log('coins')
+  console.log(coins)
   // dispatch liquidation tx , and recieve and object with results on it
   const results = await liquidationHelper.sendLiquidationsTx(txs, coins)
 
