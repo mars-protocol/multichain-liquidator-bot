@@ -12,12 +12,15 @@ import {
   sleep,
 } from './helpers.js'
 import { osmosis } from 'osmojs'
+import fetch from 'node-fetch';
 
 import 'dotenv/config.js'
+import { fetchBatch } from './hive.js'
 
 const PREFIX = process.env.PREFIX!
 const GAS_PRICE = process.env.GAS_PRICE || '0.01uosmo'
 const RPC_ENDPOINT = process.env.RPC_ENDPOINT!
+const HIVE_ENDPOINT = process.env.HIVE_ENDPOINT!
 const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 const LIQUIDATABLE_ASSETS : string[]= JSON.parse(
   process.env.LIQUIDATABLE_ASSETS!
@@ -39,13 +42,6 @@ const addresses: ProtocolAddresses = {
 }
 
 const balances : Map<string, number> = new Map()
-
-enum QueryType {
-  DEBTS,
-  COLLATERALS
-}
-const DEBTS = 'debts'
-const COLLATERALS = 'collaterals'
 
 // Program entry
 export const main = async () => {
@@ -92,30 +88,6 @@ const setBalances = async(client : SigningCosmWasmClient, liquidatorAddress: str
   }
 }
 
-const getTypeString = (queryType : QueryType): string => {
-  return queryType == QueryType.COLLATERALS ? COLLATERALS : DEBTS
-}
-
-
-const produceUserPositionQuery = (user: string, redbankAddress: string) : string => {
-  return `{
-    ${user}:wasm {
-      ${producePositionQuerySection(user, QueryType.DEBTS, redbankAddress)},
-      ${producePositionQuerySection(user, QueryType.COLLATERALS, redbankAddress)}
-    }
-  }`
-}
-
-const producePositionQuerySection = (user: string, queryType : QueryType, redbankAddress: string) => {
-  const typeString = getTypeString(queryType)
-  return `
-      ${typeString}:contractQuery(
-        contractAddress: "${redbankAddress}"
-        query: { user_${typeString}: { user: "${user}" } }
-      )
-  `
-}
-
 // exported for testing
 export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInterface) => {
   const positions: Position[] = await redis.fetchUnhealthyPositions()
@@ -126,22 +98,18 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
     return
   }
 
-  const txs: LiquidationTx[] = []
-  const debtsToRepay = new Map<string, number>()
-  
-  const queries : string[] = positions.map((position) => produceUserPositionQuery(position.Address,addresses.redBank))
 
-  // dispatch queries, get back an array of objects
-  // query
+  const positionData = await fetchBatch(positions, addresses.redBank, HIVE_ENDPOINT)
+
+  const txs: LiquidationTx[] = []
+  const debtsToRepay = new Map<string, number>()  
 
   // for each address, send liquidate tx
   positions.forEach((position: Position) => {
     // we can only liquidate what we have in our wallet
-    console.log(position.Address)
-    console.log(position)
+
     const tx = liquidationHelper.produceLiquidationTx(position)
     const debtDenom = tx.debt_denom
-    console.log({tx})
     const amount: number =
       Number(position.Debts.find((debt: Asset) => debt.token === debtDenom)?.amount || 0)
 
@@ -162,8 +130,6 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
 
   debtsToRepay.forEach((amount, denom) => coins.push({ denom, amount: amount.toFixed(0) }))
 
-  console.log('coins')
-  console.log(coins)
   // dispatch liquidation tx , and recieve and object with results on it
   const results = await liquidationHelper.sendLiquidationsTx(txs, coins)
 
