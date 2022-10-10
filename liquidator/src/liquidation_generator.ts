@@ -1,6 +1,7 @@
 import { Asset } from './types/asset.js'
 import { Position } from './types/position.js'
 import { LiquidationTx } from './types/liquidation.js'
+import { AssetResponse, Collateral, DataResponse, Debt } from './hive.js'
 
 /**
  * Generate a simple liquidation tx for a position.
@@ -15,28 +16,29 @@ import { LiquidationTx } from './types/liquidation.js'
  * @param position The unhealthy position to be liquidated
  * @returns A liquidation transaction for the given position.
  */
-export const createLiquidationTx = (position: Position): LiquidationTx => {
-  const debtAsset = getLargestDebt(position.debts)
+export const createLiquidationTx = (debts: Debt[], collaterals: Collateral[], address: string): LiquidationTx => {
+
+  const debtAsset : AssetResponse = getLargestDebt(debts)
 
   return {
-    collateral_denom: getLargestCollateral(position.collaterals),
+    collateral_denom: getLargestCollateral(collaterals),
     debt_denom: debtAsset.denom,
-    user_address: position.address,
-    amount: debtAsset.amount.toFixed(0),
+    user_address: address,
+    amount: debtAsset.amount.toString(),
   }
 }
 
 // Sort asset array from highest amount to lowest
-const sortAssetArrayByAmount = (assets: Asset[]): Asset[] => {
+const sortAssetArrayByAmount = (assets: AssetResponse[]): AssetResponse[] => {
   // deep copy, so we don't mess up the og array.
   const assetClone = [...assets]
-  return assetClone.sort((a: Asset, b: Asset) => a.amount - b.amount).reverse()
+  return assetClone.sort((a: AssetResponse, b: AssetResponse) => Number(a.amount) - Number(b.amount)).reverse()
 }
 
-export const getLargestCollateral = (collaterals: Asset[]): string => {
+export const getLargestCollateral = (collaterals: Collateral[]): string => {
   return sortAssetArrayByAmount(collaterals)[0].denom
 }
 
-export const getLargestDebt = (debts: Asset[]): Asset => {
+export const getLargestDebt = (debts: Debt[]): AssetResponse => {
   return sortAssetArrayByAmount(debts)[0]
 }

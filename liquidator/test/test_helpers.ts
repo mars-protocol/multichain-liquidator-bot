@@ -1,17 +1,17 @@
+import { AssetResponse } from '../src/hive'
 import { Asset } from '../src/types/asset'
 import { Position } from '../src/types/position'
 
-export const generateRandomAsset = (): Asset => {
+export const generateRandomAsset = (): AssetResponse => {
   return {
     denom: Math.random().toString(),
-    amount: Math.random(),
+    amount: Math.random().toFixed(0),
+    amount_scaled: '0'
   }
 }
 
 export const generateRandomPosition = (): Position => {
   return {
-    address: Math.random().toString(),
-    collaterals: [generateRandomAsset(), generateRandomAsset()],
-    debts: [generateRandomAsset(), generateRandomAsset()],
+    Address: Math.random().toString(),
   }
 }

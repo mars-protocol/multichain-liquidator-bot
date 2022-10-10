@@ -1,4 +1,4 @@
-import { LiquidationHelper } from '../src/liquidation_helpers'
+import { LiquidationHelper } from '../src/liquidation_helpers.js'
 
 describe('Liquidation helper tests', () => {
   test('We can parse liquidation successfully', () => {

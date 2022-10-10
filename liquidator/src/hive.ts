@@ -8,27 +8,27 @@ enum QueryType {
 const DEBTS = 'debts'
 const COLLATERALS = 'collaterals'
 
-interface AssetResponse {
+export interface AssetResponse {
     denom : string
     amount_scaled: string
     amount: string,
 }
 
-interface Debts extends AssetResponse{
+export interface Debt extends AssetResponse{
     uncollateralised: boolean
 }
-interface Collaterals extends AssetResponse{
+export interface Collateral extends AssetResponse{
     enabled: boolean
 }
 
 interface UserPositionData {
     [key: string]: {
-        debts : Debts
-        collaterals: Collaterals
+        debts : Debt[]
+        collaterals: Collateral[]
     }
 }
 
-interface DataResponse {
+export interface DataResponse {
     data : UserPositionData
 }
 

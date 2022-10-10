@@ -7,9 +7,8 @@
 // - LocalOsmosis
 //
 
-import { AccountData, coin, Coin, makeCosmoshubPath } from '@cosmjs/amino'
+import { makeCosmoshubPath } from '@cosmjs/amino'
 import {
-  ExecuteResult,
   SigningCosmWasmClient,
   SigningCosmWasmClientOptions,
 } from '@cosmjs/cosmwasm-stargate'
@@ -160,17 +159,17 @@ const pushPositionsToRedis = async (addresses: string[], redisClient: RedisClien
   for (const index in addresses) {
     console.log(`pushing position to redis: ${addresses[index]}`)
     const position: Position = {
-      address: addresses[index],
+      Address: addresses[index],
       collaterals: [
         {
           amount: 10000000,
-          denom: osmoDenom,
+          token: osmoDenom,
         },
       ],
-      debts: [
+      Debts: [
         {
           amount: 3000000,
-          denom: atomDenom,
+          token: atomDenom,
         },
       ],
     }
@@ -183,18 +182,18 @@ const dispatchLiquidations = async (liquidationHelper: LiquidationHelper) => {
   await run(liquidationHelper, redisInterface)
 }
 
-// used for debugging tests
-const getFirstAddresses = (accounts: readonly AccountData[]) => {
-  const seededAddresses: string[] = []
-  let index = 1
+// // used for debugging tests
+// const getFirstAddresses = (accounts: readonly AccountData[]) => {
+//   const seededAddresses: string[] = []
+//   let index = 1
 
-  while (index <= 10) {
-    seededAddresses.push(accounts[index].address)
-    index += 1
-  }
+//   while (index <= 10) {
+//     seededAddresses.push(accounts[index].address)
+//     index += 1
+//   }
 
-  return seededAddresses
-}
+//   return seededAddresses
+// }
 
 runTest().catch((e) => {
   console.log(e)

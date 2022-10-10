@@ -1,21 +1,23 @@
-import { IRedisInterface, RedisInterface } from './redis.js'
 import { LiquidationHelper } from './liquidation_helpers.js'
-import { Asset } from './types/asset'
+
 import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
 import { Position } from './types/position'
 import { Coin, GasPrice } from '@cosmjs/stargate'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from '@cosmjs/cosmwasm-stargate'
 import {
+  makeSwapMessage,
+  makeWithdrawMessage,
   ProtocolAddresses,
+  queryHealth,
   // ProtocolAddresses,
   sleep,
 } from './helpers.js'
 import { osmosis } from 'osmojs'
-import fetch from 'node-fetch';
 
 import 'dotenv/config.js'
-import { fetchBatch } from './hive.js'
+import { DataResponse, Debt, fetchBatch } from './hive.js'
+import { IRedisInterface, RedisInterface } from './redis.js'
 
 const PREFIX = process.env.PREFIX!
 const GAS_PRICE = process.env.GAS_PRICE || '0.01uosmo'
@@ -99,19 +101,34 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
   }
 
 
-  const positionData = await fetchBatch(positions, addresses.redBank, HIVE_ENDPOINT)
+  const positionData : DataResponse[] = await fetchBatch(positions, addresses.redBank, HIVE_ENDPOINT)
 
+  console.log(`fetched batch ${positionData.length}`)
   const txs: LiquidationTx[] = []
   const debtsToRepay = new Map<string, number>()  
 
+  const healthQueries : Promise<any>[] = []
+
   // for each address, send liquidate tx
-  positions.forEach((position: Position) => {
+  positionData.forEach(async (positionResponse: DataResponse) => {
     // we can only liquidate what we have in our wallet
 
-    const tx = liquidationHelper.produceLiquidationTx(position)
+    
+    // get actual data object
+    const positionAddress = Object.keys(positionResponse.data)[0]
+
+    // Logging stuff todo - remove me
+    const healthQuery = queryHealth(liquidationHelper.client, positionAddress,addresses)
+    healthQueries.push(healthQuery)
+    console.log(positionAddress)
+
+
+    const position = positionResponse.data[positionAddress]
+    
+    const tx = liquidationHelper.produceLiquidationTx(position.debts, position.collaterals, positionAddress)
     const debtDenom = tx.debt_denom
     const amount: number =
-      Number(position.Debts.find((debt: Asset) => debt.token === debtDenom)?.amount || 0)
+      Number(position.debts.find((debt: Debt) => debt.denom === debtDenom)?.amount || 0)
 
     const debtAmount = debtsToRepay.get(tx.debt_denom) || 0
 
@@ -124,8 +141,16 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
     } else{
       console.log(`cannot liquidate liquidatable position because we do not have enough assets`)
     }
+
   })
 
+  let healthy = 0
+  for (const index in healthQueries) {
+    await healthQueries[index].then((result) => {
+    if (Number(result.health_status.borrowing.liq_threshold_hf) >= 1) {
+      healthy += 1
+    }})
+  }
   const coins: Coin[] = []
 
   debtsToRepay.forEach((amount, denom) => coins.push({ denom, amount: amount.toFixed(0) }))
@@ -136,14 +161,26 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
   // Log the amount of liquidations executed
   redis.incrementBy('executor.liquidations.executed', results.length)
 
+  const liquidatorAddress = liquidationHelper.getLiquidatorAddress()
   console.log(`liquidated ${results.length} positions`)
   for (const index in results) {
     const liquidation: LiquidationResult = results[index]
-    await liquidationHelper.swap(
+
+    // produce withdrawl message for the collateral received
+    const withdrawMessage = makeWithdrawMessage(
+      liquidatorAddress,
+      liquidation.collateralReceivedDenom, 
+      addresses.redBank, 
+      liquidatorAddress)
+
+    const swapMessage = makeSwapMessage(
+      liquidatorAddress,
       liquidation.collateralReceivedDenom,
       liquidation.debtRepaidDenom,
-      Number(liquidation.collateralReceivedAmount),
+      liquidation.collateralReceivedAmount,
     )
+    
+    await liquidationHelper.client.signAndBroadcast(liquidatorAddress,[withdrawMessage, swapMessage])
   }
 }
 

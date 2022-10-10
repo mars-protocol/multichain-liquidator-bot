@@ -1,7 +1,10 @@
 import { MsgExecuteContractEncodeObject, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { AccountData, Coin, EncodeObject } from '@cosmjs/proto-signing'
+import { AccountData, coin, Coin, EncodeObject } from '@cosmjs/proto-signing'
 import { readFileSync } from 'fs'
 import { toUtf8 } from '@cosmjs/encoding'
+import { osmosis } from 'osmojs'
+import { MsgSwapExactAmountIn, SwapAmountInRoute } from 'osmojs/types/proto/osmosis/gamm/v1beta1/tx'
+const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 
 export async function sleep(timeout: number) {
   await new Promise((resolve) => setTimeout(resolve, timeout))
@@ -169,6 +172,29 @@ export const makeWithdrawMessage = (
 
   return executeContractMsg
 }
+
+export const makeSwapMessage = (
+  liquidatorAddress: string,
+  assetInDenom: string,
+  assetOutDenom: string,
+  assetInAmount: number,
+  route: SwapAmountInRoute[]
+) : MsgSwapExactAmountIn => {
+
+  // create the message
+  const msg = swapExactAmountIn({
+    sender: liquidatorAddress,
+    routes: route,
+    tokenIn: coin(assetInAmount, assetInDenom),
+
+    // TODO: make this amount at least what we repaid so we don't lose money
+    tokenOutMinAmount: '1',
+  })
+
+  return msg.value
+}
+
+
 
 export const deposit = async (
   client: SigningCosmWasmClient,
