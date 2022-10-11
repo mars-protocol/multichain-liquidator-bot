@@ -192,13 +192,17 @@ func (service *Manager) Run() error {
 				}).Error("Unable to collect metrics")
 			}
 
-			err = service.submitMetrics(metrics)
-			if err != nil {
-				service.logger.WithFields(logrus.Fields{
-					"height": height,
-					"error":  err,
-				}).Error("Unable to submit metrics")
-			}
+			// Submitting metrics takes a second or two, don't hold up
+			// the rest of the work because of it
+			go func() {
+				err := service.submitMetrics(metrics)
+				if err != nil {
+					service.logger.WithFields(logrus.Fields{
+						"height": height,
+						"error":  err,
+					}).Error("Unable to submit metrics")
+				}
+			}()
 		}
 
 		service.logger.WithFields(logrus.Fields{
@@ -218,18 +222,22 @@ func (service *Manager) Run() error {
 		// If there are items left in the queue, we need to scale the service
 		// If there are no items left, we need to determine if we have too
 		// many services running
-		for scalerName, scaler := range service.scalers {
-			scaleDirection, shouldScale, err := scaler.ScaleAutomatic()
-			if err != nil {
-				return err
-			}
+		// Only check for scaling if we're not shutting down otherwise
+		// we might scale a service due to services being removed at shutdown
+		if atomic.LoadUint32(&service.continueRunning) == 1 {
+			for scalerName, scaler := range service.scalers {
+				scaleDirection, shouldScale, err := scaler.ScaleAutomatic()
+				if err != nil {
+					return err
+				}
 
-			if shouldScale {
-				service.logger.WithFields(logrus.Fields{
-					"scaler":    scalerName,
-					"height":    height,
-					"direction": scaleDirection,
-				}).Debug("Service is scaling")
+				if shouldScale {
+					service.logger.WithFields(logrus.Fields{
+						"scaler":    scalerName,
+						"height":    height,
+						"direction": scaleDirection,
+					}).Debug("Service is scaling")
+				}
 			}
 		}
 
@@ -382,9 +390,6 @@ func (service *Manager) monitorContractStorageSize(
 			"total":      stateResponse.Pagination.Total,
 			"elapsed_ms": time.Since(start).Milliseconds(),
 		}).Debug("Fetched contract items")
-
-		// TODO Compare total amount of items vs total collected by the collector
-		// TODO This will be implemented after changes are completed by Red Bank
 
 		// Store the total amount of items
 		service.metricsCache.Set(
