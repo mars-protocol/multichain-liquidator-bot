@@ -242,7 +242,7 @@ func (service *Manager) Run() error {
 		}
 
 		// TODO: Can we move this somewhere else
-		// Clear the queue from any remaining work
+		// Clear the queues from any remaining work
 		err = service.queue.Purge(service.collectorQueueName)
 		if err != nil {
 			return err

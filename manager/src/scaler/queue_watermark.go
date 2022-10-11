@@ -14,12 +14,18 @@ import (
 // active services fall between the given watermark levels based on queue
 // sizes
 type QueueWatermark struct {
-	queue               interfaces.Queuer
-	queueName           string
-	deployer            managerinterfaces.Deployer
-	lowWaterMark        int
-	highWaterMark       int
-	minimumServiceCount int
+	queue     interfaces.Queuer
+	queueName string
+	deployer  managerinterfaces.Deployer
+	// watermarkViolationCount keeps track of the amount of times
+	// the watermark was breached
+	watermarkViolationCount int
+	// watermarkViolationMax determines the maximum amount of times
+	// the watermark was violated before scaling
+	watermarkViolationMax int
+	lowWaterMark          int
+	highWaterMark         int
+	minimumServiceCount   int
 
 	logger *logrus.Entry
 }
@@ -58,12 +64,14 @@ func NewQueueWatermark(
 	}
 
 	return &QueueWatermark{
-		queue:               queue,
-		queueName:           queueName,
-		deployer:            deployer,
-		lowWaterMark:        lowWaterMark,
-		highWaterMark:       highWaterMark,
-		minimumServiceCount: minimumServiceCount,
+		queue:                   queue,
+		queueName:               queueName,
+		deployer:                deployer,
+		watermarkViolationCount: 0,
+		watermarkViolationMax:   10,
+		lowWaterMark:            lowWaterMark,
+		highWaterMark:           highWaterMark,
+		minimumServiceCount:     minimumServiceCount,
 		logger: logger.WithFields(logrus.Fields{
 			"subservice": "scaler",
 			"type":       "queuewatermark",
@@ -116,7 +124,24 @@ func (qwm *QueueWatermark) ScaleAutomatic() (string, bool, error) {
 
 	// If the item count has risen above the high watermark, we can scale up
 	if itemCount >= qwm.highWaterMark {
-		return "up", true, qwm.ScaleUp()
+		qwm.watermarkViolationCount++
+		qwm.logger.WithFields(logrus.Fields{
+			"new_value": qwm.watermarkViolationCount,
+			"max_value": qwm.watermarkViolationMax,
+		}).Debug("Increased violation count")
+
+		// To avoid scaling too aggressively we allow the watermark to be
+		// breached a few times before scaling
+		// This avoids scaling rapidly in case of a handful of query failures
+		// that leave a queue above the high watermark
+		if qwm.watermarkViolationCount >= qwm.watermarkViolationMax {
+			qwm.logger.WithFields(logrus.Fields{
+				"value":     qwm.watermarkViolationCount,
+				"max_value": qwm.watermarkViolationMax,
+			}).Debug("Watermark violation maximum exceeded")
+			qwm.watermarkViolationCount = 0
+			return "up", true, qwm.ScaleUp()
+		}
 	}
 
 	return "none", false, err
