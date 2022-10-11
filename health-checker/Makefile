@@ -26,15 +26,15 @@ run: build ## Build and run the service binary
 	BATCH_SIZE=1 \
 	LOG_LEVEL=debug \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
-	LIQUIDATOR_QUEUE_NAME=liquidator \
-	REDBANK_ADDRESS=osmo1utjx3594tlvfw4375esgu72wa4sdgf0q7x4ye27husf5kvuzp5rsqhpcl3 \
-	ADDRESS_PER_JOB=1 \
-	JOBS_PER_WORKER=1 \
+	LIQUIDATOR_QUEUE_NAME=executor \
+	REDBANK_ADDRESS=osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv \
+	ADDRESS_PER_JOB=10 \
+	JOBS_PER_WORKER=10 \
 	CHAIN_ID=localosmosis \
 	REDIS_DATABASE=0 \
 	REDIS_METRICS_DATABASE=0 \
 	HEALTH_CHECK_QUEUE_NAME=health_check \
-	HIVE_ENDPOINT=http://127.0.0.1 \
+	HIVE_ENDPOINT=http://127.0.0.1:8085/graphql \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled
