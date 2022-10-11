@@ -104,7 +104,7 @@ export class LiquidationHelper implements ILiquidationHelper {
     return await this.client.signAndBroadcast(this.liquidatorAddress, [msg], 'auto')
   }
 
-  getLiquidatorAddress() : string {
+  getLiquidatorAddress(): string {
     return this.liquidatorAddress
   }
 
@@ -116,9 +116,9 @@ export class LiquidationHelper implements ILiquidationHelper {
     }
 
     console.log({
-      "liquidatorAddress": this.liquidatorAddress,
-      "filterer": this.liquidationFilterContract,
-      "coins": coins
+      liquidatorAddress: this.liquidatorAddress,
+      filterer: this.liquidationFilterContract,
+      coins: coins,
     })
 
     const result = await this.client.execute(

@@ -8,10 +8,7 @@
 //
 
 import { makeCosmoshubPath } from '@cosmjs/amino'
-import {
-  SigningCosmWasmClient,
-  SigningCosmWasmClientOptions,
-} from '@cosmjs/cosmwasm-stargate'
+import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from '@cosmjs/cosmwasm-stargate'
 import { HdPath } from '@cosmjs/crypto'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { GasPrice } from '@cosmjs/stargate'

@@ -46,14 +46,14 @@ export class RedisInterface implements IRedisInterface {
    * @param key The key to increment
    * @param value The value to increment by
    */
-   async incrementBy(key: string, value: number): Promise<number> {
+  async incrementBy(key: string, value: number): Promise<number> {
     if (!this.client) {
-        console.log(`ERROR: redis client not connected`)
-        return 0
+      console.log(`ERROR: redis client not connected`)
+      return 0
     }
 
     return await this.client.incrBy(key, value)
-   }
+  }
 
   /**
    * @param url The redis endpoint. Not pass this parameter defaults to localhost

@@ -3,9 +3,13 @@ import { AccountData, coin, Coin, EncodeObject } from '@cosmjs/proto-signing'
 import { readFileSync } from 'fs'
 import { toUtf8 } from '@cosmjs/encoding'
 import { osmosis } from 'osmojs'
-import { AminoConverter } from 'osmojs/src/proto/osmosis/gamm/v1beta1/tx.amino'; 
-import {  SwapAmountInRoute, MsgSwapExactAmountIn, MsgSwapExactAmountOut } from 'osmojs/types/proto/osmosis/gamm/v1beta1/tx'
-const { swapExactAmountIn  } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
+import { AminoConverter } from 'osmojs/src/proto/osmosis/gamm/v1beta1/tx.amino'
+import {
+  SwapAmountInRoute,
+  MsgSwapExactAmountIn,
+  MsgSwapExactAmountOut,
+} from 'osmojs/types/proto/osmosis/gamm/v1beta1/tx'
+const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
 export async function sleep(timeout: number) {
   await new Promise((resolve) => setTimeout(resolve, timeout))
@@ -14,8 +18,8 @@ export async function sleep(timeout: number) {
 export function readAddresses(deployConfigPath: string): ProtocolAddresses {
   try {
     const data = readFileSync(deployConfigPath, 'utf8')
-    const deployData : {addresses : ProtocolAddresses} = JSON.parse(data)
-    const result : ProtocolAddresses = deployData.addresses
+    const deployData: { addresses: ProtocolAddresses } = JSON.parse(data)
+    const result: ProtocolAddresses = deployData.addresses
     return result
   } catch (e) {
     console.error(`Failed to load artifacts path - could not find ${deployConfigPath}`)
@@ -50,10 +54,10 @@ export const seedAddresses = async (
   coins: Coin[],
 ): Promise<string[]> => {
   const seededAddresses: string[] = []
-  const sendTokenMsgs : EncodeObject[] = []
+  const sendTokenMsgs: EncodeObject[] = []
 
   console.log(`seeding children for ${sender}`)
-  accounts.forEach((account)=> {
+  accounts.forEach((account) => {
     if (account.address === sender) return
 
     const addressToSeed = account.address
@@ -134,7 +138,7 @@ export const makeBorrowMessage = (
   assetDenom: string,
   amount: string,
   redBankContractAddress: string,
-): MsgExecuteContractEncodeObject=> {
+): MsgExecuteContractEncodeObject => {
   const executeContractMsg: MsgExecuteContractEncodeObject = {
     typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
     value: {
@@ -172,16 +176,15 @@ export const makeWithdrawMessage = (
 }
 
 interface MsgSwapEncodeObject {
-  typeUrl: string,
-  value : MsgSwapExactAmountIn
+  typeUrl: string
+  value: MsgSwapExactAmountIn
 }
 
 export const makeSwapMessage = (
   liquidatorAddress: string,
   tokenIn: Coin,
-  route: SwapAmountInRoute[]
-) : MsgSwapEncodeObject  => {
-  
+  route: SwapAmountInRoute[],
+): MsgSwapEncodeObject => {
   // create the message
   const msg = swapExactAmountIn({
     sender: liquidatorAddress,
@@ -194,13 +197,11 @@ export const makeSwapMessage = (
 
   const executeContractMsg: MsgSwapEncodeObject = {
     typeUrl: msg.typeUrl,
-    value: msg.value
+    value: msg.value,
   }
 
   return executeContractMsg
 }
-
-
 
 export const deposit = async (
   client: SigningCosmWasmClient,
@@ -209,7 +210,7 @@ export const deposit = async (
   amount: string,
   addresses: ProtocolAddresses,
 ) => {
-  const msg = { deposit: { } }
+  const msg = { deposit: {} }
   const coins = [
     {
       denom: assetDenom,

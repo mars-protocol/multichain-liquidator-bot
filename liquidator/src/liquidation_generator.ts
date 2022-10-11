@@ -16,9 +16,12 @@ import { AssetResponse, Collateral, DataResponse, Debt } from './hive.js'
  * @param position The unhealthy position to be liquidated
  * @returns A liquidation transaction for the given position.
  */
-export const createLiquidationTx = (debts: Debt[], collaterals: Collateral[], address: string): LiquidationTx => {
-
-  const debtAsset : AssetResponse = getLargestDebt(debts)
+export const createLiquidationTx = (
+  debts: Debt[],
+  collaterals: Collateral[],
+  address: string,
+): LiquidationTx => {
+  const debtAsset: AssetResponse = getLargestDebt(debts)
 
   return {
     collateral_denom: getLargestCollateral(collaterals),
@@ -32,7 +35,9 @@ export const createLiquidationTx = (debts: Debt[], collaterals: Collateral[], ad
 const sortAssetArrayByAmount = (assets: AssetResponse[]): AssetResponse[] => {
   // deep copy, so we don't mess up the og array.
   const assetClone = [...assets]
-  return assetClone.sort((a: AssetResponse, b: AssetResponse) => Number(a.amount) - Number(b.amount)).reverse()
+  return assetClone
+    .sort((a: AssetResponse, b: AssetResponse) => Number(a.amount) - Number(b.amount))
+    .reverse()
 }
 
 export const getLargestCollateral = (collaterals: Collateral[]): string => {
