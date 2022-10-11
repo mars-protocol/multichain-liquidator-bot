@@ -3,13 +3,13 @@ import { AccountData, coin, Coin, EncodeObject } from '@cosmjs/proto-signing'
 import { readFileSync } from 'fs'
 import { toUtf8 } from '@cosmjs/encoding'
 import { osmosis } from 'osmojs'
-import { MsgSwapExactAmountIn, SwapAmountInRoute } from 'osmojs/types/proto/osmosis/gamm/v1beta1/tx'
-const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
-
+import { AminoConverter } from 'osmojs/src/proto/osmosis/gamm/v1beta1/tx.amino'; 
+import {  SwapAmountInRoute, MsgSwapExactAmountIn, MsgSwapExactAmountOut } from 'osmojs/types/proto/osmosis/gamm/v1beta1/tx'
+const { swapExactAmountIn  } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
+osmosis.gamm.v1beta1.MsgSwapExactAmountIn
 export async function sleep(timeout: number) {
   await new Promise((resolve) => setTimeout(resolve, timeout))
 }
-
 // Reads json containing contract addresses located in /artifacts folder for specified network.
 export function readAddresses(deployConfigPath: string): ProtocolAddresses {
   try {
@@ -121,7 +121,7 @@ export const makeDepositMessage = (
     value: {
       sender: sender,
       contract: redBankContractAddress,
-      msg: toUtf8(`{ "deposit": { "denom": "${assetDenom}" } }`),
+      msg: toUtf8(`{ "deposit": {} }`),
       funds: coins,
     },
   }
@@ -134,7 +134,7 @@ export const makeBorrowMessage = (
   assetDenom: string,
   amount: string,
   redBankContractAddress: string,
-): MsgExecuteContractEncodeObject => {
+): MsgExecuteContractEncodeObject=> {
   const executeContractMsg: MsgExecuteContractEncodeObject = {
     typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
     value: {
@@ -152,7 +152,6 @@ export const makeWithdrawMessage = (
   sender: string,
   assetDenom: string,
   redBankContractAddress: string,
-  recipient: string,
 ): MsgExecuteContractEncodeObject => {
   const executeContractMsg: MsgExecuteContractEncodeObject = {
     typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
@@ -162,8 +161,7 @@ export const makeWithdrawMessage = (
       msg: toUtf8(`
       { 
         "withdraw": { 
-          "denom": "${assetDenom}",
-          "recipient": "${recipient}" 
+          "denom": "${assetDenom}"
         } 
       }`),
       funds: [],
@@ -173,25 +171,33 @@ export const makeWithdrawMessage = (
   return executeContractMsg
 }
 
+interface MsgSwapEncodeObject {
+  typeUrl: string,
+  value : MsgSwapExactAmountIn
+}
+
 export const makeSwapMessage = (
   liquidatorAddress: string,
-  assetInDenom: string,
-  assetOutDenom: string,
-  assetInAmount: number,
+  tokenIn: Coin,
   route: SwapAmountInRoute[]
-) : MsgSwapExactAmountIn => {
-
+) : MsgSwapEncodeObject  => {
+  
   // create the message
   const msg = swapExactAmountIn({
     sender: liquidatorAddress,
     routes: route,
-    tokenIn: coin(assetInAmount, assetInDenom),
+    tokenIn: tokenIn,
 
-    // TODO: make this amount at least what we repaid so we don't lose money
+    // TODO: make this amount at least what we repaid so we don't lose money? OR do we just not liquidate at all
     tokenOutMinAmount: '1',
   })
 
-  return msg.value
+  const executeContractMsg: MsgSwapEncodeObject = {
+    typeUrl: msg.typeUrl,
+    value: msg.value
+  }
+
+  return executeContractMsg
 }
 
 
@@ -203,7 +209,7 @@ export const deposit = async (
   amount: string,
   addresses: ProtocolAddresses,
 ) => {
-  const msg = { deposit: { denom: assetDenom } }
+  const msg = { deposit: { } }
   const coins = [
     {
       denom: assetDenom,
