@@ -110,12 +110,12 @@ func (service *Collector) Run() error {
 			return err
 		}
 
-		service.metricsCache.IncrementBy("collector.contract_items.scanned", scanned)
-		service.metricsCache.IncrementBy("health_checker.accounts.total", int64(len(healthCheckItems)))
-
 		// Enrich the packet sent to the health check service
 		// to include endpoints / etc
 		service.queue.PushMany(service.healthCheckQueueName, healthCheckItems)
+
+		service.metricsCache.IncrementBy("collector.contract_items.scanned", scanned)
+		service.metricsCache.IncrementBy("health_checker.accounts.total", int64(len(healthCheckItems)))
 
 		service.logger.WithFields(logrus.Fields{
 			"total":      len(healthCheckItems),
