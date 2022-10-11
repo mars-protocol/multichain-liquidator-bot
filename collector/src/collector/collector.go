@@ -188,6 +188,9 @@ func (service *Collector) fetchContractItems(
 	// will have contract state keys returned as "balancesmars..."
 	for _, model := range stateResponse.Models {
 
+		// Track total scanned for metrics
+		totalScanned++
+
 		// Example of a key
 		// 00056465627473002B6F736D6F316379797A7078706C78647A6B656561376B777379646164673837333537716E6168616B616B7375696F6E
 		// The first two bytes "0005" indicate the length of the Map "name" -> 5 characters
@@ -283,9 +286,6 @@ func (service *Collector) fetchContractItems(
 			})
 		}
 		accounts[string(address)] = current
-
-		// Track total scanned for metrics
-		totalScanned++
 	}
 
 	// Construct the resulting output by encoding to JSON
