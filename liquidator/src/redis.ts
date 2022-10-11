@@ -34,7 +34,7 @@ export class RedisInterface implements IRedisInterface {
       return []
     }
 
-    const result = await this.client.lPopCount(this.key, 100)
+    const result = await this.client.lPopCount(this.key, 25)
 
     if (!result) return []
 

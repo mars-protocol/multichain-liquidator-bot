@@ -2,14 +2,6 @@ import { RedisInterface } from '../src/redis'
 import { generateRandomPosition } from './test_helpers'
 
 describe('Redis Tests', () => {
-  test(`We can connect to redis`, async () => {
-    // test
-    const redisInterface = new RedisInterface()
-    const redisClient = await redisInterface.connect()
-    expect(redisClient.isReady).toBe(true)
-  })
-
-describe('Redis Tests', () => {
 
     test(`We can connect to redis`, async () => {
         // test
@@ -31,6 +23,6 @@ describe('Redis Tests', () => {
 
         const returnedPositions = await redisInterface.fetchUnhealthyPositions()
         // // first in last out - so index is 1
-        expect(returnedPositions[1].address).toBe(position.address)
+        expect(returnedPositions[1].Address).toBe(position.Address)
     })
-})
+  })
