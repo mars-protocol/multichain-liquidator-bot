@@ -30,7 +30,7 @@ docker_build: build ## Build the service Docker container
 
 docker_run: ## Run the Docker container in interactive mode
 	docker run -it --rm --network="host" \
-	-e GAS_PRICE="1uosmo" \
+	-e GAS_PRICE="0.001uosmo" \
 	-e RPC_ENDPOINT="http://localhost:26657" \
 	-e SEED="notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius" \
 	-e ACCOUNTS_PER_SEED="100" \
@@ -42,7 +42,7 @@ docker_run: ## Run the Docker container in interactive mode
 	-e MAX_THREADS="20" \
 	-e OUTPOST_ARTIFACTS_PATH="/Users/<usernamezz>/outposts/artifacts/" \
 	-e CHAIN_ID="localosmosis" \
-	-e CONTRACT_REDBANK_ADDRESS="osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6" \
+	-e CONTRACT_REDBANK_ADDRESS="osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv" \
 	-e CONTRACT_ORACLE_ADDRESS="osmo1vhndln95yd7rngslzvf6sax6axcshkxqpmpr886ntelh28p9ghuqqgjjmc" \
 		${IMAGE_NAME}
 

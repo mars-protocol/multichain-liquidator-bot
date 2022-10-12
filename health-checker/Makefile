@@ -26,15 +26,15 @@ run: build ## Build and run the service binary
 	BATCH_SIZE=1 \
 	LOG_LEVEL=debug \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
-	LIQUIDATOR_QUEUE_NAME=liquidator \
-	REDBANK_ADDRESS=osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6 \
-	ADDRESS_PER_JOB=1 \
-	JOBS_PER_WORKER=1 \
+	LIQUIDATOR_QUEUE_NAME=executor \
+	REDBANK_ADDRESS=osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv \
+	ADDRESS_PER_JOB=10 \
+	JOBS_PER_WORKER=10 \
 	CHAIN_ID=localosmosis \
 	REDIS_DATABASE=0 \
 	REDIS_METRICS_DATABASE=0 \
 	HEALTH_CHECK_QUEUE_NAME=health_check \
-	HIVE_ENDPOINT=http://127.0.0.1 \
+	HIVE_ENDPOINT=http://127.0.0.1:8085/graphql \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled
@@ -42,7 +42,7 @@ run_race: ## Run the service with race condition checking enabled
 	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
-	CHAIN_ID="pisco-1" \
+	CHAIN_ID="localosmosis" \
 	go run -race ./src/*.go
 
 docker_build: build ## Build the service Docker container
@@ -53,7 +53,7 @@ docker_run: ## Run the Docker container in interactive mode
 		-e LOG_LEVEL=debug \
 		-e LOG_FORMAT=text \
 		-e SERVICE_NAME="bot-collector" \
-		-e CHAIN_ID="pisco-1" \
+		-e CHAIN_ID="localosmosis" \
 		${IMAGE_NAME}
 
 docker_push: ## Push the Docker container to the registry

@@ -261,7 +261,7 @@ func (service *Manager) Run() error {
 				HiveEndpoint:       service.hiveEndpoint,
 				LCDEndpoint:        service.lcdEndpoint,
 				ContractAddress:    service.collectorContract,
-				ContractItemPrefix: "debts,collaterals",
+				ContractItemPrefix: "debts",
 				ContractPageOffset: offset,
 				ContractPageLimit:  uint64(limit),
 			}

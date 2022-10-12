@@ -181,7 +181,7 @@ git clone https://github.com/mars-protocol/outposts.git
 ## Creating positions
 
 ```node
-yarn run env:createPositions
+yarn run env:deployPositions
 ```
 
 *Note that if you already have positions this will not wipe your previous positions, meaning you may have some 'dirty data' which can interfere with your test*

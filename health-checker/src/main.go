@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	health_checker "github.com/mars-protocol/multichain-liquidator-bot/health-checker/src/health-checker"
 
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime"
+
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/cache"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
@@ -36,6 +38,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to process config: %s", err)
 	}
+
+	fmt.Println("config")
+	fmt.Println(config)
 
 	log.SetOutput(os.Stdout)
 	log.SetFormatter(&log.JSONFormatter{

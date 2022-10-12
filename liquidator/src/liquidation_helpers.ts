@@ -1,20 +1,20 @@
 import { ExecuteResult, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { coin, Coin, DeliverTxResponse, logs } from '@cosmjs/stargate'
+import { coin, Coin, DeliverTxResponse } from '@cosmjs/stargate'
 import { Attribute, Event } from '@cosmjs/stargate/build/logs'
 import { LcdPool, OsmosisApiClient } from 'cosmology'
-import { LiquidationResult, LiquidationTx } from './types/liquidation'
+import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
 import { createLiquidationTx } from './liquidation_generator.js'
 
-import { Position } from './types/position'
 import { osmosis } from 'osmojs'
 import { SwapAmountInRoute } from 'osmojs/types/proto/osmosis/gamm/v1beta1/tx'
 import Long from 'long'
+import { Collateral, Debt } from './hive.js'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 
 export interface ILiquidationHelper {
   // Produce the ts required to liquidate a position
-  produceLiquidationTx(address: Position): LiquidationTx
+  produceLiquidationTx(debts: Debt[], collaterals: Collateral[], address: string): LiquidationTx
   sendLiquidationsTx(txs: LiquidationTx[], coins: Coin[]): Promise<LiquidationResult[]>
   swap(
     assetInDenom: string,
@@ -24,7 +24,7 @@ export interface ILiquidationHelper {
 }
 
 export class LiquidationHelper implements ILiquidationHelper {
-  private client: SigningCosmWasmClient
+  public client: SigningCosmWasmClient
   private liquidatorAddress: string
   private liquidationFilterContract: string
 
@@ -41,7 +41,7 @@ export class LiquidationHelper implements ILiquidationHelper {
   // Find a pool Id where we can swap asset A with asset B.
   // TODO - this will only work for direct routes (i.e a pool of A:B or B:A), update to handle multihop
   async findRoute(denomA: string, denomB: string): Promise<SwapAmountInRoute[]> {
-    const api = new OsmosisApiClient({ url: process.env.RPC_ENDPOINT! })
+    const api = new OsmosisApiClient({ url: process.env.LCD_ENDPOINT! })
 
     // TODO: Consider extracting getPools to a helper method - only use for that library is here.
     const lcdPools = await api.getPools()
@@ -89,6 +89,7 @@ export class LiquidationHelper implements ILiquidationHelper {
   ): Promise<DeliverTxResponse> {
     const route = await this.findRoute(assetInDenom, assetOutDenom)
 
+    console.log(`found route ${route}`)
     // create the message
     const msg = swapExactAmountIn({
       sender: this.liquidatorAddress,
@@ -103,12 +104,22 @@ export class LiquidationHelper implements ILiquidationHelper {
     return await this.client.signAndBroadcast(this.liquidatorAddress, [msg], 'auto')
   }
 
+  getLiquidatorAddress(): string {
+    return this.liquidatorAddress
+  }
+
   async sendLiquidationsTx(txs: LiquidationTx[], coins: Coin[]): Promise<LiquidationResult[]> {
     const msg = {
       liquidate_many: {
         liquidations: txs,
       },
     }
+
+    console.log({
+      liquidatorAddress: this.liquidatorAddress,
+      filterer: this.liquidationFilterContract,
+      coins: coins,
+    })
 
     const result = await this.client.execute(
       this.liquidatorAddress,
@@ -125,12 +136,9 @@ export class LiquidationHelper implements ILiquidationHelper {
   parseLiquidationResult(result: ExecuteResult): LiquidationResult[] {
     const liquidationResults: LiquidationResult[] = []
 
-    console.log(result.logs[0].events)
     result.logs[0].events.forEach((e) => {
       if (e.type === 'wasm') {
-        console.log(`found wasm`)
         const result = this.parseLiquidationResultInner(e)
-        console.log(result)
         liquidationResults.push.apply(liquidationResults, result)
       }
     })
@@ -149,7 +157,6 @@ export class LiquidationHelper implements ILiquidationHelper {
     }
 
     wasm.attributes.forEach((attribute: Attribute) => {
-      console.log(attribute)
       // find all parameters we require
       switch (attribute.key) {
         case 'collateral_denom':
@@ -172,8 +179,6 @@ export class LiquidationHelper implements ILiquidationHelper {
             debtRepaidAmount: '',
             collateralReceivedAmount: '',
           }
-          console.log(result)
-          console.log(results.length)
           break
       }
     })
@@ -181,7 +186,7 @@ export class LiquidationHelper implements ILiquidationHelper {
     return results
   }
 
-  produceLiquidationTx(position: Position): LiquidationTx {
-    return createLiquidationTx(position)
+  produceLiquidationTx(debts: Debt[], collaterals: Collateral[], address: string): LiquidationTx {
+    return createLiquidationTx(debts, collaterals, address)
   }
 }

@@ -22,11 +22,12 @@ type HealthChecker struct {
 	healthCheckQueueName string
 	liquidationQueueName string
 	jobsPerWorker        int
-	redbankAddress       string
 	addressesPerJob      int
-	batchSize            int
-	logger               *logrus.Entry
-	continueRunning      uint32
+	redbankAddress       string
+
+	batchSize       int
+	logger          *logrus.Entry
+	continueRunning uint32
 }
 
 var (
@@ -58,9 +59,15 @@ func New(
 		return nil, errors.New("HealthCheckQueue and liquidationQueue must be set")
 	}
 
+	if addressesPerJob == 0 {
+
+		return nil, errors.New("AddressesPerJob cannot be 0")
+	}
+
 	return &HealthChecker{
 		queue:                queue,
 		metricsCache:         metricsCache,
+		hive:                 hive,
 		healthCheckQueueName: healthCheckQueueName,
 		liquidationQueueName: liquidationQueueName,
 		jobsPerWorker:        jobsPerWorker,
@@ -79,6 +86,7 @@ func (s *HealthChecker) getExecuteFunction(redbankAddress string) func(ctx conte
 		args interface{}) (interface{}, error) {
 		positions, ok := args.([]types.HealthCheckWorkItem)
 		if !ok {
+			s.logger.Error("Failed to load positions")
 			return nil, errDefault
 		}
 
@@ -99,11 +107,9 @@ func (s *HealthChecker) getExecuteFunction(redbankAddress string) func(ctx conte
 func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, addressesPerJob int) []Job {
 
 	numberOfAddresses := len(positionList)
-
 	jobs := []Job{}
 	// Slice our address into jobs, each job fetching N number of addresses
 	for i := 0; i < len(positionList); i += addressesPerJob {
-
 		remainingAddresses := float64(numberOfAddresses - i)
 		maxAddresses := float64(addressesPerJob)
 		sliceEnd := i + int(math.Min(remainingAddresses, maxAddresses))
@@ -132,7 +138,7 @@ func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, a
 func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte {
 	var unhealthyPositions [][]byte
 	for _, userResult := range results {
-		ltv, err := strconv.ParseFloat(userResult.ContractQuery.HealthStatus.Borrowing, 32)
+		ltv, err := strconv.ParseFloat(userResult.ContractQuery.HealthStatus.Borrowing.LiquidationThresholdHf, 32)
 		if err != nil {
 			s.logger.Errorf("An Error Occurred decoding health status. %v", err)
 		} else if ltv < 1 {
@@ -155,6 +161,7 @@ func (s *HealthChecker) Run() error {
 	if err != nil {
 		return err
 	}
+
 	// cleanup
 	defer s.queue.Disconnect()
 
@@ -168,14 +175,16 @@ func (s *HealthChecker) Run() error {
 		}).Debug("Fetching items from Redis")
 
 		// The queue will return a nil item but no error when no items were in the queue
+
 		items, err := s.queue.FetchMany(s.healthCheckQueueName, s.batchSize)
 		if err != nil {
 			return err
 		}
 
 		if items == nil {
+			s.logger.Info("no items yet")
 			// No items yet, sleep to prevent spam of fetch many
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 			continue
 		}
 
@@ -204,7 +213,6 @@ func (s *HealthChecker) Run() error {
 		// Dispatch workers to fetch position statuses
 		jobs := s.generateJobs(positions, s.addressesPerJob)
 		userResults, success := s.RunWorkerPool(jobs)
-
 		s.metricsCache.IncrementBy("health_checker.accounts.scanned", int64(len(userResults)))
 
 		// A warning incase we do not successfully load data for all positions.
@@ -297,5 +305,6 @@ func (s *HealthChecker) RunWorkerPool(jobs []Job) ([]UserResult, bool) {
 func (s *HealthChecker) Stop() error {
 	// Block long running routines from continuing
 	atomic.StoreUint32(&s.continueRunning, 0)
+	s.logger.Info("Stopping")
 	return nil
 }
