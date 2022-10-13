@@ -2,10 +2,12 @@ import { LiquidationHelper } from './liquidation_helpers.js'
 
 import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
 import { Position } from './types/position'
-import { Coin, GasPrice } from '@cosmjs/stargate'
-import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
-import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from '@cosmjs/cosmwasm-stargate'
+import { toUtf8 } from '@cosmjs/encoding'
+import { Coin, SigningStargateClient } from '@cosmjs/stargate'
+import { coins, DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
+import { CosmWasmClient, ExecuteResult, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import {
+  makeExecuteContractMessage,
   makeSwapMessage,
   makeWithdrawMessage,
   ProtocolAddresses,
@@ -13,7 +15,7 @@ import {
   // ProtocolAddresses,
   sleep,
 } from './helpers.js'
-import { osmosis } from 'osmojs'
+import { FEES, getSigningOsmosisClientOptions, osmosis, cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
 import { DataResponse, Debt, fetchBatch } from './hive.js'
@@ -29,6 +31,17 @@ const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 const LIQUIDATABLE_ASSETS: string[] = JSON.parse(process.env.LIQUIDATABLE_ASSETS!)
 console.log(process.env.ROUTES)
 const ROUTES: Routes = JSON.parse(process.env.ROUTES!)
+
+const {
+  swapExactAmountIn
+} = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
+
+const {
+  executeContract,
+} = cosmwasm.wasm.v1.MessageComposer.withTypeUrl;
+
+import { getSigningOsmosisClient, signAndBroadcast } from 'osmojs';
+import { MsgExecuteContract } from 'osmojs/types/proto/cosmwasm/wasm/v1/tx.js'
 
 interface Routes {
   // Route for given pair [debt:collateral]
@@ -46,9 +59,6 @@ interface Collaterals {
 // todo don't store in .env
 const SEED = process.env.SEED!
 
-// const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
-// const addresses: ProtocolAddresses = readAddresses(deployDetails)
-
 const addresses: ProtocolAddresses = {
   oracle: process.env.CONTRACT_ORACLE_ADDRESS as string,
   redBank: process.env.CONTRACT_REDBANK_ADDRESS as string,
@@ -57,8 +67,11 @@ const addresses: ProtocolAddresses = {
   incentives: '',
   rewardsCollector: '',
 }
-console.log(ROUTES)
+
 const balances: Map<string, number> = new Map()
+
+let osmosisClient : SigningStargateClient
+let cosmwasmQueryClient : CosmWasmClient
 
 // Program entry
 export const main = async () => {
@@ -69,34 +82,62 @@ export const main = async () => {
 
   //The liquidator account should always be the first under that seed
   const liquidatorAddress = (await liquidator.getAccounts())[0].address
-
-  const clientOption: SigningCosmWasmClientOptions = {
-    gasPrice: GasPrice.fromString(GAS_PRICE),
-  }
-
-  const client = await SigningCosmWasmClient.connectWithSigner(
+  
+  cosmwasmQueryClient = await SigningCosmWasmClient.connectWithSigner(
     RPC_ENDPOINT,
-    liquidator,
-    clientOption,
+    liquidator
   )
 
-  // add swap message
-  const swapTypeUrl = '/osmosis.gamm.v1beta1.MsgSwapExactAmountIn'
-  client.registry.register(swapTypeUrl, osmosis.gamm.v1beta1.MsgSwapExactAmountIn)
+  osmosisClient = await getSigningOsmosisClient({rpcEndpoint: RPC_ENDPOINT, signer: liquidator})
 
+  const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
+  osmosisClient.registry.register(executeTypeUrl, cosmwasm.wasm.v1.MsgExecuteContract)
+    
   const liquidationHelper = new LiquidationHelper(
-    client,
     liquidatorAddress,
     LIQUIDATION_FILTERER_CONTRACT,
   )
 
-  await setBalances(client, liquidatorAddress)
+  await setBalances(cosmwasmQueryClient, liquidatorAddress)
 
   // run
   while (true) await run(liquidationHelper, redis)
 }
 
-const setBalances = async (client: SigningCosmWasmClient, liquidatorAddress: string) => {
+const getFee = () => {
+  return {
+    amount: coins(62500, 'uosmo'),
+    gas: '25000000'
+  }
+}
+
+const sendLiquidationsTx = async(txs: LiquidationTx[], coins: Coin[], liquidationHelper : LiquidationHelper): Promise<LiquidationResult[]> => {
+  const liquidateMsg = JSON.stringify({liquidate_many: {liquidations: txs}})
+
+  const msg = toUtf8(liquidateMsg)
+
+  const msgs = [executeContract(
+    makeExecuteContractMessage(liquidationHelper.getLiquidatorAddress(), liquidationHelper.getLiquidationFiltererContract(), msg,coins).value as MsgExecuteContract
+  )]
+
+  const result = await signAndBroadcast({
+    client: osmosisClient,
+    chainId: process.env.CHAIN_ID!,
+    address: liquidationHelper.getLiquidatorAddress(),
+    //@ts-ignore
+    msgs: msgs,
+    fee:getFee(),
+    memo:'sss'
+  }
+  )
+
+  if (!result || !result.rawLog) return []
+  const events = JSON.parse(result.rawLog)[0]
+  
+  return liquidationHelper.parseLiquidationResult(events.events)
+}
+
+const setBalances = async (client: CosmWasmClient, liquidatorAddress: string) => {
   for (const denom in LIQUIDATABLE_ASSETS) {
     const balance = await client.getBalance(liquidatorAddress, LIQUIDATABLE_ASSETS[denom])
     balances.set(LIQUIDATABLE_ASSETS[denom], Number(balance.amount))
@@ -105,7 +146,7 @@ const setBalances = async (client: SigningCosmWasmClient, liquidatorAddress: str
 
 // exported for testing
 export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInterface) => {
-  console.log(`===============Running==================`)
+  console.log(`*Running*`)
   console.log({ balances })
   const positions: Position[] = await redis.fetchUnhealthyPositions()
   if (positions.length == 0) {
@@ -118,19 +159,14 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
   const positionData: DataResponse[] = await fetchBatch(positions, addresses.redBank, HIVE_ENDPOINT)
 
   console.log(`- found ${positionData.length} positions queued for liquidation.`)
+  
   const txs: LiquidationTx[] = []
   const debtsToRepay = new Map<string, number>()
-
-  const healthQueries: Promise<any>[] = []
 
   // for each address, send liquidate tx
   positionData.forEach(async (positionResponse: DataResponse) => {
     // get actual data object
     const positionAddress = Object.keys(positionResponse.data)[0]
-
-    // Logging stuff todo - remove me
-    const healthQuery = queryHealth(liquidationHelper.client, positionAddress, addresses)
-    healthQueries.push(healthQuery)
 
     const position = positionResponse.data[positionAddress]
 
@@ -156,35 +192,22 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
       console.log(
         `- WARNING: Cannot liquidate liquidatable position for ${tx.user_address} because we do not have enough assets.`,
       )
-      console.log({
-        unliquidatableDebtSize: amount,
-        scheduledForLiquidation: debtAmount,
-        liquidatorBalance: walletBalance,
-        denom: tx.debt_denom,
-      })
+      // todo notify?
     }
   })
 
-  let healthy = 0
-  for (const index in healthQueries) {
-    await healthQueries[index].then((result) => {
-      if (Number(result.health_status.borrowing.liq_threshold_hf) >= 1) {
-        healthy += 1
-      }
-    })
-  }
-  const coins: Coin[] = []
+  
+  const myCoins: Coin[] = []
 
-  debtsToRepay.forEach((amount, denom) => coins.push({ denom, amount: amount.toFixed(0) }))
+  debtsToRepay.forEach((amount, denom) => myCoins.push({ denom, amount: amount.toFixed(0) }))
 
   // dispatch liquidation tx , and recieve and object with results on it
-  const results = await liquidationHelper.sendLiquidationsTx(txs, coins)
+  const results = await sendLiquidationsTx(txs, myCoins, liquidationHelper)
 
   // Log the amount of liquidations executed
   redis.incrementBy('executor.liquidations.executed', results.length)
 
   const liquidatorAddress = liquidationHelper.getLiquidatorAddress()
-  console.log(await queryHealth(liquidationHelper.client, liquidatorAddress, addresses))
 
   console.log(`- Successfully liquidated ${results.length} positions`)
 
@@ -213,19 +236,34 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
     // just mark this collateral as present
     collaterals[collateralRecievedDenom] = 0
   }
-  const msgs: EncodeObject[] = []
+
+  const msgs : Object[] = []
 
   // for each asset, create a withdraw message
   Object.keys(collaterals).forEach((denom: string) =>
-    msgs.push(makeWithdrawMessage(liquidatorAddress, denom, addresses.redBank)),
+    msgs.push(executeContract(
+      makeWithdrawMessage(liquidatorAddress, denom, addresses.redBank).value as MsgExecuteContract
+    ))
   )
 
   // for each route, build a swap message
-  Object.keys(swaps).forEach((route: string) =>
-    msgs.push(makeSwapMessage(liquidatorAddress, swaps[route], ROUTES[route])),
+  Object.keys(swaps).forEach((route: string) => msgs.push( swapExactAmountIn({
+      sender:liquidatorAddress,
+      routes:ROUTES[route],
+      tokenIn: swaps[route],
+      tokenOutMinAmount: '10', //todo test slippage
+    }))
   )
-  // console.log(await liquidationHelper.findRoute("a", "b"))
-  await liquidationHelper.client.signAndBroadcast(liquidatorAddress, msgs, 'auto')
+
+  await signAndBroadcast({
+    client: osmosisClient,
+    chainId: 'localosmosis',
+    address: liquidatorAddress,
+    msgs: msgs,
+    fee:getFee(),
+    memo:'sss'
+  })
+  
   console.log(`- Lquidation Process Complete.`)
 }
 

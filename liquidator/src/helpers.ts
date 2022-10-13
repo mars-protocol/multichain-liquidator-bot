@@ -1,13 +1,11 @@
-import { MsgExecuteContractEncodeObject, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { AccountData, coin, Coin, EncodeObject } from '@cosmjs/proto-signing'
+import { CosmWasmClient, MsgExecuteContractEncodeObject, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
+import { AccountData, Coin, EncodeObject } from '@cosmjs/proto-signing'
 import { readFileSync } from 'fs'
 import { toUtf8 } from '@cosmjs/encoding'
 import { osmosis } from 'osmojs'
-import { AminoConverter } from 'osmojs/src/proto/osmosis/gamm/v1beta1/tx.amino'
 import {
   SwapAmountInRoute,
   MsgSwapExactAmountIn,
-  MsgSwapExactAmountOut,
 } from 'osmojs/types/proto/osmosis/gamm/v1beta1/tx'
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -152,27 +150,38 @@ export const makeBorrowMessage = (
   return executeContractMsg
 }
 
-export const makeWithdrawMessage = (
+export const makeExecuteContractMessage = (
   sender: string,
-  assetDenom: string,
-  redBankContractAddress: string,
+  contractAddress: string,
+  msg: Uint8Array,
+  funds: Coin[]
 ): MsgExecuteContractEncodeObject => {
   const executeContractMsg: MsgExecuteContractEncodeObject = {
     typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
     value: {
       sender: sender,
-      contract: redBankContractAddress,
-      msg: toUtf8(`
-      { 
-        "withdraw": { 
-          "denom": "${assetDenom}"
-        } 
-      }`),
-      funds: [],
+      contract: contractAddress,
+      msg: msg,
+      funds:funds,
     },
   }
 
   return executeContractMsg
+}
+
+export const makeWithdrawMessage = (
+  sender: string,
+  assetDenom: string,
+  redBankContractAddress: string,
+): MsgExecuteContractEncodeObject => {
+
+  const msg = toUtf8(`
+      { 
+        "withdraw": { 
+          "denom": "${assetDenom}"
+        } 
+      }`)
+  return makeExecuteContractMessage(sender, redBankContractAddress, msg,[])
 }
 
 interface MsgSwapEncodeObject {
@@ -185,6 +194,7 @@ export const makeSwapMessage = (
   tokenIn: Coin,
   route: SwapAmountInRoute[],
 ): MsgSwapEncodeObject => {
+
   // create the message
   const msg = swapExactAmountIn({
     sender: liquidatorAddress,
@@ -240,7 +250,7 @@ export const repay = async (
 }
 
 export const queryHealth = async (
-  client: SigningCosmWasmClient,
+  client: CosmWasmClient,
   address: string,
   addresses: ProtocolAddresses,
 ) => {
