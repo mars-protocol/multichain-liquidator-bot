@@ -7,16 +7,22 @@
 default: build ## Build the binary
 
 build: ## Build all the services
-	cd collector && make
-	cd health-checker && make
-	cd liquidator && make
 	cd manager && make
+	# cd collector && make
+	# cd health-checker && make
+	# cd liquidator && make
 
 docker_build: build ## Build all the services' Docker images
-	cd collector && make docker_build
-	cd health-checker && make docker_build
-	cd liquidator && make docker_build
 	cd manager && make docker_build
+	# cd collector && make docker_build
+	# cd health-checker && make docker_build
+	# cd liquidator && make docker_build
+
+docker_push: docker_build ## Build all the services' Docker images
+	cd manager && make docker_push
+	# cd collector && make docker_push
+	# cd health-checker && make docker_push
+	# cd liquidator && make docker_push
 
 run: docker_build ## Build Docker images and start manager
 	cd manager && make run
