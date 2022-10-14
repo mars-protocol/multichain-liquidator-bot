@@ -8,21 +8,21 @@ The bot is composed of 4 distinct parts and more details are [available in this 
 1. Collector
 
 The Collector service is responsible for fetching all the user addresses that
-have debts in the Mars Red Bank and passes them on to the Health Checker. More info in [collector/README](collector/README.md)
+have debts in the Mars Red Bank and passes them on to the Health Checker. More info in [collector/README](collector)
 
 2. Health Checker
 
 Health Checker is responsible for fetching the health status for positions, 
-and flagging unhealthy positions for liquidation. More info in [health-checker/README](health-checker/README.md)
+and flagging unhealthy positions for liquidation. More info in [health-checker/README](health-checker)
 
 3. Liquidator
 
-The Liquidator service is responsible for handling liquidations of unhealthy positions. More info in [liquidator/README](liquidator/README.md)
+The Liquidator service is responsible for handling liquidations of unhealthy positions. More info in [liquidator/README](liquidator)
 
 4. Manager
 
 The Manager service is responsible for ensuring all the data is processed within
-a timeframe. By default, the timeframe is a single block. More info in [manager/README](manager/README.md)
+a timeframe. By default, the timeframe is a single block. More info in [manager/README](manager)
 
 ## Usage
 
@@ -164,5 +164,6 @@ that needs to be created manually or via a tool such as
 
 3. Note: You'll need to provide the manager with a role ARN. You can create this manually or let AWS create it for you the first time that you create the manager definition. Once you created the definition for the manager you can find the role ARN under Task definition -> JSON. This needs to be added to the definition itself.
 
-If everything was configured correctly your service should start. You can open the Manager's logs in CloudWatch -> Log Groups to see what it's doing.
+If everything was configured correctly your service should start. You can open the Manager's logs in CloudWatch -> Log Groups to see what it's doing. The manager will deploy the other services as needed and they don't
+need to be managed manually.
 
