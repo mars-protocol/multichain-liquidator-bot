@@ -52,6 +52,27 @@ make docker_build
 
 ### Docker
 
+Before starting, ensure your user can run Docker commands without `sudo`. If 
+you can't, refer to [DigitalOcean's guide (Step 2)](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04)
+
+For Docker we assume you're using the local registry built into Docker. You can
+see all your existing images by using `docker images`
+
+We provide convenience Makefiles for each service to ease compiling and building 
+Docker containers. To build all the Docker images, use the top-level Makefile
+by running `make docker_build` in the project root. This will compile the 
+service and build the Docker images locally for each service.
+
+Once the images are available for the collector, health checker and executor
+you may change the config in the manager's Makefile located at `./manager/Makefile`. 
+You'll need to tweak the settings for the RPC, Hive and websocket endpoints as well
+as COLLECTOR_CONFIG, EXECUTOR_CONFIG and HEALTH_CHECKER_CONFIG to match your setup.
+
+When you're ready to start the service, do `make run_manager` from the project
+root. This will start the manager service and it will deploy the other services
+as needed.
+
+
 ### AWS using Elastic Container Service (ECS)
 
 The guide below does not provide the optimal security setup for the cluster, 
