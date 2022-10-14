@@ -38,6 +38,8 @@ type awsECSConfig struct {
 	MemoryMB       int      `envconfig:"AWS_SERVICE_MEMORY_MB" required:"true"`
 	Subnets        []string `envconfig:"AWS_SERVICE_SUBNETS" required:"true"`
 	SecurityGroups []string `envconfig:"AWS_SERVICE_SECURITY_GROUPS" required:"true"`
+	RoleARN        string   `envconfig:"AWS_ROLE_ARN" required:"true"`
+	Region         string   `envconfig:"AWS_REGION" required:"true"`
 }
 
 // NewAWSECS creates a new instance of the AWS ECS deployer that will deploy
@@ -78,6 +80,8 @@ func NewAWSECS(
 		ecsConfig.CpuUnits,
 		ecsConfig.MemoryMB,
 		containerEnv,
+		ecsConfig.RoleARN,
+		ecsConfig.Region,
 	)
 	if err != nil {
 		return nil, err
@@ -225,6 +229,8 @@ func getOrCreateTaskDefinition(
 	cpuUnits int,
 	memoryMB int,
 	containerEnv map[string]string,
+	roleARN string,
+	region string,
 ) (string, error) {
 	// Check if we have a task definition already
 	// 10 second AWS timeout
@@ -261,17 +267,26 @@ func getOrCreateTaskDefinition(
 						Cpu:         *aws.Int32(int32(cpuUnits)),
 						Memory:      aws.Int32(int32(memoryMB)),
 						Environment: env,
+						LogConfiguration: &types.LogConfiguration{
+							LogDriver: types.LogDriverAwslogs,
+							Options: map[string]string{
+								"awslogs-group":         fmt.Sprintf("/ecs/%s", service),
+								"awslogs-region":        region,
+								"awslogs-stream-prefix": "ecs",
+							},
+						},
 					},
 				},
 				RuntimePlatform: &types.RuntimePlatform{
 					OperatingSystemFamily: types.OSFamilyLinux,
 					CpuArchitecture:       types.CPUArchitectureX8664,
 				},
-				Cpu:         aws.String(strconv.Itoa(cpuUnits)),
-				Memory:      aws.String(strconv.Itoa(memoryMB)),
-				NetworkMode: types.NetworkModeAwsvpc,
-				Family:      aws.String(service),
-				TaskRoleArn: aws.String(""),
+				Cpu:              aws.String(strconv.Itoa(cpuUnits)),
+				Memory:           aws.String(strconv.Itoa(memoryMB)),
+				NetworkMode:      types.NetworkModeAwsvpc,
+				Family:           aws.String(service),
+				TaskRoleArn:      aws.String(""),
+				ExecutionRoleArn: aws.String(roleARN),
 				RequiresCompatibilities: []types.Compatibility{
 					types.CompatibilityFargate,
 				},
@@ -344,6 +359,7 @@ func getOrCreateService(
 		// Service registered
 		return aws.ToString(service.Service.ServiceArn), nil
 	}
+
 	// Existing service
 	return aws.ToString(service.ServiceArn), nil
 }

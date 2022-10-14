@@ -193,6 +193,28 @@ func main() {
 			logger.Fatal(err)
 		}
 
+		// Set up the health checker's deployer
+		healthCheckerDeployer, err = deployer.NewAWSECS(
+			"health-checker",
+			config.HealthCheckerImage,
+			healthCheckerConfig,
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		// Set up the executor's deployer
+		executorDeployer, err = deployer.NewAWSECS(
+			"executor",
+			config.ExecutorImage,
+			executorConfig,
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
 	default:
 		logger.Fatal("Invalid deployer type specified: ", config.DeployerType)
 

@@ -120,4 +120,28 @@ that needs to be created manually or via a tool such as
         - Soft memory limit: 256
         - No port mappings
         - Healthcheck: Not required
-        - Environment variables
+        - Environment variables: Set all variables specified in Makefile
+
+            _Take special note of all the endpoints and be sure to use the Redis you configured earlier as well as the AWS keys you need to create and provide_
+        - Start timeout: 30
+        - Stop timeout: 30
+        - Auto-configure CloudWatch Logs: Checked
+
+2. Create service from task definition
+
+    - Launch type: Fargate
+    - Operating system family: Linux
+    - Task definition: multichain-manager with the latest revision
+    - Number of tasks: 1 (A single instance of the manager can manage tens of thousands of debt positions)
+    - Minimum healthy percent: 100
+    - Maximum percent: 200
+    - Deployment circuit breaker: Disabled
+    - Deployment type: Rolling update
+    - Enable ECS managed tags: Checked
+    - Auto-assign public IP: Enabled (disabling this will block the pulling of the container)
+    - Service auto scaling: Do not adjust the service's desired count
+
+3. Note: You'll need to provide the manager with a role ARN. You can create this manually or let AWS create it for you the first time that you create the manager definition. Once you created the definition for the manager you can find the role ARN under Task definition -> JSON. This needs to be added to the definition itself.
+
+If everything was configured correctly your service should start. You can open the Manager's logs in CloudWatch -> Log Groups to see what it's doing.
+
