@@ -4,7 +4,7 @@ import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
 import { Position } from './types/position'
 import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
-import { coins, DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
+import { coins, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { CosmWasmClient, ExecuteResult, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import {
   makeExecuteContractMessage,
@@ -106,11 +106,14 @@ export const main = async () => {
   while (true) await run(liquidationHelper, redis)
 }
 
-const getFee = () => {
-  return {
-    amount: coins(62500, 'uosmo'),
-    gas: '25000000' // todo optimise this
+const getFee = async(msgs: EncodeObject[], address: string) => {
+  const gasEstimated = await client.simulate(address, msgs, '');
+  const fee = {
+    amount: coins(0.01, 'uosmo'),
+    gas: Number(gasEstimated*1.3).toString()
   }
+
+  return fee
 }
 
 const sendLiquidationsTx = async(txs: LiquidationTx[], coins: Coin[], liquidationHelper : LiquidationHelper): Promise<LiquidationResult[]> => {
@@ -118,19 +121,24 @@ const sendLiquidationsTx = async(txs: LiquidationTx[], coins: Coin[], liquidatio
 
   const msg = toUtf8(liquidateMsg)
 
-  const msgs = [executeContract(
-    makeExecuteContractMessage(liquidationHelper.getLiquidatorAddress(), liquidationHelper.getLiquidationFiltererContract(), msg,coins).value as MsgExecuteContract
+  const msgs: EncodeObject[] = [
+    executeContract(
+      makeExecuteContractMessage(
+        liquidationHelper.getLiquidatorAddress(), 
+        liquidationHelper.getLiquidationFiltererContract(), 
+        msg,
+        coins).value as MsgExecuteContract
   )]
 
+   
   const result = await signAndBroadcast({
     client: client,
     chainId: process.env.CHAIN_ID!,
     address: liquidationHelper.getLiquidatorAddress(),
     msgs: msgs,
-    fee:getFee(),
+    fee:getFee(msgs,liquidationHelper.getLiquidationFiltererContract()),
     memo:'sss'
-  }
-  )
+  })
 
   if (!result || !result.rawLog) return []
   const events = JSON.parse(result.rawLog)[0]
@@ -237,7 +245,7 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
     collaterals[collateralRecievedDenom] = 0
   }
 
-  const msgs : Object[] = []
+  const msgs : EncodeObject[] = []
 
   // for each asset, create a withdraw message
   Object.keys(collaterals).forEach((denom: string) =>
@@ -260,7 +268,7 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
     chainId: 'localosmosis',
     address: liquidatorAddress,
     msgs: msgs,
-    fee:getFee(),
+    fee:getFee(msgs, liquidationHelper.getLiquidationFiltererContract()),
     memo:'sss'
   })
   
