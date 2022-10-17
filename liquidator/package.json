@@ -7,6 +7,7 @@
   "type": "module",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.188.0",
     "@cosmjs/cosmwasm-stargate": "^0.28.13",
     "@cosmjs/proto-signing": "^0.28.13",
     "@cosmjs/stargate": "^0.28.13",
@@ -17,7 +18,8 @@
     "redis": "^4.3.0",
     "request": "^2.88.2",
     "requests": "^0.3.0",
-    "ts-node": "^10.9.1"
+    "ts-node": "^10.9.1",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/jest": "^29.1.1",

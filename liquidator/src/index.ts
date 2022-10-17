@@ -42,6 +42,7 @@ const {
 
 import { getSigningOsmosisClient, signAndBroadcast } from 'osmojs';
 import { MsgExecuteContract } from 'osmojs/types/proto/cosmwasm/wasm/v1/tx.js'
+import { getSeedPhrase } from './aws.js'
 
 interface Routes {
   // Route for given pair [debt:collateral]
@@ -70,35 +71,36 @@ const addresses: ProtocolAddresses = {
 
 const balances: Map<string, number> = new Map()
 
-let osmosisClient : SigningStargateClient
-let cosmwasmQueryClient : CosmWasmClient
+let client : SigningStargateClient
+let queryClient : CosmWasmClient
 
 // Program entry
 export const main = async () => {
   const redis = new RedisInterface()
   await redis.connect()
 
-  const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(SEED, { prefix: PREFIX })
+  const seedPhrase = await getSeedPhrase()
+  const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(seedPhrase, { prefix: PREFIX })
 
   //The liquidator account should always be the first under that seed
   const liquidatorAddress = (await liquidator.getAccounts())[0].address
   
-  cosmwasmQueryClient = await SigningCosmWasmClient.connectWithSigner(
+  queryClient = await SigningCosmWasmClient.connectWithSigner(
     RPC_ENDPOINT,
     liquidator
   )
 
-  osmosisClient = await getSigningOsmosisClient({rpcEndpoint: RPC_ENDPOINT, signer: liquidator})
+  client = await getSigningOsmosisClient({rpcEndpoint: RPC_ENDPOINT, signer: liquidator})
 
   const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
-  osmosisClient.registry.register(executeTypeUrl, cosmwasm.wasm.v1.MsgExecuteContract)
+  client.registry.register(executeTypeUrl, cosmwasm.wasm.v1.MsgExecuteContract)
     
   const liquidationHelper = new LiquidationHelper(
     liquidatorAddress,
     LIQUIDATION_FILTERER_CONTRACT,
   )
 
-  await setBalances(cosmwasmQueryClient, liquidatorAddress)
+  await setBalances(queryClient, liquidatorAddress)
 
   // run
   while (true) await run(liquidationHelper, redis)
@@ -107,7 +109,7 @@ export const main = async () => {
 const getFee = () => {
   return {
     amount: coins(62500, 'uosmo'),
-    gas: '25000000'
+    gas: '25000000' // todo optimise this
   }
 }
 
@@ -121,10 +123,9 @@ const sendLiquidationsTx = async(txs: LiquidationTx[], coins: Coin[], liquidatio
   )]
 
   const result = await signAndBroadcast({
-    client: osmosisClient,
+    client: client,
     chainId: process.env.CHAIN_ID!,
     address: liquidationHelper.getLiquidatorAddress(),
-    //@ts-ignore
     msgs: msgs,
     fee:getFee(),
     memo:'sss'
@@ -146,8 +147,7 @@ const setBalances = async (client: CosmWasmClient, liquidatorAddress: string) =>
 
 // exported for testing
 export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInterface) => {
-  console.log(`*Running*`)
-  console.log({ balances })
+  console.log("Checking for liquidations")
   const positions: Position[] = await redis.fetchUnhealthyPositions()
   if (positions.length == 0) {
     //sleep to avoid spamming redis db when empty
@@ -254,9 +254,9 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
       tokenOutMinAmount: '10', //todo test slippage
     }))
   )
-
+  console.log(`- Swapping assets...`)
   await signAndBroadcast({
-    client: osmosisClient,
+    client: client,
     chainId: 'localosmosis',
     address: liquidatorAddress,
     msgs: msgs,
