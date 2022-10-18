@@ -110,12 +110,12 @@ func (service *Collector) Run() error {
 			return err
 		}
 
-		service.metricsCache.IncrementBy("collector.contract_items.scanned", scanned)
-		service.metricsCache.IncrementBy("health_checker.accounts.total", int64(len(healthCheckItems)))
-
 		// Enrich the packet sent to the health check service
 		// to include endpoints / etc
 		service.queue.PushMany(service.healthCheckQueueName, healthCheckItems)
+
+		service.metricsCache.IncrementBy("collector.contract_items.scanned", scanned)
+		service.metricsCache.IncrementBy("health_checker.accounts.total", int64(len(healthCheckItems)))
 
 		service.logger.WithFields(logrus.Fields{
 			"total":      len(healthCheckItems),
@@ -187,6 +187,9 @@ func (service *Collector) fetchContractItems(
 	// Example: A contract Map "balances" containing MARS addresses as keys
 	// will have contract state keys returned as "balancesmars..."
 	for _, model := range stateResponse.Models {
+
+		// Track total scanned for metrics
+		totalScanned++
 
 		// Example of a key
 		// 00056465627473002B6F736D6F316379797A7078706C78647A6B656561376B777379646164673837333537716E6168616B616B7375696F6E
@@ -283,9 +286,6 @@ func (service *Collector) fetchContractItems(
 			})
 		}
 		accounts[string(address)] = current
-
-		// Track total scanned for metrics
-		totalScanned++
 	}
 
 	// Construct the resulting output by encoding to JSON

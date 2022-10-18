@@ -3,6 +3,7 @@ package deployer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/kelseyhightower/envconfig"
 	"github.com/sirupsen/logrus"
 )
 
@@ -29,19 +31,31 @@ type AWSECS struct {
 	logger *logrus.Entry
 }
 
+// awsECSConfig specifies the environment config for AWS
+type awsECSConfig struct {
+	ClusterARN     string   `envconfig:"AWS_CLUSTER_ARN" required:"true"`
+	CpuUnits       int      `envconfig:"AWS_SERVICE_CPU_UNITS" required:"true"`
+	MemoryMB       int      `envconfig:"AWS_SERVICE_MEMORY_MB" required:"true"`
+	Subnets        []string `envconfig:"AWS_SERVICE_SUBNETS" required:"true"`
+	SecurityGroups []string `envconfig:"AWS_SERVICE_SECURITY_GROUPS" required:"true"`
+	RoleARN        string   `envconfig:"AWS_ROLE_ARN" required:"true"`
+	Region         string   `envconfig:"AWS_REGION" required:"true"`
+}
+
 // NewAWSECS creates a new instance of the AWS ECS deployer that will deploy
 // the given container in the specified cluster
 func NewAWSECS(
 	service string,
 	container string,
 	containerEnv map[string]string,
-	clusterARN string,
-	cpuUnits int,
-	memoryMB int,
-	subnets []string,
-	securityGroups []string,
 	logger *logrus.Entry,
 ) (*AWSECS, error) {
+
+	var ecsConfig awsECSConfig
+	err := envconfig.Process("", &ecsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to process AWS ECS config: %s", err)
+	}
 
 	// Loads the config from the following environment variables
 	// AWS_ACCESS_KEY_ID
@@ -63,8 +77,11 @@ func NewAWSECS(
 		client,
 		service,
 		container,
-		cpuUnits,
-		memoryMB,
+		ecsConfig.CpuUnits,
+		ecsConfig.MemoryMB,
+		containerEnv,
+		ecsConfig.RoleARN,
+		ecsConfig.Region,
 	)
 	if err != nil {
 		return nil, err
@@ -72,10 +89,10 @@ func NewAWSECS(
 
 	serviceARN, err := getOrCreateService(
 		client,
-		clusterARN,
+		ecsConfig.ClusterARN,
 		service,
-		subnets,
-		securityGroups,
+		ecsConfig.Subnets,
+		ecsConfig.SecurityGroups,
 		taskDefinitionARN,
 	)
 	if err != nil {
@@ -87,7 +104,7 @@ func NewAWSECS(
 		container:         container,
 		containerEnv:      containerEnv,
 		client:            client,
-		clusterARN:        clusterARN,
+		clusterARN:        ecsConfig.ClusterARN,
 		taskDefinitionARN: taskDefinitionARN,
 		serviceARN:        serviceARN,
 		logger: logger.WithFields(logrus.Fields{
@@ -211,6 +228,9 @@ func getOrCreateTaskDefinition(
 	container string,
 	cpuUnits int,
 	memoryMB int,
+	containerEnv map[string]string,
+	roleARN string,
+	region string,
 ) (string, error) {
 	// Check if we have a task definition already
 	// 10 second AWS timeout
@@ -223,11 +243,15 @@ func getOrCreateTaskDefinition(
 		})
 	if err != nil {
 
-		// TODO: Add environment variables
-		// var env []string
-		// for key, value := range dep.containerEnv {
-		// 	env = append(env, fmt.Sprintf("%s=%s", key, value))
-		// }
+		// Add environment variables
+		var env []types.KeyValuePair
+		for key, value := range containerEnv {
+			// env = append(env, fmt.Sprintf("%s=%s", key, value))
+			env = append(env, types.KeyValuePair{
+				Name:  aws.String(key),
+				Value: aws.String(value),
+			})
+		}
 
 		// If we get an error we most likely don't have a task definition
 		// deployed yet, so we create a new one
@@ -238,21 +262,31 @@ func getOrCreateTaskDefinition(
 			&ecs.RegisterTaskDefinitionInput{
 				ContainerDefinitions: []types.ContainerDefinition{
 					{
-						Name:   aws.String(service),
-						Image:  aws.String(container),
-						Cpu:    *aws.Int32(int32(cpuUnits)),
-						Memory: aws.Int32(int32(memoryMB)),
+						Name:        aws.String(service),
+						Image:       aws.String(container),
+						Cpu:         *aws.Int32(int32(cpuUnits)),
+						Memory:      aws.Int32(int32(memoryMB)),
+						Environment: env,
+						LogConfiguration: &types.LogConfiguration{
+							LogDriver: types.LogDriverAwslogs,
+							Options: map[string]string{
+								"awslogs-group":         fmt.Sprintf("/ecs/%s", service),
+								"awslogs-region":        region,
+								"awslogs-stream-prefix": "ecs",
+							},
+						},
 					},
 				},
 				RuntimePlatform: &types.RuntimePlatform{
 					OperatingSystemFamily: types.OSFamilyLinux,
 					CpuArchitecture:       types.CPUArchitectureX8664,
 				},
-				Cpu:         aws.String(strconv.Itoa(cpuUnits)),
-				Memory:      aws.String(strconv.Itoa(memoryMB)),
-				NetworkMode: types.NetworkModeAwsvpc,
-				Family:      aws.String(service),
-				TaskRoleArn: aws.String(""),
+				Cpu:              aws.String(strconv.Itoa(cpuUnits)),
+				Memory:           aws.String(strconv.Itoa(memoryMB)),
+				NetworkMode:      types.NetworkModeAwsvpc,
+				Family:           aws.String(service),
+				TaskRoleArn:      aws.String(""),
+				ExecutionRoleArn: aws.String(roleARN),
 				RequiresCompatibilities: []types.Compatibility{
 					types.CompatibilityFargate,
 				},
@@ -325,6 +359,7 @@ func getOrCreateService(
 		// Service registered
 		return aws.ToString(service.Service.ServiceArn), nil
 	}
+
 	// Existing service
 	return aws.ToString(service.ServiceArn), nil
 }

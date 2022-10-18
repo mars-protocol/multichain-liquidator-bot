@@ -131,26 +131,29 @@ func main() {
 	// Set up the deployer, AWS or Docker
 	// The deployers need the container images for collector, health-checker
 	// and liquidator
+	collectorConfig, err := parseConfig(config.CollectorConfig)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	healthCheckerConfig, err := parseConfig(config.HealthCheckerConfig)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	executorConfig, err := parseConfig(config.ExecutorConfig)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	switch strings.ToLower(config.DeployerType) {
 	case DeployerTypeDocker:
-
-		serviceConfig, err := parseConfig(config.CollectorConfig)
-		if err != nil {
-			logger.Fatal(err)
-		}
 
 		// Set up the collector's deployer
 		collectorDeployer, err = deployer.NewDocker(
 			"collector",
 			config.CollectorImage,
-			serviceConfig,
+			collectorConfig,
 			logger,
 		)
-		if err != nil {
-			logger.Fatal(err)
-		}
-
-		serviceConfig, err = parseConfig(config.HealthCheckerConfig)
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -159,14 +162,9 @@ func main() {
 		healthCheckerDeployer, err = deployer.NewDocker(
 			"health-checker",
 			config.HealthCheckerImage,
-			serviceConfig,
+			healthCheckerConfig,
 			logger,
 		)
-		if err != nil {
-			logger.Fatal(err)
-		}
-
-		serviceConfig, err = parseConfig(config.ExecutorConfig)
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -175,7 +173,7 @@ func main() {
 		executorDeployer, err = deployer.NewDocker(
 			"executor",
 			config.ExecutorImage,
-			serviceConfig,
+			executorConfig,
 			logger,
 		)
 		if err != nil {
@@ -183,6 +181,40 @@ func main() {
 		}
 
 	case DeployerTypeECS:
+
+		// Set up the collector's deployer
+		collectorDeployer, err = deployer.NewAWSECS(
+			"collector",
+			config.CollectorImage,
+			collectorConfig,
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		// Set up the health checker's deployer
+		healthCheckerDeployer, err = deployer.NewAWSECS(
+			"health-checker",
+			config.HealthCheckerImage,
+			healthCheckerConfig,
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
+		// Set up the executor's deployer
+		executorDeployer, err = deployer.NewAWSECS(
+			"executor",
+			config.ExecutorImage,
+			executorConfig,
+			logger,
+		)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
 	default:
 		logger.Fatal("Invalid deployer type specified: ", config.DeployerType)
 
