@@ -11,6 +11,7 @@
     "@cosmjs/cosmwasm-stargate": "^0.28.13",
     "@cosmjs/proto-signing": "^0.28.13",
     "@cosmjs/stargate": "^0.28.13",
+    "@cosmology/core": "^1.10.0",
     "cosmology": "^0.10.3",
     "dotenv": "^16.0.2",
     "node-fetch": "^3.2.10",
