@@ -36,7 +36,7 @@
   "scripts": {
     "test:integration": "node --loader ts-node/esm test/integration/liquidation_test.ts",
     "build": "tsc --project tsconfig.json",
-    "start": "node --loader ts-node/esm src/index.ts",
+    "start": "node --loader ts-node/esm src/main.ts",
     "test": "jest",
     "lint": "yarn format-check && eslint . && yarn build",
     "format": "prettier --write .",

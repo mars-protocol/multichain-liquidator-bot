@@ -10,4 +10,4 @@ RUN npm install
 
 RUN npx tsc --project tsconfig.json
 
-CMD node ./build/src/index.js
+CMD node ./build/src/main.js

@@ -13,7 +13,7 @@ import { HdPath } from '@cosmjs/crypto'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { GasPrice } from '@cosmjs/stargate'
 import { RedisClientType } from 'redis'
-import { run } from '../../src/index.js'
+import { run } from '../../src/main.js'
 import { LiquidationHelper } from '../../src/liquidation_helpers.js'
 import { RedisInterface } from '../../src/redis.js'
 import {
