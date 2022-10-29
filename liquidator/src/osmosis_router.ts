@@ -1,37 +1,11 @@
 import { OsmosisApiClient } from "@cosmology/core/types/clients/osmosis";
-import { CoinDenom, getPricesFromCoinGecko, LcdPool, makePoolPairs, makePoolsPretty, osmoDenomToSymbol, PrettyPair, PrettyPool, prettyPool, TradeRoute } from "cosmology";
-type CoinSymbol =
-    'ATOM' |
-    'OSMO' |
-    'ION' |
-    'AKT' |
-    'DVPN' |
-    'IRIS' |
-    'CRO' |
-    'XPRT' |
-    'REGEN' |
-    'IOV' |
-    'NGM' |
-    'EEUR' |
-    'JUNO' |
-    'LIKE' |
-    'USTC' |
-    'LUNC' |
-    'BCNA' |
-    'SCRT' |
-    'MED'
+import { CoinDenom, getPricesFromCoinGecko, makePoolPairs, makePoolsPretty, osmoDenomToSymbol, PrettyPair, PrettyPool, TradeRoute, CoinSymbol } from "cosmology";
 
-export interface CoinValue {
-    denom: string,
-    amount: string
-}
 
-export interface Trade {
-    sell: CoinValue;
-    buy: CoinValue;
-    beliefValue: string;
-}
 
+/**
+ * Responsible for 
+ */
 class OsmosisRouter {
     private lcdApi : OsmosisApiClient
     private pools: PrettyPool[] 
@@ -87,31 +61,43 @@ class OsmosisRouter {
         if (!routeOptions) {
             throw new Error('no trade routes found!');
         }
-        // todo for each route option, check liquidity
+        // for each route, check liqudity
+        // map each route into the smallest liqudiity - in dollars
+        // return the max of this
         return routeOptions[0]
-
     }
 
-    routeThroughPool(denom: CoinDenom, tokenInDenom: string, tokenOutDenom: string, pairs: PrettyPair[] ): TradeRoute[] {
-        const symbol : CoinSymbol = osmoDenomToSymbol(denom) 
+    /**
+     * Finds a multi hop route through an intermediary pool, or returns an empty list if no route is found.
+     * 
+     * Useful if you want to swap Asset A to B have no direct pool with a A:B, as it confirms a route for a given
+     * hop token denom, e.g [A:hopDenom, hopDenom:B] to swap A->B.
+     * @param hopDenom The denom used to hop through.
+     * @param tokenInDenom The denom of the asset we are selling
+     * @param tokenOutDenom The denom of the asset we are buying
+     * @param pairs Available pairs on the given osmosis network
+     * @returns A multihop route through the given hop denom, or and empty route if no such route exists
+     */
+    routeThroughPool(hopDenom: CoinDenom, tokenInDenom: string, tokenOutDenom: string, pairs: PrettyPair[] ): TradeRoute[] {
+        const symbol : CoinSymbol = osmoDenomToSymbol(hopDenom) 
       
         const sellPool = pairs.find(
           (pair) =>
-            (pair.base_address == tokenInDenom && pair.quote_address == denom) ||
-            (pair.quote_address == tokenInDenom && pair.base_address == denom)
+            (pair.base_address == tokenInDenom && pair.quote_address == hopDenom) ||
+            (pair.quote_address == tokenInDenom && pair.base_address == hopDenom)
         )
       
         const buyPool = pairs.find(
           (pair) =>
-            (pair.base_address == denom && pair.quote_address == tokenOutDenom) ||
-            (pair.quote_address == denom && pair.base_address == tokenOutDenom)
+            (pair.base_address == hopDenom && pair.quote_address == tokenOutDenom) ||
+            (pair.quote_address == hopDenom && pair.base_address == tokenOutDenom)
         )
       
         if (sellPool && buyPool) {
           const routes = [
             {
               poolId: sellPool.id,
-              tokenOutDenom: denom,
+              tokenOutDenom: hopDenom,
               tokenOutSymbol: symbol,
               tokenInSymbol: osmoDenomToSymbol(tokenInDenom),
               liquidity: sellPool.liquidity
