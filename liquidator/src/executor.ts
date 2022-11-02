@@ -57,9 +57,6 @@ interface Collaterals {
   [key: string]: number
 }
 
-// todo don't store in .env
-const SEED = process.env.SEED!
-
 const addresses: ProtocolAddresses = {
   oracle: process.env.CONTRACT_ORACLE_ADDRESS as string,
   redBank: process.env.CONTRACT_REDBANK_ADDRESS as string,
@@ -74,36 +71,55 @@ const balances: Map<string, number> = new Map()
 let client : SigningStargateClient
 let queryClient : CosmWasmClient
 
-// Program entry
-export const main = async () => {
-  const redis = new RedisInterface()
-  await redis.connect()
+// Default just reads from db
+const getDefaultSecretManager = (): SecretManager => {
+ return {
+  getSeedPhrase: () => process.env.SEED!
+ }
+}
 
-  const seedPhrase = await getSeedPhrase()
-  const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(seedPhrase, { prefix: PREFIX })
+/**
+ * Executor class is the entry point for the executor service
+ * 
+ * @param sm An optional parameter. If you want to use a secret manager to hold the seed 
+ *           phrase, implement the secret manager interface and pass as a dependency.
+ */
+export class Executor {
+  private sm : SecretManager
+  constructor(sm? : SecretManager) {
+    this.sm = !sm ? getDefaultSecretManager() : sm
+  }
 
-  //The liquidator account should always be the first under that seed
-  const liquidatorAddress = (await liquidator.getAccounts())[0].address
+  async start() {
+    const redis = new RedisInterface()
+    await redis.connect()
   
-  queryClient = await SigningCosmWasmClient.connectWithSigner(
-    RPC_ENDPOINT,
-    liquidator
-  )
-
-  client = await getSigningOsmosisClient({rpcEndpoint: RPC_ENDPOINT, signer: liquidator})
-
-  const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
-  client.registry.register(executeTypeUrl, cosmwasm.wasm.v1.MsgExecuteContract)
+    const seedPhrase = await getSeedPhrase()
+    const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(seedPhrase, { prefix: PREFIX })
+  
+    //The liquidator account should always be the first under that seed
+    const liquidatorAddress = (await liquidator.getAccounts())[0].address
     
-  const liquidationHelper = new LiquidationHelper(
-    liquidatorAddress,
-    LIQUIDATION_FILTERER_CONTRACT,
-  )
-
-  await setBalances(queryClient, liquidatorAddress)
-
-  // run
-  while (true) await run(liquidationHelper, redis)
+    queryClient = await SigningCosmWasmClient.connectWithSigner(
+      RPC_ENDPOINT,
+      liquidator
+    )
+  
+    client = await getSigningOsmosisClient({rpcEndpoint: RPC_ENDPOINT, signer: liquidator})
+  
+    const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
+    client.registry.register(executeTypeUrl, cosmwasm.wasm.v1.MsgExecuteContract)
+      
+    const liquidationHelper = new LiquidationHelper(
+      liquidatorAddress,
+      LIQUIDATION_FILTERER_CONTRACT,
+    )
+  
+    await setBalances(queryClient, liquidatorAddress)
+  
+    // run
+    while (true) await run(liquidationHelper, redis)
+  }
 }
 
 const getFee = async(msgs: EncodeObject[], address: string) => {
@@ -137,7 +153,7 @@ const sendLiquidationsTx = async(txs: LiquidationTx[], coins: Coin[], liquidatio
     address: liquidationHelper.getLiquidatorAddress(),
     msgs: msgs,
     fee:getFee(msgs,liquidationHelper.getLiquidationFiltererContract()),
-    memo:'sss'
+    memo:''
   })
 
   if (!result || !result.rawLog) return []
@@ -274,8 +290,3 @@ export const run = async (liquidationHelper: LiquidationHelper, redis: IRedisInt
   
   console.log(`- Lquidation Process Complete.`)
 }
-
-main().catch((e) => {
-  console.log(e)
-  process.exit(1)
-})
