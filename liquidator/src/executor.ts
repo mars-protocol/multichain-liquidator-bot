@@ -42,7 +42,6 @@ const {
 
 import { getSigningOsmosisClient, signAndBroadcast } from 'osmojs';
 import { MsgExecuteContract } from 'osmojs/types/proto/cosmwasm/wasm/v1/tx.js'
-import { getSeedPhrase } from './aws.js'
 
 interface Routes {
   // Route for given pair [debt:collateral]
@@ -71,11 +70,17 @@ const balances: Map<string, number> = new Map()
 let client : SigningStargateClient
 let queryClient : CosmWasmClient
 
-// Default just reads from db
 const getDefaultSecretManager = (): SecretManager => {
- return {
-  getSeedPhrase: () => process.env.SEED!
- }
+  return {
+    getSeedPhrase: async () => {
+      
+      const seed = process.env.SEED
+      if (!seed) 
+        throw Error("Failed to find SEED environment variable. Add your seed phrase to the SEED environment variable or implement a secret manager instance")
+
+      return seed
+    }
+  }
 }
 
 /**
@@ -94,7 +99,7 @@ export class Executor {
     const redis = new RedisInterface()
     await redis.connect()
   
-    const seedPhrase = await getSeedPhrase()
+    const seedPhrase = await this.sm.getSeedPhrase()
     const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(seedPhrase, { prefix: PREFIX })
   
     //The liquidator account should always be the first under that seed
