@@ -1,4 +1,4 @@
-import { run } from '../src/main'
+import { run } from '../src/executor'
 import { IRedisInterface } from '../src/redis.js'
 import { LiquidationHelper } from '../src/liquidation_helpers.js'
 import { Position } from '../src/types/position'
