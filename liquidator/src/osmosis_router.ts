@@ -1,69 +1,85 @@
-import { OsmosisApiClient } from "@cosmology/core/types/clients/osmosis";
-import { CoinDenom, getPricesFromCoinGecko, makePoolPairs, makePoolsPretty, osmoDenomToSymbol, PrettyPair, PrettyPool, TradeRoute, CoinSymbol } from "cosmology";
+import { 
+  CoinDenom, 
+  osmoDenomToSymbol, 
+  CoinSymbol 
+} from "cosmology";
+import { osmosis } from "osmojs";
+import { Pool } from "osmojs/types/codegen/osmosis/gamm/pool-models/balancer/balancerPool";
 
-
+const BASE_ASSET_INDEX = 0
+const QUOTE_ASSET_INDEX = 1
 
 /**
- * Responsible for 
+ * Router provides a route to swap between any two given assets.
+ * 
  */
-class OsmosisRouter {
-    private lcdApi : OsmosisApiClient
-    private pools: PrettyPool[] 
-    constructor(lcdUrl: string) {
-        this.lcdApi = new OsmosisApiClient({
-            url: lcdUrl
-          });
-
+export class OsmosisRouter {
+    private rpcEndpoint: string 
+    private pools: Pool[] 
+    constructor(rpcEndpoint: string) {
+        this.rpcEndpoint = rpcEndpoint
         this.pools = []
     }
 
+    // Instantiate our pools
     async init() : Promise<boolean> {
-        const prices = await getPricesFromCoinGecko();
-        this.pools = makePoolsPretty(prices, (await this.lcdApi.getPools()).pools)
+        const client = await osmosis.ClientFactory.createRPCQueryClient({ rpcEndpoint:this.rpcEndpoint })
+        const poolResponse = await client.osmosis.gamm.v1beta1.pools()
 
+        this.pools = poolResponse.pools.map(({ value }) => {
+          return osmosis.gamm.v1beta1.Pool.decode(value);
+        });
         return true
     }
 
-    getRoute(tokenInDenom: string, tokenOutDenom: string, amount: string) : TradeRoute[] {
-        return this.lookupRoutesForTrade(tokenInDenom, tokenOutDenom, makePoolPairs(this.pools))
+    getRoute(tokenInDenom: string, tokenOutDenom: string) : OsmosisRouteHop[] {
+        return this.lookupRoutesForTrade(tokenInDenom, tokenOutDenom, this.pools)
     }
 
-    lookupRoutesForTrade(tokenInDenom: string, tokenOutDenom:string, pairs: PrettyPair[]): TradeRoute[] {
-        const directPool = pairs.find(
-          (pair) =>
-            (pair.base_address == tokenInDenom &&
-              pair.quote_address == tokenOutDenom) ||
-            (pair.quote_address == tokenInDenom &&
-              pair.base_address == tokenOutDenom)
+    private lookupRoutesForTrade(tokenInDenom: string, tokenOutDenom:string, pools: Pool[]): OsmosisRouteHop[] {
+        const directPool = pools.find(
+          (pool) =>
+            (pool.poolAssets[BASE_ASSET_INDEX].token?.denom == tokenInDenom &&
+              pool.poolAssets[BASE_ASSET_INDEX].token?.denom == tokenOutDenom) ||
+            (pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom == tokenInDenom &&
+              pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom == tokenOutDenom)
         )
       
         if (directPool) {
           return [
             {
               poolId: directPool.id,
-              tokenOutDenom: tokenOutDenom,
-              tokenOutSymbol: osmoDenomToSymbol(tokenOutDenom),
-              tokenInSymbol: osmoDenomToSymbol(tokenInDenom),
-              liquidity: directPool.liquidity
+              tokenIn: tokenInDenom,
+              tokenOut: tokenOutDenom
             }
           ]
         }
       
         // all pairs that have our sell asset
-        const possibleStartingPairs = pairs.filter((pair)=> pair.base_address === tokenInDenom || pair.quote_address === tokenInDenom)
+        const possibleStartingPairs = pools.filter(
+            (pool) => pool.poolAssets[BASE_ASSET_INDEX].token?.denom === tokenInDenom || 
+              pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom === tokenInDenom)
 
         // for each starting pair, find the denom that is not our sell denom and try find a pool with it
-        const routeOptions : TradeRoute[][] = possibleStartingPairs.map((pair) => {
-            const useableDenom = pair.base_address === tokenInDenom ? pair.quote_address : pair.base_address
-            return this.routeThroughPool(useableDenom, tokenInDenom, tokenOutDenom, pairs)
+        const routeOptions : OsmosisRouteHop[][] = possibleStartingPairs.map((pair) => {
+            const baseAssetAddress = pair.poolAssets[BASE_ASSET_INDEX].token?.denom
+            const quoteAssetAddress = pair.poolAssets[QUOTE_ASSET_INDEX].token?.denom
+
+            if (!baseAssetAddress || !quoteAssetAddress) {
+              return []
+            }
+            const useableDenom = baseAssetAddress === tokenInDenom ? quoteAssetAddress : baseAssetAddress
+            return this.routeThroughPool(useableDenom, tokenInDenom, tokenOutDenom, pools)
         })
 
         if (!routeOptions) {
-            throw new Error('no trade routes found!');
+            throw new Error('no trade routes found!')
         }
+
         // for each route, check liqudity
         // map each route into the smallest liqudiity - in dollars
         // return the max of this
+        routeOptions[0]
         return routeOptions[0]
     }
 
@@ -75,39 +91,35 @@ class OsmosisRouter {
      * @param hopDenom The denom used to hop through.
      * @param tokenInDenom The denom of the asset we are selling
      * @param tokenOutDenom The denom of the asset we are buying
-     * @param pairs Available pairs on the given osmosis network
+     * @param pools Available pairs on the given osmosis network
      * @returns A multihop route through the given hop denom, or and empty route if no such route exists
      */
-    routeThroughPool(hopDenom: CoinDenom, tokenInDenom: string, tokenOutDenom: string, pairs: PrettyPair[] ): TradeRoute[] {
+    private routeThroughPool(hopDenom: CoinDenom, tokenInDenom: string, tokenOutDenom: string, pools: Pool[] ): OsmosisRouteHop[] {
         const symbol : CoinSymbol = osmoDenomToSymbol(hopDenom) 
       
-        const sellPool = pairs.find(
-          (pair) =>
-            (pair.base_address == tokenInDenom && pair.quote_address == hopDenom) ||
-            (pair.quote_address == tokenInDenom && pair.base_address == hopDenom)
+        const sellPool = pools.find(
+          (pool) =>
+            (pool.poolAssets[BASE_ASSET_INDEX].token?.denom == tokenInDenom && pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom == hopDenom) ||
+            (pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom == tokenInDenom && pool.poolAssets[BASE_ASSET_INDEX].token?.denom == hopDenom)
         )
       
-        const buyPool = pairs.find(
-          (pair) =>
-            (pair.base_address == hopDenom && pair.quote_address == tokenOutDenom) ||
-            (pair.quote_address == hopDenom && pair.base_address == tokenOutDenom)
+        const buyPool = pools.find(
+          (pool) =>
+            (pool.poolAssets[BASE_ASSET_INDEX].token?.denom == hopDenom && pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom == tokenOutDenom) ||
+            (pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom == hopDenom && pool.poolAssets[BASE_ASSET_INDEX].token?.denom == tokenOutDenom)
         )
       
         if (sellPool && buyPool) {
           const routes = [
             {
               poolId: sellPool.id,
-              tokenOutDenom: hopDenom,
-              tokenOutSymbol: symbol,
-              tokenInSymbol: osmoDenomToSymbol(tokenInDenom),
-              liquidity: sellPool.liquidity
+              tokenIn: tokenInDenom,
+              tokenOut: tokenOutDenom,
             },
             {
               poolId: buyPool.id,
-              tokenOutDenom: tokenOutDenom,
-              tokenOutSymbol: osmoDenomToSymbol(tokenOutDenom),
-              tokenInSymbol: symbol,
-              liquidity: buyPool.liquidity
+              tokenIn: tokenInDenom,
+              tokenOut: tokenOutDenom,
             }
           ];
       
