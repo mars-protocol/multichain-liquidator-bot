@@ -1,7 +1,5 @@
 import { 
-  CoinDenom, 
-  osmoDenomToSymbol, 
-  CoinSymbol 
+  CoinDenom
 } from "cosmology";
 import { osmosis } from "osmojs";
 import { Pool } from "osmojs/types/codegen/osmosis/gamm/pool-models/balancer/balancerPool";
@@ -37,12 +35,13 @@ export class OsmosisRouter {
     }
 
     private lookupRoutesForTrade(tokenInDenom: string, tokenOutDenom:string, pools: Pool[]): OsmosisRouteHop[] {
-        const directPool = pools.find(
+       
+      const directPool = pools.find(
           (pool) =>
-            (pool.poolAssets[BASE_ASSET_INDEX].token?.denom == tokenInDenom &&
-              pool.poolAssets[BASE_ASSET_INDEX].token?.denom == tokenOutDenom) ||
-            (pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom == tokenInDenom &&
-              pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom == tokenOutDenom)
+            (pool.poolAssets[BASE_ASSET_INDEX].token?.denom === tokenInDenom &&
+              pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom === tokenOutDenom) ||
+            (pool.poolAssets[QUOTE_ASSET_INDEX].token?.denom === tokenInDenom &&
+              pool.poolAssets[BASE_ASSET_INDEX].token?.denom === tokenOutDenom)
         )
       
         if (directPool) {
@@ -76,9 +75,7 @@ export class OsmosisRouter {
             throw new Error('no trade routes found!')
         }
 
-        // for each route, check liqudity
-        // map each route into the smallest liqudiity - in dollars
-        // return the max of this
+        // TODO - return the route with the best liqudity
         routeOptions[0]
         return routeOptions[0]
     }
@@ -95,7 +92,6 @@ export class OsmosisRouter {
      * @returns A multihop route through the given hop denom, or and empty route if no such route exists
      */
     private routeThroughPool(hopDenom: CoinDenom, tokenInDenom: string, tokenOutDenom: string, pools: Pool[] ): OsmosisRouteHop[] {
-        const symbol : CoinSymbol = osmoDenomToSymbol(hopDenom) 
       
         const sellPool = pools.find(
           (pool) =>
