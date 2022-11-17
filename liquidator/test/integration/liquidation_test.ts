@@ -13,7 +13,6 @@ import { HdPath } from '@cosmjs/crypto'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { GasPrice } from '@cosmjs/stargate'
 import { RedisClientType } from 'redis'
-import { run } from '../../src/executor.js'
 import { LiquidationHelper } from '../../src/liquidation_helpers.js'
 import { RedisInterface } from '../../src/redis.js'
 import {
@@ -28,6 +27,7 @@ import {
 import { Position } from '../../src/types/position'
 import path from 'path'
 import 'dotenv/config.js'
+import { Executor } from '../../src/executor.js'
 
 const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
 
@@ -39,9 +39,9 @@ const deployerSeed =
   'notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius'
 
 // preferentially run tests on local ososis
-const localOsmosisRPC = 'http://localhost:26657'
+const localOsmosisRPC = 'http://localhost:26659'
 
-const redisInterface = new RedisInterface(redisQueueName)
+const redisInterface = new RedisInterface()
 
 // run test
 const runTest = async () => {
@@ -74,7 +74,7 @@ const runTest = async () => {
   )
   const deployerAddress = accounts[0].address
 
-  const liquidationHelper = new LiquidationHelper(client, deployerAddress, addresses.filterer)
+  const liquidationHelper = new LiquidationHelper(deployerAddress, addresses.filterer)
 
   const osmoToSend = { amount: '11000000', denom: osmoDenom }
   const atomToSend = { amount: '10000000', denom: atomDenom }
@@ -156,27 +156,18 @@ const pushPositionsToRedis = async (addresses: string[], redisClient: RedisClien
   for (const index in addresses) {
     console.log(`pushing position to redis: ${addresses[index]}`)
     const position: Position = {
-      Address: addresses[index],
-      collaterals: [
-        {
-          amount: 10000000,
-          token: osmoDenom,
-        },
-      ],
-      Debts: [
-        {
-          amount: 3000000,
-          token: atomDenom,
-        },
-      ],
+      Address: addresses[index]
     }
 
     await redisClient.lPush(redisQueueName, JSON.stringify(position))
   }
 }
 
-const dispatchLiquidations = async (liquidationHelper: LiquidationHelper) => {
-  await run(liquidationHelper, redisInterface)
+const dispatchLiquidations = async (liquidationHelper : LiquidationHelper) => {
+  const executor = new Executor()
+
+  const {redis} = await executor.initiate()
+  await executor.run(liquidationHelper, redis)
 }
 
 // // used for debugging tests
