@@ -7,11 +7,17 @@ import { Pool } from "osmojs/types/codegen/osmosis/gamm/pool-models/balancer/bal
 const BASE_ASSET_INDEX = 0
 const QUOTE_ASSET_INDEX = 1
 
+export interface OsmosisRouterInterface {
+  init(): Promise<boolean>
+  getRoute(tokenInDenom: string, tokenOutDenom: string) : OsmosisRouteHop[]
+}
+
+
 /**
  * Router provides a route to swap between any two given assets.
  * 
  */
-export class OsmosisRouter {
+export class OsmosisRouter implements OsmosisRouterInterface {
     private rpcEndpoint: string 
     private pools: Pool[] 
     constructor(rpcEndpoint: string) {
