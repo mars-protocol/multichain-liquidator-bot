@@ -25,7 +25,7 @@ export const calculateOutputXYKPool = (x1 : number, y1 : number, xChange : numbe
  * @param y1 Number of y tokens in the pool before the swap
  * @param x1 Number of x tokens in the pool before the swap
  * @param xChange The number of x tokens we are selling
- * @return The number of y tokens we will recieve
+ * @return The price impact of the swap, measured in basis points  
  */
 export const calculateSlippageBp = (x1: number, y1 : number, xChange : number) => {
 
@@ -36,6 +36,6 @@ export const calculateSlippageBp = (x1: number, y1 : number, xChange : number) =
     // scale to percentage
     const percentageDifference = (priceDifference / initialPrice) * 100
 
-    // scale to bp
+    // scale to bp (e.g 1% is 100bp)
     return percentageDifference * 100
 }
