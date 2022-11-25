@@ -2,6 +2,7 @@ import { AMMRouter } from "../src/amm_router"
 import { Coin } from "@cosmjs/amino"
 import { Pool } from "../src/types/Pool"
 import Long from "long"
+import BigNumber from "bignumber.js"
 
 
 const generateRandomPoolAsset =(
@@ -215,10 +216,10 @@ describe('Osmosis Router Tests', () => {
         expect(routes.length).toBe(2)
     })
 
-    test('We find multiple routes when depth of both routes is > 1', ()=> {
+    test('We find cheapest route', ()=> {
 
 
-        // routea = "osmo:atom:shit:shit2:stable"
+        // routea = "osmo:shit:stable"
         // routeb = "osmo:atom:stable"
         const osmoDenom = 'osmo'
         const atomDenom = 'atom'
@@ -227,24 +228,21 @@ describe('Osmosis Router Tests', () => {
         const stableDenom = 'stable'
         const pools = [
             generateRandomPool(
-                [generateRandomPoolAsset(osmoDenom), generateRandomPoolAsset(atomDenom)]
-            ),
-            generateRandomPool(),
-            generateRandomPool(
-                [generateRandomPoolAsset(atomDenom), generateRandomPoolAsset(shitDenom)]
-                ),
-            generateRandomPool(),
-            generateRandomPool(
-                [generateRandomPoolAsset(shitDenom), generateRandomPoolAsset(hex)]
-            ),
-            generateRandomPool(),
-            generateRandomPool(
-                [generateRandomPoolAsset(hex), generateRandomPoolAsset(stableDenom)]
+                [generateRandomPoolAsset(osmoDenom, '100'), generateRandomPoolAsset(atomDenom,'100')]
             ),
             generateRandomPool(),
             generateRandomPool(),
             generateRandomPool(
-                [generateRandomPoolAsset(atomDenom), generateRandomPoolAsset(stableDenom)]
+                [generateRandomPoolAsset(shitDenom, '100'), generateRandomPoolAsset(osmoDenom, '101')]
+            ),
+            generateRandomPool(),
+            generateRandomPool(
+                [generateRandomPoolAsset(shitDenom, '100'), generateRandomPoolAsset(stableDenom, '100')]
+            ),
+            generateRandomPool(),
+            generateRandomPool(),
+            generateRandomPool(
+                [generateRandomPoolAsset(atomDenom, '100'), generateRandomPoolAsset(stableDenom, '100')]
             )
         ]
 
@@ -254,8 +252,15 @@ describe('Osmosis Router Tests', () => {
         const routes = router.getRoutes(osmoDenom, stableDenom)
 
         expect(routes.length).toBe(2)
+
+        const route1Cost = router.getEstimatedOutput(new BigNumber(1), routes[0])
+        const route2cost = router.getEstimatedOutput(new BigNumber(1), routes[1])
+
+        // our first route should have better pricing
+        expect(route1Cost.toNumber()).toBeGreaterThan(route2cost.toNumber())
     })
 
     // test we can correctly identify cheapest route
+
     // test we correctly identify longer route when cheaper
 })

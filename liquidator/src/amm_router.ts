@@ -1,6 +1,6 @@
 import BigNumber from "bignumber.js";
 import { calculateOutputXYKPool } from "./math";
-import { RouteHop } from "./types/OsmosisRouteHop";
+import { RouteHop } from "./types/RouteHop";
 import { Pool } from "./types/Pool";
 
 const BASE_ASSET_INDEX = 0
@@ -31,10 +31,17 @@ export class AMMRouter implements AMMRouterInterface {
      * @return The estimated amount of asset we think we will recieve
      */
     getEstimatedOutput(tokenInAmount: BigNumber, route: RouteHop[]): BigNumber {
-      let amountAfterFees = BigNumber(0)
+
+      let amountAfterFees = new BigNumber(0)
+
+      if(tokenInAmount.isEqualTo(0)) {
+        console.log("ERROR - cannot use token in amount of 0")
+        return amountAfterFees
+      }
+
       // for each hop
       route.forEach((routeHop) => {
-        const amountBeforeFees = calculateOutputXYKPool(routeHop.x1, routeHop.y1, tokenInAmount)
+        const amountBeforeFees = calculateOutputXYKPool(new BigNumber(routeHop.x1), new BigNumber(routeHop.y1), new BigNumber(tokenInAmount))
         amountAfterFees = amountBeforeFees.minus(amountBeforeFees.multipliedBy(routeHop.swapFee))
         tokenInAmount = amountAfterFees
       })
