@@ -1,5 +1,5 @@
 import BigNumber from "bignumber.js";
-import { calculateOutputXYKPool } from "./math";
+import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from "./math";
 import { RouteHop } from "./types/RouteHop";
 import { Pool } from "./types/Pool";
 
@@ -44,6 +44,25 @@ export class AMMRouter implements AMMRouterInterface {
         const amountBeforeFees = calculateOutputXYKPool(new BigNumber(routeHop.x1), new BigNumber(routeHop.y1), new BigNumber(tokenInAmount))
         amountAfterFees = amountBeforeFees.minus(amountBeforeFees.multipliedBy(routeHop.swapFee))
         tokenInAmount = amountAfterFees
+      })
+
+      return amountAfterFees
+    }
+
+    // todo hea
+    getEstimatedRequiredInput(tokenOutRequired: BigNumber, route: RouteHop[]) : BigNumber {
+      let amountAfterFees = new BigNumber(0)
+
+      if(tokenOutRequired.isEqualTo(0)) {
+        console.log("ERROR - cannot use token out amount of 0")
+        return amountAfterFees
+      }
+
+      // for each hop
+      route.forEach((routeHop) => {
+        const amountInBeforeFees = calculateRequiredInputXYKPool(new BigNumber(routeHop.x1), new BigNumber(routeHop.y1), new BigNumber(tokenOutRequired))
+        amountAfterFees = amountInBeforeFees.plus(tokenOutRequired.multipliedBy(routeHop.swapFee))
+        tokenOutRequired = amountAfterFees
       })
 
       return amountAfterFees
