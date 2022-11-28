@@ -12,9 +12,25 @@ import BigNumber from "bignumber.js"
  * @return The number of y tokens we will recieve
  */
 export const calculateOutputXYKPool = (x1 : BigNumber, y1 : BigNumber, xChange : BigNumber) => {
-    
     // ∆y = (∆x / (x1 + ∆x)) * y1
     return xChange.dividedBy(x1.plus(xChange)).multipliedBy(y1)
+}
+
+/**
+ * Calculates the output of x we need to sell to recieve the desired amount of y.
+ * 
+ * In this case, x is the token we are putting into the pool (selling), y is the token we are
+ * taking out (buying)
+ * 
+ * @param y1 Number of y tokens in the pool before the swap
+ * @param x1 Number of x tokens in the pool before the swap
+ * @param yChange The number of y tokens we are wanting to buy
+ * @return The number of y tokens we will recieve
+ */
+ export const calculateRequiredInputXYKPool = (x1 : BigNumber, y1 : BigNumber, yChange : BigNumber) => {
+    // ∆x = (∆y / (y1 - ∆y)) * x1
+
+    return yChange.dividedBy(y1.minus(yChange)).multipliedBy(x1)
 }
 
 /**
