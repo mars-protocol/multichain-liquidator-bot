@@ -1,6 +1,5 @@
 import { ExecuteResult, SigningCosmWasmClient as CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { coin, Coin, SigningStargateClient } from '@cosmjs/stargate'
-import { Attribute, Event } from '@cosmjs/stargate/build/logs'
+import { Attribute, coin, Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
 import { createLiquidationTx } from './liquidation_generator.js'
 
@@ -53,6 +52,8 @@ export class LiquidationHelper implements ILiquidationHelper {
       collateralReceivedAmount: '',
     }
 
+    console.log(wasm)
+    //@ts-ignore
     wasm.attributes.forEach((attribute: Attribute) => {
       // find all parameters we require
       switch (attribute.key) {
