@@ -187,6 +187,25 @@ interface MsgSwapEncodeObject {
   value: MsgSwapExactAmountIn
 }
 
+export const makeRepayMessage = (
+  sender: string,
+  assetDenom: string,
+  redBankContractAddress: string,
+  coins: Coin[],
+): MsgExecuteContractEncodeObject => {
+  const executeContractMsg: MsgExecuteContractEncodeObject = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: {
+      sender: sender,
+      contract: redBankContractAddress,
+      msg: toUtf8(`{ "repay" : { "denom": "${assetDenom}" } }`),
+      funds: coins,
+    },
+  }
+
+  return executeContractMsg
+}
+
 export const makeSwapMessage = (
   liquidatorAddress: string,
   tokenIn: Coin,
