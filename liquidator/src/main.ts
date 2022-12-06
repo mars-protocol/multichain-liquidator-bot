@@ -1,4 +1,4 @@
-import { Executor } from "./executor"
+import { Executor } from "./executor.js"
 
 export const main = async() => {
 

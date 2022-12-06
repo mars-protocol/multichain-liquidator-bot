@@ -4,7 +4,7 @@ import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
 import { Position } from './types/position'
 import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
-import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx'
+import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import { coins, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { CosmWasmClient, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import {
@@ -28,9 +28,10 @@ import fetch from 'node-fetch'
 import { Pool } from './types/Pool.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
 
+
 const PREFIX = process.env.PREFIX!
 const RPC_ENDPOINT = process.env.RPC_ENDPOINT!
-const LCD_ENDPOINT = process.env.LCD_URL!
+const LCD_ENDPOINT = process.env.LCD_ENDPOINT!
 const HIVE_ENDPOINT = process.env.HIVE_ENDPOINT!
 const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 const LIQUIDATABLE_ASSETS: string[] = JSON.parse(process.env.LIQUIDATABLE_ASSETS!)

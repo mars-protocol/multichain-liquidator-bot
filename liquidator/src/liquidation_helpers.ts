@@ -1,5 +1,5 @@
-import { ExecuteResult, SigningCosmWasmClient as CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { Attribute, coin, Coin, SigningStargateClient } from '@cosmjs/stargate'
+
+import { Attribute } from '@cosmjs/stargate'
 import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
 import { createLiquidationTx } from './liquidation_generator.js'
 

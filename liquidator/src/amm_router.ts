@@ -1,5 +1,5 @@
 import BigNumber from "bignumber.js";
-import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from "./math";
+import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from "./math.js";
 import { RouteHop } from "./types/RouteHop";
 import { Pool } from "./types/Pool";
 
