@@ -30,7 +30,7 @@ export class AMMRouter implements AMMRouterInterface {
      * @param route 
      * @return The estimated amount of asset we think we will recieve
      */
-    getEstimatedOutput(tokenInAmount: BigNumber, route: RouteHop[]): BigNumber {
+    getOutput(tokenInAmount: BigNumber, route: RouteHop[]): BigNumber {
 
       let amountAfterFees = new BigNumber(0)
 
@@ -50,7 +50,7 @@ export class AMMRouter implements AMMRouterInterface {
     }
 
     // todo hea
-    getEstimatedRequiredInput(tokenOutRequired: BigNumber, route: RouteHop[]) : BigNumber {
+    getRequiredInput(tokenOutRequired: BigNumber, route: RouteHop[]) : BigNumber {
       let amountAfterFees = new BigNumber(0)
 
       if(tokenOutRequired.isEqualTo(0)) {
@@ -66,6 +66,37 @@ export class AMMRouter implements AMMRouterInterface {
       })
 
       return amountAfterFees
+    }
+
+    getBestRouteByOutput(tokenInDenom : string, tokenOutDenom: string, amountIn: BigNumber) : RouteHop[] {
+      const routeOptions = this.getRoutes(tokenInDenom, tokenOutDenom)
+
+      const bestRoute = routeOptions.sort(
+        (routeA, routeB) => {
+          
+          const routeAReturns = this.getOutput(amountIn,routeA)
+          const routeBReturns = this.getOutput(amountIn,routeB)
+          return routeAReturns.minus(routeBReturns).toNumber()
+        }).pop()
+
+      return bestRoute || []
+    }
+
+    getBestRouteByInput(tokenInDenom : string, tokenOutDenom: string, amountOut: BigNumber) : RouteHop[] {
+      const routeOptions = this.getRoutes(tokenInDenom, tokenOutDenom)
+
+      const bestRoute = routeOptions.sort(
+        (routeA, routeB) => {
+          
+          const routeAReturns = this.getRequiredInput(amountOut,routeA)
+          const routeBReturns = this.getRequiredInput(amountOut,routeB)
+
+          // route a is a better route if it returns 
+
+          return routeAReturns.minus(routeBReturns).toNumber()
+        }).pop()
+
+      return bestRoute || []
     }
 
     getRoutes(tokenInDenom: string, tokenOutDenom: string) : RouteHop[][] {
