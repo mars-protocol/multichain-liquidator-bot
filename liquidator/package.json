@@ -7,6 +7,7 @@
   "type": "module",
   "license": "MIT",
   "dependencies": {
+    "@marsjs-types": "file:../../mars-types/marsjs-types-v1.0.0.tgz",
     "@aws-sdk/client-secrets-manager": "^3.188.0",
     "@cosmjs/amino": "^0.29.4",
     "@cosmjs/cosmwasm-stargate": "^0.29.4",
@@ -40,7 +41,7 @@
     "test:integration": "node --loader ts-node/esm test/integration/liquidation_test.ts",
     "build": "tsc --project tsconfig.json",
     "start": "node --loader ts-node/esm src/main.ts",
-    "test": "jest",
+    "test": "yarn node --experimental-vm-modules $(yarn bin jest)",
     "lint": "yarn format-check && eslint . && yarn build",
     "format": "prettier --write .",
     "format-check": "prettier --ignore-path .gitignore --check ."

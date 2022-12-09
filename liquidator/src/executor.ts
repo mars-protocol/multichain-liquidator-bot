@@ -272,21 +272,21 @@ export class Executor {
       const bestRoute = routeOptions.sort(
         (routeA, routeB) => {
           
-          const routeAReturns = this.ammRouter.getEstimatedOutput(collateralAmount,routeA)
-          const routeBReturns = this.ammRouter.getEstimatedOutput(collateralAmount,routeB)
+          const routeAReturns = this.ammRouter.getOutput(collateralAmount,routeA)
+          const routeBReturns = this.ammRouter.getOutput(collateralAmount,routeB)
           return routeAReturns.minus(routeBReturns).toNumber()
         }).pop()
       
-        if (bestRoute) {
-          msgs.push(
-            swapExactAmountIn({
-              sender:liquidatorAddress,
-              // cast to long because osmosis felt it neccessary to create their own Long rather than use the js one
-              routes:bestRoute?.map((route) => {return {poolId: route.poolId as Long, tokenOutDenom: NEUTRAL_ASSET_DENOM}}),
-              tokenIn: collateral,
-              // allow for 0.5%% slippage from what we estimated
-              tokenOutMinAmount: this.ammRouter.getEstimatedOutput(new BigNumber(collateral.amount), bestRoute).multipliedBy(0.995).toFixed(0), 
-            }))
+      if (bestRoute) {
+        msgs.push(
+          swapExactAmountIn({
+            sender:liquidatorAddress,
+            // cast to long because osmosis felt it neccessary to create their own Long rather than use the js one
+            routes:bestRoute?.map((route) => {return {poolId: route.poolId as Long, tokenOutDenom: NEUTRAL_ASSET_DENOM}}),
+            tokenIn: collateral,
+            // allow for 0.5%% slippage from what we estimated
+            tokenOutMinAmount: this.ammRouter.getOutput(new BigNumber(collateral.amount), bestRoute).multipliedBy(0.995).toFixed(0), 
+          }))
         }
     })
 
@@ -301,14 +301,14 @@ export class Executor {
       const bestRoute = routeOptions.sort(
         (routeA, routeB) => {
           
-          const routeAReturns = this.ammRouter.getEstimatedRequiredInput(debtAmount,routeA)
-          const routeBReturns = this.ammRouter.getEstimatedRequiredInput(debtAmount,routeB)
+          const routeAReturns = this.ammRouter.getRequiredInput(debtAmount,routeA)
+          const routeBReturns = this.ammRouter.getRequiredInput(debtAmount,routeB)
           return routeAReturns.minus(routeBReturns).toNumber()
         }).pop()
       
         if (bestRoute) {
           // we swap a little more to ensure we do not get debt
-          const bestRouteAmount = this.ammRouter.getEstimatedRequiredInput(debtAmount.multipliedBy(1.0075), bestRoute)
+          const bestRouteAmount = this.ammRouter.getRequiredInput(debtAmount.multipliedBy(1.0075), bestRoute)
           msgs.push(
             swapExactAmountIn({
               sender:liquidatorAddress,

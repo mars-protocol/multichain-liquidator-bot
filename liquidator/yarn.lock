@@ -1750,6 +1750,12 @@
     big-integer "^1.6.48"
     utility-types "^3.10.0"
 
+"@marsjs-types@file:../../mars-types/marsjs-types-v1.0.0.tgz":
+  version "1.0.0"
+  resolved "file:../../mars-types/marsjs-types-v1.0.0.tgz#1229870ab6320c95f4005e1bdb87839633e0a5b1"
+  dependencies:
+    "@cosmjs/amino" "^0.29.4"
+
 "@noble/hashes@^1", "@noble/hashes@^1.0.0":
   version "1.1.2"
   resolved "https://registry.npmjs.org/@noble/hashes/-/hashes-1.1.2.tgz"
