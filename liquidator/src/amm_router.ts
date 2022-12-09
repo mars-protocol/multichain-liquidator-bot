@@ -1,5 +1,5 @@
 import BigNumber from "bignumber.js";
-import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from "./math.js";
+import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from "./math";
 import { RouteHop } from "./types/RouteHop";
 import { Pool } from "./types/Pool";
 
@@ -68,7 +68,7 @@ export class AMMRouter implements AMMRouterInterface {
       return amountAfterFees
     }
 
-    getBestRouteByOutput(tokenInDenom : string, tokenOutDenom: string, amountIn: BigNumber) : RouteHop[] {
+    getBestRouteGivenInput(tokenInDenom : string, tokenOutDenom: string, amountIn: BigNumber) : RouteHop[] {
       const routeOptions = this.getRoutes(tokenInDenom, tokenOutDenom)
 
       const bestRoute = routeOptions.sort(
@@ -82,7 +82,7 @@ export class AMMRouter implements AMMRouterInterface {
       return bestRoute || []
     }
 
-    getBestRouteByInput(tokenInDenom : string, tokenOutDenom: string, amountOut: BigNumber) : RouteHop[] {
+    getBestRouteGivenOutput(tokenInDenom : string, tokenOutDenom: string, amountOut: BigNumber) : RouteHop[] {
       const routeOptions = this.getRoutes(tokenInDenom, tokenOutDenom)
 
       const bestRoute = routeOptions.sort(
