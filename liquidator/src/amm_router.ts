@@ -49,7 +49,6 @@ export class AMMRouter implements AMMRouterInterface {
       return amountAfterFees
     }
 
-    // todo hea
     getRequiredInput(tokenOutRequired: BigNumber, route: RouteHop[]) : BigNumber {
       let amountAfterFees = new BigNumber(0)
 
