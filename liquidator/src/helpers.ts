@@ -3,10 +3,8 @@ import { AccountData, Coin, EncodeObject } from '@cosmjs/proto-signing'
 import { readFileSync } from 'fs'
 import { toUtf8 } from '@cosmjs/encoding'
 import { osmosis } from 'osmojs'
-import {
-  SwapAmountInRoute,
-  MsgSwapExactAmountIn,
-} from 'osmojs/types/proto/osmosis/gamm/v1beta1/tx'
+import { MsgSwapExactAmountIn, SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
+
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
 export async function sleep(timeout: number) {
@@ -187,6 +185,25 @@ export const makeWithdrawMessage = (
 interface MsgSwapEncodeObject {
   typeUrl: string
   value: MsgSwapExactAmountIn
+}
+
+export const makeRepayMessage = (
+  sender: string,
+  assetDenom: string,
+  redBankContractAddress: string,
+  coins: Coin[],
+): MsgExecuteContractEncodeObject => {
+  const executeContractMsg: MsgExecuteContractEncodeObject = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: {
+      sender: sender,
+      contract: redBankContractAddress,
+      msg: toUtf8(`{ "repay" : { "denom": "${assetDenom}" } }`),
+      funds: coins,
+    },
+  }
+
+  return executeContractMsg
 }
 
 export const makeSwapMessage = (

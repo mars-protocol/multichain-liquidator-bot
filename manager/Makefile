@@ -47,7 +47,7 @@ run: build .start_redis ## Build and run the service binary
 	HEALTH_CHECKER_IMAGE=multichain-health-checker:latest \
 	EXECUTOR_IMAGE=multichain-liquidator:latest \
 	SCALING_TYPE="watermark" \
-	COLLECTOR_CONTRACT="osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6" \
+	COLLECTOR_CONTRACT="osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv" \
 	AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
 	AWS_SECRET_ACCESS_KEY="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" \
 	AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
@@ -56,8 +56,8 @@ run: build .start_redis ## Build and run the service binary
 	AWS_SERVICE_SUBNETS="subnet-14ef644c" \
 	AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
 	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "localosmosis","REDIS_DATABASE": "0", "REDIS_METRICS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
-	HEALTH_CHECKER_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-health-checker","CHAIN_ID": "localosmosis","REDIS_ENDPOINT":"127.0.0.1:6379","REDIS_DATABASE":"0","REDIS_METRICS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"http://127.0.0.1:8080/graphql","REDBANK_ADDRESS":"osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6","ADDRESS_PER_JOB":"1","JOBS_PER_WORKER":"1","BATCH_SIZE":"1"}' \
-	EXECUTOR_CONFIG='{"GAS_PRICE": "1uosmo","RPC_ENDPOINT": "http://localhost:26657","SEED": "notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius","ACCOUNTS_PER_SEED": "100","RPC_URL": "http://localhost:26657","QUEUE_NAME": "liquidator","LIQUIDATION_QUEUE_NAME": "liquidator","ATOM_DENOM": "uion","OSMO_DENOM": "uosmo","MAX_THREADS": "20","OUTPOST_ARTIFACTS_PATH": "/Users/<usernamezz>/outposts/artifacts/","CHAIN_ID": "localosmosis","CONTRACT_REDBANK_ADDRESS":"osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6","CONTRACT_ORACLE_ADDRESS":"osmo1vhndln95yd7rngslzvf6sax6axcshkxqpmpr886ntelh28p9ghuqqgjjmc"}' \
+	HEALTH_CHECKER_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-health-checker","CHAIN_ID": "localosmosis","REDIS_ENDPOINT":"127.0.0.1:6379","REDIS_DATABASE":"0","REDIS_METRICS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"http://127.0.0.1:8080/graphql","REDBANK_ADDRESS":"osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv","ADDRESS_PER_JOB":"1","JOBS_PER_WORKER":"1","BATCH_SIZE":"1"}' \
+	EXECUTOR_CONFIG='{"GAS_PRICE": "1uosmo","RPC_ENDPOINT": "http://localhost:26657","SEED": "notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius","ACCOUNTS_PER_SEED": "100","RPC_URL": "http://localhost:26657","QUEUE_NAME": "liquidator","LIQUIDATION_QUEUE_NAME": "liquidator","ATOM_DENOM": "uion","OSMO_DENOM": "uosmo","MAX_THREADS": "20","OUTPOST_ARTIFACTS_PATH": "/Users/<usernamezz>/outposts/artifacts/","CHAIN_ID": "localosmosis","CONTRACT_REDBANK_ADDRESS":"osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv","CONTRACT_ORACLE_ADDRESS":"osmo1vhndln95yd7rngslzvf6sax6axcshkxqpmpr886ntelh28p9ghuqqgjjmc"}' \
 	METRICS_ENABLED=false \
 	DD_SITE="us5.datadoghq.com" \
 	DD_API_KEY="f1ffedda9de19cf4cef2ae80f2b6e210" \
@@ -85,7 +85,7 @@ run_race: .start_redis ## Run the service with race condition checking enabled
 	HEALTH_CHECKER_IMAGE=redis:latest \
 	EXECUTOR_IMAGE=redis:latest \
 	SCALING_TYPE="watermark" \
-	COLLECTOR_CONTRACT="osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6" \
+	COLLECTOR_CONTRACT="osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv" \
 	AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
 	AWS_SECRET_ACCESS_KEY="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" \
 	AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
@@ -95,7 +95,7 @@ run_race: .start_redis ## Run the service with race condition checking enabled
 	AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
 	COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "localosmosis","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
 	HEALTH_CHECKER_CONFIG='{"REDIS_ENDPOINT":"127.0.0.1","REDIS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"https://phoenix-hive.terra.dev","REDBANK_ADDRESS":"osmo123","ADDRESS_PER_JOB":"5","JOBS_PER_WORKER":"2","BATCH_SIZE":"2"}' \
-	EXECUTOR_CONFIG='{"LIQUIDATION_QUEUE_NAME":"liquidator","PREFIX":"osmo","GAS_PRICE":"0.001osmo","RPC_ENDPOINT":"https://phoenix-rpc.terra.dev","LIQUIDATION_FILTERER_CONTRACT":"osmo12...32","SEED":"seed phrase here"}' \
+	EXECUTOR_CONFIG='{"LIQUIDATION_QUEUE_NAME":"liquidator","PREFIX":"osmo","GAS_PRICE":"0.001osmo","RPC_ENDPOINT":"https://phoenix-rpc.terra.dev","LIQUIDATION_FILTERER_CONTRACT":"osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv","SEED":"seed phrase here"}' \
 	METRICS_ENABLED=false \
 	DD_SITE="us5.datadoghq.com" \
 	DD_API_KEY="f1ffedda9de19cf4cef2ae80f2b6e210" \
@@ -127,7 +127,7 @@ docker_run: ## Run the Docker container in interactive mode
 		-e HEALTH_CHECKER_IMAGE=redis:latest \
 		-e EXECUTOR_IMAGE=redis:latest \
 		-e SCALING_TYPE="watermark" \
-		-e COLLECTOR_CONTRACT="osmo1fyr2mptjswz4w6xmgnpgm93x0q4s4wdl6srv3rtz3utc4f6fmxeqfjmkr6" \
+		-e COLLECTOR_CONTRACT="osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv" \
 		-e AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
 		-e AWS_SECRET_ACCESS_KEY="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" \
 		-e AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
@@ -136,7 +136,7 @@ docker_run: ## Run the Docker container in interactive mode
 		-e AWS_SERVICE_SUBNETS="subnet-14ef644c" \
 		-e AWS_SERVICE_SECURITY_GROUPS="sg-cbdefbb3" \
 		-e COLLECTOR_CONFIG='{"LOG_LEVEL": "debug","LOG_FORMAT": "text","SERVICE_NAME": "bot-collector","CHAIN_ID": "localosmosis","REDIS_DATABASE": "0","REDIS_ENDPOINT":"127.0.0.1:6379","COLLECTOR_QUEUE_NAME":"collector","HEALTH_CHECK_QUEUE_NAME": "health_check"}' \
-		-e HEALTH_CHECKER_CONFIG='{"REDIS_ENDPOINT":"127.0.0.1","REDIS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"https://phoenix-hive.terra.dev","REDBANK_ADDRESS":"osmo123","ADDRESS_PER_JOB":"5","JOBS_PER_WORKER":"2","BATCH_SIZE":"2"}' \
+		-e HEALTH_CHECKER_CONFIG='{"REDIS_ENDPOINT":"127.0.0.1","REDIS_DATABASE":"0","HEALTH_CHECK_QUEUE_NAME":"health_check","LIQUIDATOR_QUEUE_NAME":"liquidator","HIVE_ENDPOINT":"https://phoenix-hive.terra.dev","REDBANK_ADDRESS":"osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv","ADDRESS_PER_JOB":"5","JOBS_PER_WORKER":"2","BATCH_SIZE":"2"}' \
 		-e EXECUTOR_CONFIG='{"LIQUIDATION_QUEUE_NAME":"liquidator","PREFIX":"osmo","GAS_PRICE":"0.001osmo","RPC_ENDPOINT":"https://phoenix-rpc.terra.dev","LIQUIDATION_FILTERER_CONTRACT":"osmo12...32","SEED":"seed phrase here"}' \
 		-e METRICS_ENABLED=false \
 		-e DD_SITE="us5.datadoghq.com" \

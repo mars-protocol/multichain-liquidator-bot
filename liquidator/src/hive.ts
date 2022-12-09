@@ -21,7 +21,7 @@ export interface Collateral extends AssetResponse {
   enabled: boolean
 }
 
-interface UserPositionData {
+export interface UserPositionData {
   [key: string]: {
     debts: Debt[]
     collaterals: Collateral[]

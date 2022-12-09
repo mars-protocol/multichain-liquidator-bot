@@ -23,7 +23,7 @@ run: ## Build and run the service binary
 	yarn start
 
 run_node: build ## Run the service with race condition checking enabled
-	node build/src/index.js
+	node build/src/main.js
 
 docker_build: build ## Build the service Docker container
 	docker build -t ${IMAGE_NAME} .
