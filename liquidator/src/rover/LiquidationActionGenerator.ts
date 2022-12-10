@@ -41,18 +41,25 @@ export class LiquidationActionGenerator {
         const debtToRepayRatio = maxDebtValue <= maxRepayValue ? 1 : maxRepayValue / maxDebtValue
 
         // debt amount is a number, not a value (e.g in dollar / base asset denominated terms)
-        const debtAmount = debt.amount * debtToRepayRatio
-
-        // check if we have the liquidity on mars to perform this borrow action        
-        const marketInfo : MarketInfo | undefined = this.markets.find((market)=> market.denom === debt.denom)
-        const hasLiquidity = marketInfo && marketInfo.borrow_enabled  && marketInfo.available_liquidity > debtAmount
-
+        let debtAmount = debt.amount * debtToRepayRatio
+        
         const debtCoin : Coin = {
             amount : debtAmount.toFixed(0),
             denom: debt.denom
         }
+        
+        // if asset is not enabled, or we have less than 50% the required liquidity, do alternative borrow       
+        const marketInfo : MarketInfo | undefined = this.markets.find((market)=> market.denom === debt.denom)
+        if (!marketInfo || !marketInfo.borrow_enabled || (marketInfo.available_liquidity / debtAmount) < 0.5) {
+            return this.borrowWithoutLiquidity(debtCoin)
+        }
 
-        return hasLiquidity ? [ this.produceBorrowAction(debtCoin) ] : this.borrowWithoutLiquidity(debtCoin)
+        // if we have some liquidity but not enough, scale down
+        if ((marketInfo.available_liquidity / debtAmount) < 1) {
+            debtCoin.amount = (marketInfo.available_liquidity * 0.99).toFixed(0)
+        }
+       
+        return [ this.produceBorrowAction(debtCoin) ]
     }
 
     /**
@@ -72,21 +79,38 @@ export class LiquidationActionGenerator {
         const debtAmount = new BigNumber(debtCoin.amount)
         const debtdenom = debtCoin.denom
 
-        // sort the markets by best -> worst swap in terms of cost, and return the best.
-        const bestMarket = this.markets.sort(
+        // filter out disabled markets + our debt denom to avoid corrupted swap messages
+        // sort the markets by best -> worst swap in terms of redbank liqudity and cost, and return the best.
+        const bestMarket = this.markets.filter((market) =>  market.borrow_enabled && market.denom !== debtdenom).sort(
             (marketA, marketB) => {
-
                 // find best routes for each market we are comparing. Best meaning cheapest input amount to get our required output 
                 const marketARoute = this.router.getBestRouteGivenOutput(marketA.denom, debtCoin.denom, debtAmount)
                 const marketBRoute = this.router.getBestRouteGivenOutput(marketB.denom, debtCoin.denom, debtAmount)
 
-                // return marketARequiredInput - marketBRequiredInput
-                return this.router.getRequiredInput(
-                    debtAmount, 
-                    marketARoute).minus(
-                        this.router.getRequiredInput(
-                            debtAmount,
-                            marketBRoute)).toNumber()
+                const marketADenomInput = this.router.getRequiredInput(debtAmount, marketARoute)
+                const marketBDenomInput = this.router.getRequiredInput(debtAmount, marketBRoute)
+                
+                // params to represent sufficient liquidity (99% is a buffer for interest rates etc)
+                const marketALiquiditySufficient = marketADenomInput.toNumber() < marketA.available_liquidity * 0.99
+                const marketBLiquiditySufficient = marketBDenomInput.toNumber() < marketB.available_liquidity * 0.99
+
+                // if neither market has liqudity, return which one has the larger share
+                if (!marketALiquiditySufficient && !marketBLiquiditySufficient) {
+                    return (marketA.available_liquidity / marketADenomInput.toNumber()) - (marketB.available_liquidity / marketBDenomInput.toNumber())
+                }
+
+                // if market b does not have liqudity, prioritise a
+                if (marketALiquiditySufficient && !marketBLiquiditySufficient) {
+                    return 1
+                }
+
+                // if market a does not have liqudity, prioritise b
+                if (!marketALiquiditySufficient && marketBLiquiditySufficient) {
+                    return -1
+                }
+
+                // if both have liqudity, return that with the cheapest swap
+                return marketADenomInput.minus(marketBDenomInput).toNumber()
             }
             ).pop()
 
@@ -98,10 +122,15 @@ export class LiquidationActionGenerator {
 
         const inputRequired = this.router.getRequiredInput(debtAmount, bestRoute)
 
+        // cap borrow to be under market liquidity
+        const safeBorrow = inputRequired.toNumber() > bestMarket.available_liquidity 
+            ? new BigNumber(bestMarket.available_liquidity*0.99)
+            : inputRequired
+
         const actions : Action[] = []
 
         const borrow: Action = this.produceBorrowAction({
-            amount: inputRequired.toFixed(0),
+            amount: safeBorrow.toFixed(0),
             denom: bestMarket.denom
         })
 
@@ -109,7 +138,8 @@ export class LiquidationActionGenerator {
 
         // Create swap message(s). Note that we are not passing in the swap amount, which means that 
         // the credit manager will swap everything that we have for that asset inside of our 
-        // credit manager sub account. To minimise slippage, should ensure 
+        // credit manager sub account. To minimise slippage, should ensure that we do not keep
+        // additional funds inside the subaccount we are using for liquidations
         bestRoute.forEach((hop: RouteHop) => {
             const action : Action = {
                 swap_exact_in: {

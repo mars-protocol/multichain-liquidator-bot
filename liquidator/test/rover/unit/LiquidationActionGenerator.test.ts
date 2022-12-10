@@ -10,16 +10,19 @@ import { NO_ROUTE_FOR_SWAP } from "../../../src/rover/constants/Errors"
 import BigNumber from "bignumber.js"
 
 describe("Liquidation Actions generator Unit Tests", () => {
+
+            // if asset is enabled, and we have less than 50% the required liquidity, do alternative borrow       
+            // if asset is enabled, and we have > 50% the required liqudidity, do normal borrow but cap
+            // if no market has suffiencient liqudity, return which one has the larger share and cap it
+
+
+
     const router : AMMRouter = new AMMRouter()
 
-    const markets : MarketInfo[] = []
-
-    const liquidationActionGenerator = new LiquidationActionGenerator(router,markets)
+   
     const debtDenom = Math.random().toString()
     const collateralDenom = Math.random().toString()
     const otherDenom = Math.random().toString()
-
-    const pools : Pool[] = []
 
     const debtToRandomAssetPrice = 1.5
 
@@ -45,8 +48,11 @@ describe("Liquidation Actions generator Unit Tests", () => {
     
     describe("Test borrow action generation", () => {
 
-        describe("When target market is liquid", () => {
-            test("We can generate borrow", () => {
+        describe("Direct Borrow", () => {
+            test("When we are liquid", () => {
+                const markets : MarketInfo[] = []
+
+                const liquidationActionGenerator = new LiquidationActionGenerator(router,markets)
                 const debtDenom = Math.random().toString()
                 const debtToRepay = 200
     
@@ -76,8 +82,48 @@ describe("Liquidation Actions generator Unit Tests", () => {
                 expect(borrowAction.borrow.amount).toBe(debtToRepay.toFixed(0))
                 expect(borrowAction.borrow.denom).toBe(debtDenom)
             })
+
+            test("When we are illiquid but > 50% ", () => {
+                const markets : MarketInfo[] = []
+
+                const liquidationActionGenerator = new LiquidationActionGenerator(router,markets)
+                const debtDenom = Math.random().toString()
+                const debtToRepay = 200
+    
+                const collateralDenom = Math.random().toString()
+                const collateralAmount = 500
+                const coin = {denom: debtDenom, amount: debtToRepay.toString()}
+                const collateral : Collateral = {
+                    type: PositionType.COIN,
+                    amount: collateralAmount,
+                    closeFactor: 0.5,
+                    denom:collateralDenom,
+                    price: 1.5
+                }
+                const debt : Debt = {
+                    amount : debtToRepay,
+                    denom : debtDenom,
+                    price : 1
+                }
+
+                
+
+                const market = generateRandomMarket(debtDenom)
+                market.available_liquidity = debtToRepay / 1.5
+                market.borrow_enabled = true
+                markets.push(market)
+                const borrowActions = liquidationActionGenerator.produceBorrowActions(debt, collateral)
+                console.log(borrowActions)
+                const borrowAction : { borrow : Coin } = borrowActions[0] as { borrow : Coin }
+                expect(borrowActions.length).toBe(1)
+                expect(borrowAction.borrow.amount).toBe(((debtToRepay / 1.5)*0.99).toFixed(0))
+                expect(borrowAction.borrow.denom).toBe(debtDenom)
+            })
     
             test("Correctly calculate repay amount based on collateral reserve factor", () => {
+                const markets : MarketInfo[] = []
+
+                const liquidationActionGenerator = new LiquidationActionGenerator(router,markets)
                 const debtDenom = Math.random().toString()
                 const debtToRepay = 200
     
@@ -109,10 +155,14 @@ describe("Liquidation Actions generator Unit Tests", () => {
         })
         
 
-        describe("When target market is illiquid", ()=> {          
+        describe("Indirect Borrow", ()=> {
 
-            test("We can generate borrow", () => {
+            test("Debt asset unavailable", () => {
               
+                const markets : MarketInfo[] = []
+
+                const liquidationActionGenerator = new LiquidationActionGenerator(router,markets)
+
                 const debtToRepay = 200
                 const collateralAmount = 500
 
@@ -131,7 +181,8 @@ describe("Liquidation Actions generator Unit Tests", () => {
                 }
                 const market = generateRandomMarket(otherDenom)
                 market.available_liquidity = debtToRepay * 1000
-                market.borrow_enabled = false
+                market.borrow_enabled = true
+              
                 markets.push(market)
 
                 const borrowActions = liquidationActionGenerator.produceBorrowActions(debt, collateral)
@@ -152,8 +203,50 @@ describe("Liquidation Actions generator Unit Tests", () => {
                 expect(borrowAction.borrow.denom).toBe(otherDenom)
             })
 
-            test("If no swap route possible for borrow we throw error", () => {
+            test("Debt available but < 50% required liquidity", () => {
+                const markets : MarketInfo[] = []
 
+                const liquidationActionGenerator = new LiquidationActionGenerator(router,markets)
+                const debtToRepay = 200
+    
+                const collateralDenom = Math.random().toString()
+                const collateralAmount = 500
+                const coin = {denom: debtDenom, amount: debtToRepay.toString()}
+                const collateral : Collateral = {
+                    type: PositionType.COIN,
+                    amount: collateralAmount,
+                    closeFactor: 0.5,
+                    denom:collateralDenom,
+                    price: 1.5
+                }
+                const debt : Debt = {
+                    amount : debtToRepay,
+                    denom : debtDenom,
+                    price : 1
+                }
+
+                const market = generateRandomMarket(debtDenom)
+                market.available_liquidity = debtToRepay / 2.1
+                market.borrow_enabled = true
+                markets.push(market)
+
+                const market2 = generateRandomMarket(otherDenom)
+                market2.available_liquidity = debtToRepay
+                market2.borrow_enabled = true
+                markets.push(market2)
+
+                const borrowActions = liquidationActionGenerator.produceBorrowActions(debt, collateral)
+                console.log(borrowActions)
+                const borrowAction : { borrow : Coin } = borrowActions[0] as { borrow : Coin }
+                expect(borrowActions.length).toBe(2)
+                expect(borrowAction.borrow.denom).toBe(otherDenom)
+            })
+    
+
+            test("If no swap route possible for borrow we throw error", () => {
+                const markets : MarketInfo[] = []
+
+                const liquidationActionGenerator = new LiquidationActionGenerator(router,markets)
                 const debtToRepay = 200
                     const collateralAmount = 500
     
