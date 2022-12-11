@@ -141,12 +141,7 @@ export class LiquidationActionGenerator {
         // credit manager sub account. To minimise slippage, should ensure that we do not keep
         // additional funds inside the subaccount we are using for liquidations
         bestRoute.forEach((hop: RouteHop) => {
-            const action : Action = {
-                swap_exact_in: {
-                    denom_out: hop.tokenOutDenom,
-                    slippage: process.env.SWAP_SLIPPAGE_LIMIT || "0.05" // 0.05% slippage? 
-                }
-            }
+            const action = this.produceSwapAction(hop.tokenInDenom, hop.tokenOutDenom)
 
             actions.push(action)
         })
@@ -155,11 +150,41 @@ export class LiquidationActionGenerator {
     }
 
     /**
+     * Swap the coillateral we won to repay the debt we borrowed. This method calculates the
+     * best route and returns an array of swap actions (on action per route hop) to execute
+     * the swap.
+     * For instance, if there is no direct pool between the collateral won and the debt borrowed,
+     * we will need to use an intermediary pool or even multiple pools to complete the swap.
+     * 
+     * @param collateralWonDenom
+     * @param debtBorrowedDenom
+     * @param debtAmount
+     * @returns An array of swap actions that convert the asset from collateral to the debt.
+     */
+    generateSwapActions = (collateralWonDenom: string, debtBorrowedDenom: string, debtAmount: string) : Action[] => {
+
+        const route = this.router.getBestRouteGivenOutput(collateralWonDenom, debtBorrowedDenom, new BigNumber(debtAmount))
+
+        if (route.length === 0) throw new Error(NO_ROUTE_FOR_SWAP)
+
+        return route.map((hop: RouteHop) => this.produceSwapAction(hop.tokenInDenom, hop.tokenOutDenom, process.env.SLIPPAGE_LIMIT) )
+    }
+
+    produceSwapAction = (denomIn: string, denomOut : string, slippage : string = "0.005") : Action => {
+        return {
+            swap_exact_in: {
+                denom_out: denomOut,
+                slippage: slippage
+            }
+        }
+    }
+
+    /**
      * Construct a simple borrow action. 
      * @param debtCoin The coin we want to borrow
      * @returns A borrow action
      */
-    produceBorrowAction = (debtCoin : Coin) : Action => {
+    private produceBorrowAction = (debtCoin : Coin) : Action => {
         const borrow: Action = {
             borrow : debtCoin
         }
