@@ -1,7 +1,7 @@
-import { LiquidationHelper } from './liquidation_helpers.js'
+import { LiquidationHelper } from '../liquidation_helpers.js'
 
-import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
-import { Position } from './types/position'
+import { LiquidationResult, LiquidationTx } from '../types/liquidation.js'
+import { Position } from '../types/position'
 import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
@@ -15,18 +15,19 @@ import {
   makeWithdrawMessage,
   ProtocolAddresses,
   sleep,
-} from './helpers.js'
+} from '../helpers.js'
 import { osmosis, cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
-import { DataResponse, Debt, fetchBatch } from './hive.js'
-import { IRedisInterface, RedisInterface } from './redis.js'
+import { DataResponse, Debt, fetchRedbankBatch } from '../hive.js'
+import { IRedisInterface, RedisInterface } from '../redis.js'
 import { SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx.js'
 import BigNumber from 'bignumber.js'
-import { AMMRouter } from './amm_router.js'
+import { AMMRouter } from '../amm_router.js'
 import fetch from 'node-fetch'
-import { Pool } from './types/Pool.js'
+import { Pool } from '../types/Pool.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
+import { BaseExecutor } from '../BaseExecutor.js'
 
 
 const PREFIX = process.env.PREFIX!
@@ -83,80 +84,13 @@ let maxBorrow : BigNumber = new BigNumber(0)
 let client : SigningStargateClient
 let queryClient : CosmWasmClient
 
-const getDefaultSecretManager = (): SecretManager => {
-  return {
-    getSeedPhrase: async () => {
-      
-      const seed = process.env.SEED
-      if (!seed) 
-        throw Error("Failed to find SEED environment variable. Add your seed phrase to the SEED environment variable or implement a secret manager instance")
-
-      return seed
-    }
-  }
-}
-
 /**
  * Executor class is the entry point for the executor service
  * 
  * @param sm An optional parameter. If you want to use a secret manager to hold the seed 
  *           phrase, implement the secret manager interface and pass as a dependency.
  */
-export class Executor {
-  private sm : SecretManager
-  private ammRouter : AMMRouter
-
-  constructor(sm? : SecretManager) {
-    this.sm = !sm ? getDefaultSecretManager() : sm
-    this.ammRouter = new AMMRouter()
-  }
-
-  async initiate() : Promise<{
-    redis: RedisInterface
-    liquidationHelper: LiquidationHelper
-  }> {
-    const redis = new RedisInterface()
-    await redis.connect()
-  
-    const seedPhrase = await this.sm.getSeedPhrase()
-    const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(seedPhrase, { prefix: PREFIX })
-  
-    const pools = await loadPools()
-    this.ammRouter.setPools(pools)
-
-    //The liquidator account should always be the first under that seed, although we could set the index as a parameter in the .env
-    const liquidatorAddress = (await liquidator.getAccounts())[0].address
-    
-    queryClient = await SigningCosmWasmClient.connectWithSigner(
-      RPC_ENDPOINT,
-      liquidator
-    )
-  
-    client = await SigningStargateClient.connectWithSigner(RPC_ENDPOINT, liquidator)
-  
-    const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
-  
-    client.registry.register(executeTypeUrl, MsgExecuteContract)
-      
-    const liquidationHelper = new LiquidationHelper(
-      liquidatorAddress,
-      LIQUIDATION_FILTERER_CONTRACT,
-    )
-
-    
-  
-    console.log('setting balances')
-    await setBalances(queryClient, liquidatorAddress)
-    
-    // todo if gas is low, notify here
-
-    await setPrices(queryClient)
-    
-    return {
-      redis,
-      liquidationHelper
-    }
-  }
+export class Executor extends BaseExecutor{
 
   async start() {
     
@@ -359,10 +293,10 @@ export class Executor {
   async run(liquidationHelper: LiquidationHelper, redis: IRedisInterface) {
 
     // Find our limit we can borrow. Denominated in 
-    maxBorrow = await getMaxBorrow(liquidationHelper.getLiquidatorAddress())
+    maxBorrow = await this.getMaxBorrow(liquidationHelper.getLiquidatorAddress())
 
     console.log("Checking for liquidations")
-    const positions: Position[] = await redis.fetchUnhealthyPositions()
+    const positions: Position[] = await redis.popUnhealthyPositions()
     
     if (positions.length == 0) {
       //sleep to avoid spamming redis db when empty
@@ -372,7 +306,7 @@ export class Executor {
     }
   
     // Fetch position data
-    const positionData: DataResponse[] = await fetchBatch(positions, addresses.redBank, HIVE_ENDPOINT)
+    const positionData: DataResponse[] = await fetchRedbankBatch(positions, addresses.redBank, HIVE_ENDPOINT)
   
     console.log(`- found ${positionData.length} positions queued for liquidation.`)
     
@@ -457,40 +391,4 @@ const sendBorrowAndLiquidateTx = async(txs: LiquidationTx[], borrowMessages: Enc
   const events = JSON.parse(result.rawLog)[0]
   
   return liquidationHelper.parseLiquidationResult(events.events)
-}
-
-const setBalances = async (client: CosmWasmClient, liquidatorAddress: string) => {
-  for (const denom in LIQUIDATABLE_ASSETS) {
-
-    const balance = await client.getBalance(liquidatorAddress, LIQUIDATABLE_ASSETS[denom])
-
-    console.log({
-      balance,
-      liquidatorAddress
-    })
-    balances.set(LIQUIDATABLE_ASSETS[denom], Number(balance.amount))
-  }
-}
-
-const setPrices = async (client: CosmWasmClient) => {
-
-  const result : Price[]= await client.queryContractSmart(ORACLE_ADDRESS, {
-    prices: {},
-  })
-  
-  result.forEach((price: Price) => prices.set(price.denom, price.price))
-}
-
-const getMaxBorrow = async( liquidatorAddress : string) : Promise<BigNumber> => {
-  const result = await queryClient.queryContractSmart(REDBANK_ADDRESS, {
-    user_position: { user_addr: liquidatorAddress },
-  })
-
-  return new BigNumber(result.weighted_max_ltv_collateral)
-}
-
-const loadPools = async() : Promise<Pool[]> => {
-  const response = await fetch(`${LCD_ENDPOINT}/osmosis/gamm/v1beta1/pools`)
-  const pools : Pool[] = await response.json() as Pool[]
-  return pools
 }

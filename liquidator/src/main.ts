@@ -1,4 +1,4 @@
-import { Executor } from "./executor.js"
+import { Executor } from "./redbank/executor.js"
 
 export const main = async() => {
 
