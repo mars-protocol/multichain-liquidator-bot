@@ -56,7 +56,7 @@ export class LiquidationActionGenerator {
 
         // if we have some liquidity but not enough, scale down
         if ((marketInfo.available_liquidity / debtAmount) < 1) {
-            debtCoin.amount = (marketInfo.available_liquidity * 0.99).toFixed(0)
+            debtCoin.amount = (marketInfo.available_liquidity * GENERIC_BUFFER).toFixed(0)
         }
        
         return [ this.produceBorrowAction(debtCoin) ]
@@ -90,9 +90,9 @@ export class LiquidationActionGenerator {
                 const marketADenomInput = this.router.getRequiredInput(debtAmount, marketARoute)
                 const marketBDenomInput = this.router.getRequiredInput(debtAmount, marketBRoute)
                 
-                // params to represent sufficient liquidity (99% is a buffer for interest rates etc)
-                const marketALiquiditySufficient = marketADenomInput.toNumber() < marketA.available_liquidity * 0.99
-                const marketBLiquiditySufficient = marketBDenomInput.toNumber() < marketB.available_liquidity * 0.99
+                // params to represent sufficient liquidity
+                const marketALiquiditySufficient = marketADenomInput.toNumber() < marketA.available_liquidity * GENERIC_BUFFER
+                const marketBLiquiditySufficient = marketBDenomInput.toNumber() < marketB.available_liquidity * GENERIC_BUFFER
 
                 // if neither market has liqudity, return which one has the larger share
                 if (!marketALiquiditySufficient && !marketBLiquiditySufficient) {
@@ -124,7 +124,7 @@ export class LiquidationActionGenerator {
 
         // cap borrow to be under market liquidity
         const safeBorrow = inputRequired.toNumber() > bestMarket.available_liquidity 
-            ? new BigNumber(bestMarket.available_liquidity*0.99)
+            ? new BigNumber(bestMarket.available_liquidity*GENERIC_BUFFER)
             : inputRequired
 
         const actions : Action[] = []
