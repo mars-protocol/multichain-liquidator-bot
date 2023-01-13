@@ -26,7 +26,6 @@ import BigNumber from 'bignumber.js'
 import { AMMRouter } from './amm_router.js'
 import fetch from 'node-fetch'
 import { Pool } from './types/Pool.js'
-import { Long } from 'osmojs/types/codegen/helpers.js'
 
 
 const PREFIX = process.env.PREFIX!
@@ -37,39 +36,13 @@ const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
 const LIQUIDATABLE_ASSETS: string[] = JSON.parse(process.env.LIQUIDATABLE_ASSETS!)
 const ORACLE_ADDRESS = process.env.ORACLE_ADDRESS!
 const REDBANK_ADDRESS = process.env.REDBANK_ADDRESS!
-const NEUTRAL_ASSET_DENOM = process.env.NEUTRAL_ASSET_DENOM!
-
-const {
-  swapExactAmountIn
-} = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
-
-const {
-  executeContract,
-} = cosmwasm.wasm.v1.MessageComposer.withTypeUrl;
-
-
-interface Routes {
-  // Route for given pair [debt:collateral]
-  [pair: string]: SwapAmountInRoute[]
-}
 
 interface Price {
   price: number
   denom: string
 }
 
-const addresses: ProtocolAddresses = {
-  oracle: process.env.CONTRACT_ORACLE_ADDRESS as string,
-  redBank: process.env.CONTRACT_REDBANK_ADDRESS as string,
-  addressProvider: '',
-  filterer: '',
-  incentives: '',
-  rewardsCollector: '',
-}
-
-const prices : Map<string, number> = new Map()
 const balances: Map<string, number> = new Map()
-let maxBorrow : BigNumber = new BigNumber(0)
 let client : SigningStargateClient
 let queryClient : CosmWasmClient
 
@@ -96,7 +69,7 @@ export class BaseExecutor {
     public sm : SecretManager
     public ammRouter : AMMRouter
     public redis : RedisInterface
-
+    public prices : Map<string, number> = new Map()
     constructor(sm? : SecretManager) {
         this.sm = !sm ? getDefaultSecretManager() : sm
         this.ammRouter = new AMMRouter()
@@ -167,7 +140,7 @@ setPrices = async (client: CosmWasmClient) => {
       prices: {},
     })
     
-    result.forEach((price: Price) => prices.set(price.denom, price.price))
+    result.forEach((price: Price) => this.prices.set(price.denom, price.price))
   }
   
 getMaxBorrow = async( liquidatorAddress : string) : Promise<BigNumber> => {
