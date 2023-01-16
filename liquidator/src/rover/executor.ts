@@ -25,8 +25,8 @@ export class Executor extends BaseExecutor {
     }
 
     start = async() => {
-
-        // fetch 
+        // this will fetch prices etc
+        this.initiate()
     }
 
     run = async() => {
