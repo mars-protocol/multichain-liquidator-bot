@@ -1,7 +1,7 @@
 import { AMMRouter} from "../amm_router";
 import { MarketInfo } from "./types/MarketInfo";
-import { Collateral, Debt } from "./types/RoverPosition";
-import { Action, Coin } from "@marsjs-types/creditmanager/mars-credit-manager/MarsCreditManager.types"
+import { Collateral, Debt, PositionType } from "./types/RoverPosition";
+import { Action, Coin, VaultPositionType, VaultBaseForString } from "@marsjs-types/creditmanager/mars-credit-manager/MarsCreditManager.types"
 import BigNumber from "bignumber.js";
 import { RouteHop } from "../types/RouteHop";
 import { NO_ROUTE_FOR_SWAP, NO_VALID_MARKET } from "./constants/Errors";
@@ -170,7 +170,39 @@ export class LiquidationActionGenerator {
         return route.map((hop: RouteHop) => this.produceSwapAction(hop.tokenInDenom, hop.tokenOutDenom, process.env.SLIPPAGE_LIMIT) )
     }
 
-    produceSwapAction = (denomIn: string, denomOut : string, slippage : string = "0.005") : Action => {
+
+    generateLiquidationAction = (positionType : PositionType, debtCoin: Coin, liquidateeAccountId : string, requestCoinDenom : string, vaultPositionType? : VaultPositionType) : Action=> {
+        return positionType === PositionType.COIN 
+            ? this.produceLiquidateCoin(debtCoin, liquidateeAccountId, requestCoinDenom) 
+            : this.produceLiquidateVault(debtCoin,liquidateeAccountId, vaultPositionType!, {address: requestCoinDenom})
+    }
+
+    private produceLiquidateCoin = (debtCoin: Coin, liquidateeAccountId : string, requestCoinDenom: string) : Action => {
+        return {
+            liquidate_coin: {
+              debt_coin: debtCoin,
+              liquidatee_account_id: liquidateeAccountId,
+              request_coin_denom: requestCoinDenom,
+            }
+        }
+    }
+
+    private produceLiquidateVault = (
+        debtCoin: Coin, 
+        liquidateeAccountId : string, 
+        vaultPositionType : VaultPositionType,
+        requestVault: VaultBaseForString) : Action => {
+        return {
+            liquidate_vault: {
+                debt_coin: debtCoin,
+                liquidatee_account_id: liquidateeAccountId,
+                position_type: vaultPositionType,
+                request_vault: requestVault,
+            }
+          }
+    }
+
+    private produceSwapAction = (denomIn: string, denomOut : string, slippage : string = "0.005") : Action => {
         return {
             swap_exact_in: {
                 denom_out: denomOut,
