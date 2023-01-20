@@ -42,10 +42,6 @@ interface Price {
   denom: string
 }
 
-const balances: Map<string, number> = new Map()
-let client : SigningStargateClient
-let queryClient : CosmWasmClient
-
 const getDefaultSecretManager = (): SecretManager => {
   return {
     getSeedPhrase: async () => {
@@ -70,6 +66,9 @@ export class BaseExecutor {
     public ammRouter : AMMRouter
     public redis : RedisInterface
     public prices : Map<string, number> = new Map()
+    public balances: Map<string, number> = new Map()
+    public client : SigningStargateClient | undefined = undefined
+    public queryClient : CosmWasmClient | undefined = undefined
     constructor(sm? : SecretManager) {
         this.sm = !sm ? getDefaultSecretManager() : sm
         this.ammRouter = new AMMRouter()
@@ -92,16 +91,16 @@ export class BaseExecutor {
     //The liquidator account should always be the first under that seed, although we could set the index as a parameter in the .env
     const liquidatorAddress = (await liquidator.getAccounts())[0].address
     
-    queryClient = await SigningCosmWasmClient.connectWithSigner(
+    this.queryClient = await SigningCosmWasmClient.connectWithSigner(
       RPC_ENDPOINT,
       liquidator
     )
   
-    client = await SigningStargateClient.connectWithSigner(RPC_ENDPOINT, liquidator)
+    this.client = await SigningStargateClient.connectWithSigner(RPC_ENDPOINT, liquidator)
   
     const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
   
-    client.registry.register(executeTypeUrl, MsgExecuteContract)
+    this.client.registry.register(executeTypeUrl, MsgExecuteContract)
       
     const liquidationHelper = new LiquidationHelper(
       liquidatorAddress,
@@ -109,16 +108,28 @@ export class BaseExecutor {
     )
   
     console.log('setting balances')
-    await this.setBalances(queryClient, liquidatorAddress)
+    await this.setBalances(this.queryClient, liquidatorAddress)
     
+    // set up liquidator pools
+
     // todo if gas is low, notify here
 
-    await this.setPrices(queryClient)
+    await this.setPrices(this.queryClient)
     
     return {
       redis: this.redis,
       liquidationHelper
     }
+  }
+
+  getMaxBorrow = async( liquidatorAddress : string) : Promise<BigNumber> => {
+    if (!this.queryClient) throw new Error("Client is null, call initiate() before using this class")
+    console.log({REDBANK_ADDRESS, liquidatorAddress})
+    const result = await this.queryClient.queryContractSmart(REDBANK_ADDRESS, {
+      user_position: { user: liquidatorAddress },
+    })
+  
+    return new BigNumber(result.weighted_max_ltv_collateral)
   }
 
   setBalances = async (client: CosmWasmClient, liquidatorAddress: string) => {
@@ -130,7 +141,7 @@ export class BaseExecutor {
         balance,
         liquidatorAddress
       })
-      balances.set(LIQUIDATABLE_ASSETS[denom], Number(balance.amount))
+      this.balances.set(LIQUIDATABLE_ASSETS[denom], Number(balance.amount))
     }
   }
   
@@ -143,13 +154,7 @@ setPrices = async (client: CosmWasmClient) => {
     result.forEach((price: Price) => this.prices.set(price.denom, price.price))
   }
   
-getMaxBorrow = async( liquidatorAddress : string) : Promise<BigNumber> => {
-    const result = await queryClient.queryContractSmart(REDBANK_ADDRESS, {
-      user_position: { user_addr: liquidatorAddress },
-    })
-  
-    return new BigNumber(result.weighted_max_ltv_collateral)
-  }
+
 
 loadPools = async() : Promise<Pool[]> => {
     const response = await fetch(`${LCD_ENDPOINT}/osmosis/gamm/v1beta1/pools`)
