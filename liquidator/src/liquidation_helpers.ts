@@ -1,4 +1,3 @@
-
 import { Attribute } from '@cosmjs/stargate'
 import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
 import { createLiquidationTx } from './liquidation_generator.js'
@@ -13,14 +12,10 @@ export interface ILiquidationHelper {
 }
 
 export class LiquidationHelper implements ILiquidationHelper {
-  
   private liquidatorAddress: string
   private liquidationFilterContract: string
 
-  constructor(
-    liquidatorAddress: string,
-    liquidationFilterContract: string,
-  ) {
+  constructor(liquidatorAddress: string, liquidationFilterContract: string) {
     this.liquidatorAddress = liquidatorAddress
     this.liquidationFilterContract = liquidationFilterContract
   }
