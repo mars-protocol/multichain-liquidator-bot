@@ -75,26 +75,6 @@ export class Executor extends BaseExecutor {
   async initiate(): Promise<{ redis: RedisInterface; liquidationHelper: LiquidationHelper }> {
     const { redis, liquidationHelper } = await super.initiate()
 
-    // Deposit all stable denom into redbank
-    const neutralBalance = this.balances.get(NEUTRAL_ASSET_DENOM) || 0
-    if (neutralBalance > 0) {
-      const depositCoin = { denom: NEUTRAL_ASSET_DENOM, amount: neutralBalance.toFixed(0) }
-
-      const deposit = [
-        makeDepositMessage(
-          liquidationHelper.getLiquidatorAddress(),
-          NEUTRAL_ASSET_DENOM,
-          addresses.redBank,
-          [depositCoin],
-        ),
-      ]
-      await this.client?.signAndBroadcast(
-        liquidationHelper.getLiquidatorAddress(),
-        deposit,
-        await this.getFee(deposit, liquidationHelper.getLiquidatorAddress()),
-      )
-    }
-
     return { redis, liquidationHelper }
   }
 
@@ -108,7 +88,7 @@ export class Executor extends BaseExecutor {
     const debtsToRepay = new Map<string, BigNumber>()
 
     let totalDebtValue = BigNumber(0)
-
+    const availableValue = new BigNumber(this.balances.get(NEUTRAL_ASSET_DENOM) || 0).multipliedBy(this.prices.get(NEUTRAL_ASSET_DENOM) || 0)
 
     // create a list of debts that need to be liquidated
     positionData.forEach(async (positionResponse: DataResponse) => {
@@ -121,7 +101,7 @@ export class Executor extends BaseExecutor {
         const largestDebt = getLargestDebt(position.debts, this.prices)
 
         // total debt value is calculated in base denom (i.e uosmo)
-        const remainingAvailableSize = maxBorrow.multipliedBy(0.85).minus(totalDebtValue)
+        const remainingAvailableSize = availableValue.minus(totalDebtValue)
         
         if (remainingAvailableSize.isGreaterThan(100)) {
 
@@ -182,26 +162,17 @@ export class Executor extends BaseExecutor {
   appendWithdrawMessages(
     collateralsWon: Collateral[],
     liquidatorAddress: string,
-    maxBorrow: BigNumber,
     msgs: EncodeObject[],
   ) {
     // for each asset, create a withdraw message
-    let totalRemainingBorrow = maxBorrow
     collateralsWon.forEach((collateral) => {
       const denom = collateral.denom
-      if (denom !== NEUTRAL_ASSET_DENOM) {
-
-        console.log({
-          ACTION: 'Withdrawing collateral',
-          denom,
-        })
         msgs.push(
           executeContract(
             makeWithdrawMessage(liquidatorAddress, denom, addresses.redBank)
               .value as MsgExecuteContract,
           ), // osmo1h9twyldz0z0crzgqmafa9m30nll7xljzzge6fg - liquidator
         )
-      }
     })
 
     return msgs
@@ -235,13 +206,6 @@ export class Executor extends BaseExecutor {
               .multipliedBy(0.975)
               .toFixed(0)
 
-            console.log({
-              ACTION: 'Swapping collateral to neutral',
-              route: bestRoute,
-              collateral,
-              expectedOutput: minOutput,
-            })
-
             expectedNeutralCoins = expectedNeutralCoins.plus(minOutput)
             msgs.push(
               swapExactAmountIn({
@@ -274,62 +238,63 @@ export class Executor extends BaseExecutor {
     debtsToRepay.forEach((debt) => {
       const debtAmountRequiredFromSwap = new BigNumber(debt.amount)
       if (debtAmountRequiredFromSwap.isGreaterThan(1000)) {
-        const routeOptions = this.ammRouter.getRoutes(NEUTRAL_ASSET_DENOM, debt.denom)
+        
+        if (debt.denom === NEUTRAL_ASSET_DENOM) {
+          const cappedAmount = remainingNeutral.isLessThan(debt.amount) ? remainingNeutral : new BigNumber(debt.amount)
+          remainingNeutral = neutralAvailable.minus(cappedAmount.minus(1))
 
-        const bestRoute = routeOptions
-          .sort((routeA, routeB) => {
-            const routeAReturns = this.ammRouter.getRequiredInput(
-              debtAmountRequiredFromSwap,
-              routeA,
+          const totalDebt = cappedAmount.plus(expectedDebtAssetsPostSwap.get(debt.denom) || 0)
+          expectedDebtAssetsPostSwap.set(debt.denom, totalDebt)
+        } else {
+          const routeOptions = this.ammRouter.getRoutes(NEUTRAL_ASSET_DENOM, debt.denom)
+
+          const bestRoute = routeOptions
+            .sort((routeA, routeB) => {
+              const routeAReturns = this.ammRouter.getRequiredInput(
+                debtAmountRequiredFromSwap,
+                routeA,
+              )
+              const routeBReturns = this.ammRouter.getRequiredInput(
+                debtAmountRequiredFromSwap,
+                routeB,
+              )
+              return routeAReturns.minus(routeBReturns).toNumber()
+            })
+            .pop()
+  
+          if (bestRoute) {
+  
+            const amountToSwap = this.ammRouter.getRequiredInput(
+              // we add a little more to ensure we get enough to cover debt
+              debtAmountRequiredFromSwap.multipliedBy(1.025), 
+              bestRoute,
             )
-            const routeBReturns = this.ammRouter.getRequiredInput(
-              debtAmountRequiredFromSwap,
-              routeB,
-            )
-            return routeAReturns.minus(routeBReturns).toNumber()
-          })
-          .pop()
-
-        if (bestRoute) {
-
-          const amountToSwap = this.ammRouter.getRequiredInput(
-            // we add a little more to ensure we get enough to cover debt
-            debtAmountRequiredFromSwap.multipliedBy(1.025), 
-            bestRoute,
-          )
-
-          // if amount to swap is greater than the amount available, cap it
-          const cappedSwapAmount = remainingNeutral.isLessThan(amountToSwap) ? remainingNeutral : amountToSwap
-
-          // the min amount of debt we want to recieve
-          const minDebtOutput = this.ammRouter.getOutput(cappedSwapAmount, bestRoute).multipliedBy(0.98)
-
-          // take away 1 to avoid rounding errors / decimal places overshooting.
-          remainingNeutral = neutralAvailable.minus(cappedSwapAmount.minus(1)) 
-          expectedDebtAssetsPostSwap.set(debt.denom, minDebtOutput)
-          console.log({
-            ACTION: 'Swapping neutral to debt',
-            route: bestRoute,
-            debtAmountRequiredFromSwap,
-            amountToSwap,
-            cappedSwapAmount,
-            minDebtOutput,
-            remainingNeutral,
-            debt,
-          })
-
-          msgs.push(
-            swapExactAmountIn({
-              sender: liquidatorAddress,
-              // cast to long because osmosis felt it neccessary to create their own Long rather than use the js one
-              routes: bestRoute?.map((route) => {
-                return { poolId: route.poolId as Long, tokenOutDenom: route.tokenOutDenom }
+  
+            // if amount to swap is greater than the amount available, cap it
+            const cappedSwapAmount = remainingNeutral.isLessThan(amountToSwap) ? remainingNeutral : amountToSwap
+  
+            // the min amount of debt we want to recieve
+            const minDebtOutput = this.ammRouter.getOutput(cappedSwapAmount, bestRoute).multipliedBy(0.98)
+  
+            // take away 1 to avoid rounding errors / decimal places overshooting.
+            remainingNeutral = neutralAvailable.minus(cappedSwapAmount.minus(1)) 
+  
+            const totalDebt = minDebtOutput.plus(expectedDebtAssetsPostSwap.get(debt.denom) || 0)
+  
+            expectedDebtAssetsPostSwap.set(debt.denom, totalDebt)
+  
+            msgs.push(
+              swapExactAmountIn({
+                sender: liquidatorAddress,
+                routes: bestRoute?.map((route) => {
+                  return { poolId: route.poolId as Long, tokenOutDenom: route.tokenOutDenom }
+                }),
+                tokenIn: { denom: NEUTRAL_ASSET_DENOM, amount: amountToSwap.toFixed(0) },
+                // allow for 1% slippage for debt what we estimated
+                tokenOutMinAmount: minDebtOutput.toFixed(0),
               }),
-              tokenIn: { denom: NEUTRAL_ASSET_DENOM, amount: amountToSwap.toFixed(0) },
-              // allow for 1% slippage for debt what we estimated
-              tokenOutMinAmount: minDebtOutput.toFixed(0),
-            }),
-          )
+            )
+        }
         }
       }
     })
@@ -343,11 +308,6 @@ export class Executor extends BaseExecutor {
     msgs: EncodeObject[],
     expectedDebtAssetAmounts: Map<string, BigNumber>
   ): EncodeObject[] {
-    console.log({
-      ACTION: 'REPAY',
-      debtsToRepay,
-      expectedDebtAssetAmounts
-    })
 
     debtsToRepay.forEach((debt) => {
       // Cap the amount we are repaying by the amount available
@@ -389,7 +349,6 @@ export class Executor extends BaseExecutor {
 
     // Find our limit we can borrow. Denominated in
     maxBorrow = await this.getMaxBorrow(liquidatorAddress)
-    console.log({maxBorrow})
     await this.refreshPools()
 
     // refresh our balances
@@ -405,16 +364,6 @@ export class Executor extends BaseExecutor {
       return
     }
 
-    console.log({
-      title: 'PRE LIQUIDATION',
-      collaterals: await this.queryClient?.queryContractSmart(addresses.redBank, {
-        user_collaterals: { user: liquidatorAddress },
-      }),
-      debts: await this.queryClient?.queryContractSmart(addresses.redBank, {
-        user_debts: { user: liquidatorAddress },
-      }),
-      balances: await this.client?.getAllBalances(liquidatorAddress),
-    })
     // Fetch position data
     const positionData: DataResponse[] = await fetchRedbankBatch(
       positions,
@@ -424,119 +373,86 @@ export class Executor extends BaseExecutor {
 
     console.log(`- found ${positionData.length} positions queued for liquidation.`)
 
-    // fetch debts, liquidation txs
+    // // fetch debts, liquidation txs
     const { txs, debtsToRepay } = this.produceLiquidationTxs(positionData)
     
     const debtCoins: Coin[] = []
     debtsToRepay.forEach((amount, denom) => debtCoins.push({ denom, amount: amount.toFixed(0) }))
 
-    console.log({
-      ACTION:"LIQUIDATE",
-      txs,
-      debtsToRepay,
-      debtCoins
-    })
     // deposit any neutral in our account before starting liquidations
     const firstMsgBatch : EncodeObject[] = []
+    const assetsRecieved = this.appendSwapToDebtMessages(debtCoins,liquidatorAddress, firstMsgBatch, new BigNumber(this.balances.get(NEUTRAL_ASSET_DENOM)!))
+    const coinsFromSwap : Coin[] = []
+    assetsRecieved.forEach((amount, denom) => coinsFromSwap.push({denom, amount: amount.toFixed(0)}))
 
-    this.appendSwapToDebtMessages(debtCoins,liquidatorAddress, firstMsgBatch, new BigNumber(this.balances.get(NEUTRAL_ASSET_DENOM)!))
-    
-    // this.appendDepositMessages(liquidatorAddress, firstMsgBatch)
+    const liquidateMsg = JSON.stringify({ liquidate_many: { liquidations: txs } })
+    const msg = toUtf8(liquidateMsg)
 
+    firstMsgBatch.push(
+      executeContract(
+        makeExecuteContractMessage(
+          liquidationHelper.getLiquidatorAddress(),
+          liquidationHelper.getLiquidationFiltererContract(),
+          msg,
+          coinsFromSwap,
+        ).value as MsgExecuteContract,
+      ),
+    )
 
-    // produce borrow tx's
-    const borrowTxs = firstMsgBatch.concat(this.produceBorrowTxs(debtsToRepay, liquidationHelper))
+    if (!firstMsgBatch || firstMsgBatch.length === 0 ||txs.length === 0) return []
 
-    if (txs.length === 0 ) return
-
-    // dispatch liquidation tx along with borrows, and recieve and object with results on it
-    const results = await this.sendBorrowAndLiquidateTx(
-      txs,
-      borrowTxs,
-      debtCoins,
-      liquidationHelper,
+    const result = await this.client.signAndBroadcast(
+      liquidationHelper.getLiquidatorAddress(),
+      firstMsgBatch,
+      await this.getFee(firstMsgBatch, liquidationHelper.getLiquidatorAddress()),
     )
 
 
-    // Log the amount of liquidations executed
-    redis.incrementBy('executor.liquidations.executed', results.length)
+    // redis.incrementBy('executor.liquidations.executed', results.length)
 
-    console.log(`- Successfully liquidated ${results.length} positions`)
+    console.log(`- Successfully liquidated ${txs.length} positions`)
 
     const collaterals: Collateral[] = await this.queryClient?.queryContractSmart(
       addresses.redBank,
       { user_collaterals: { user: liquidatorAddress } },
     )
 
-    const debts: Debt[] = await this.queryClient?.queryContractSmart(addresses.redBank, {
-      user_debts: { user: liquidatorAddress },
-    })
+    // second block of transactions
+    let secondBatch: EncodeObject[] = []
 
-    // todo remove me
     const balances = await this.client?.getAllBalances(liquidatorAddress)
 
-    // reset balances, as they will have changed
+    const combinedCoins = this.combineBalances(collaterals, balances!)
+
+    this.appendWithdrawMessages(collaterals, liquidatorAddress, secondBatch)
+
+    this.appendSwapToNeutralMessages(
+      combinedCoins, 
+      liquidatorAddress, 
+      secondBatch)
+ 
+    await this.client.signAndBroadcast(
+      liquidationHelper.getLiquidatorAddress(),
+      secondBatch,
+      await this.getFee(secondBatch, liquidationHelper.getLiquidatorAddress()),
+    )
+
     await this.setBalances(liquidatorAddress)
-    const expectedAssets = this.combineBalances(collaterals, balances!)
-    maxBorrow = await this.getMaxBorrow(liquidatorAddress)
 
-    console.log({
-      title: 'POST LIQUIDATION',
-      collaterals,
-      debts,
-      balances,
-      combinedBalances: expectedAssets,
+    txs.forEach((tx)=> {
+      this.addCsvRow({
+        blockHeight: result.height,
+        collateral: tx.collateral_denom,
+        debtRepaid: tx.debt_denom,
+        estimatedLtv: '0',
+        userAddress: tx.user_address,
+        liquidatorBalance: Number(this.balances.get(NEUTRAL_ASSET_DENOM) || 0)
+      })
     })
-
-    // second block of transactions
-    let msgs: EncodeObject[] = []
     
-    // we need to maintain track of our asset estimates within the transaction
-    const assets : Map<string, BigNumber> = new Map()
-
-    msgs = this.appendWithdrawMessages(collaterals, liquidatorAddress, maxBorrow, msgs)
-    const minNeutralRecieved = this.appendSwapToNeutralMessages(expectedAssets, liquidatorAddress, msgs) // get min collected stable?
-
-    const assetAmounts = this.appendSwapToDebtMessages(debts, liquidatorAddress, msgs, minNeutralRecieved)
-    assetAmounts.forEach((amount, denom) => assets.set(denom, amount))
-
-    // add our wallet balances to the debt amounts
-    this.balances.forEach((amount, denom) => {
-      const assetFromSwap = assets.get(denom) || new  BigNumber(0)
-      assets.set(denom, assetFromSwap.plus(amount))
-    })
-
-    // add our neutral amount to it as this wont be recorded in our swap to debt
-    const neutralAssetAmount = assets.get(NEUTRAL_ASSET_DENOM) || new  BigNumber(0)
-    assets.set(NEUTRAL_ASSET_DENOM, neutralAssetAmount.plus(minNeutralRecieved))
-    console.log({assts2:assets})
-    
-    this.appendRepayMessages(debts, liquidatorAddress, msgs, assets)
-
-    if (msgs.length > 0) {
-      const result = await this.client?.signAndBroadcast(
-        liquidatorAddress,
-        msgs,
-        await this.getFee(msgs, liquidatorAddress),
-      )
-    }
-
-    const finalCollaterals = await this.queryClient?.queryContractSmart(addresses.redBank, {
-      user_collaterals: { user: liquidatorAddress },
-    })
     console.log(`- Liquidation Process Complete.`)
-    console.log({
-      title: 'POST CLEANUP',
-      collaterals: finalCollaterals,
-      debts: await this.queryClient?.queryContractSmart(addresses.redBank, {
-        user_debts: { user: liquidatorAddress },
-      }),
-      walletBalance: await this.client?.getAllBalances(liquidatorAddress),
-    })
 
     this.writeCsv()
-    // get liquidator balance
-
   }
 
   combineBalances(collaterals: Collateral[], balances: readonly Coin[]): Coin[] {
@@ -573,13 +489,10 @@ export class Executor extends BaseExecutor {
       throw new Error(
         'Stargate Client is undefined, ensure you call initiate at before calling this method',
       )
+
     const liquidateMsg = JSON.stringify({ liquidate_many: { liquidations: txs } })
-
     const msg = toUtf8(liquidateMsg)
-
     const msgs: EncodeObject[] = borrowMessages
-
-    console.log({liq:liquidationHelper.getLiquidationFiltererContract()})
 
     msgs.push(
       executeContract(
@@ -608,7 +521,7 @@ export class Executor extends BaseExecutor {
     )
 
     const usdcCollateral = collaterals.find((collateral) => collateral.denom === 'usdc')
-      console.log({usdcCollateral})
+
     txs.forEach((tx) => {
       this.addCsvRow({
         blockHeight: result.height,
@@ -620,10 +533,6 @@ export class Executor extends BaseExecutor {
       })
     })
     
-    // this.
-    // result.events.forEach((value) => console.log(value))
-    // console.log({data:result.data})
-    // console.log(result.height)
     const events = JSON.parse(result.rawLog)[0]
 
     return liquidationHelper.parseLiquidationResult(events.events)
