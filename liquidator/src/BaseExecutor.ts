@@ -47,6 +47,7 @@ import {
   osmosisProtoRegistry,
 } from 'osmojs'
 import { MarketInfo } from './rover/types/MarketInfo.js'
+import { CSVWriter, Row } from './CsvWriter.js'
 
 const PREFIX = process.env.PREFIX!
 const RPC_ENDPOINT = process.env.RPC_ENDPOINT!
@@ -91,7 +92,18 @@ export class BaseExecutor {
   public client: SigningStargateClient | undefined = undefined
   public queryClient: CosmWasmClient | undefined = undefined
   private redbankMarkets: Map<string, MarketInfo> = new Map()
-
+  // used to log tests
+  private csvLogger = new CSVWriter(
+    './results.csv',
+    [
+      {id: 'blockHeight', title: 'BlockHeight'},
+      {id: 'userAddress', title: 'User'},
+      {id: 'estimatedLtv', title: 'LiquidationLtv'},
+      {id: 'debtRepaid', title: 'debtRepaid'},
+      {id: 'collateral', title: 'collateral'},
+      {id: 'liquidatorBalance', title: 'liquidatorBalance' }
+    ]
+  )
   constructor(sm?: SecretManager) {
     this.sm = !sm ? getDefaultSecretManager() : sm
     this.ammRouter = new AMMRouter()
@@ -107,8 +119,7 @@ export class BaseExecutor {
     const seedPhrase = await this.sm.getSeedPhrase()
     const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(seedPhrase, { prefix: PREFIX })
 
-    const pools = await this.loadPools()
-    this.ammRouter.setPools(pools)
+    await this.refreshPools()    
 
     //The liquidator account should always be the first under that seed, although we could set the index as a parameter in the .env
     const liquidatorAddress = (await liquidator.getAccounts())[0].address
@@ -158,15 +169,28 @@ export class BaseExecutor {
     }
   }
 
+  addCsvRow = (row : Row) => {
+    this.csvLogger.addRow(row)
+  }
+
+  writeCsv = async() => {
+    await this.csvLogger.writeToFile()
+  }
+
+  refreshPools = async () => {
+    const pools = await this.loadPools()
+    this.ammRouter.setPools(pools)
+  }
+
+
   getMaxBorrow = async (liquidatorAddress: string): Promise<BigNumber> => {
     if (!this.queryClient)
       throw new Error('Client is null, call initiate() before using this class')
-    console.log({ REDBANK_ADDRESS, liquidatorAddress })
     const result = await this.queryClient.queryContractSmart(REDBANK_ADDRESS, {
       user_position: { user: liquidatorAddress },
     })
 
-    return new BigNumber(result.weighted_max_ltv_collateral)
+    return new BigNumber(result.weighted_max_ltv_collateral).minus(result.total_collateralized_debt)
   }
 
   setBalances = async (liquidatorAddress: string) => {
