@@ -37,42 +37,8 @@ const {
   executeContract,
 } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl;
 
-
-interface Routes {
-  // Route for given pair [debt:collateral]
-  [pair: string]: SwapAmountInRoute[]
-}
-
-interface Price {
-  price: number
-  denom: string
-}
-
-interface Swaps {
-  [key: string]: Coin
-}
-
-interface Collaterals {
-  [key: string]: BigNumber
-}
-
-const addresses: ProtocolAddresses = {
-  oracle: process.env.CONTRACT_ORACLE_ADDRESS as string,
-  redBank: process.env.CONTRACT_REDBANK_ADDRESS as string,
-  addressProvider: '',
-  filterer: '',
-  incentives: '',
-  rewardsCollector: '',
-}
-
 let maxBorrow : BigNumber = new BigNumber(0)
 
-/**
- * Executor class is the entry point for the executor service
- * 
- * @param sm An optional parameter. If you want to use a secret manager to hold the seed 
- *           phrase, implement the secret manager interface and pass as a dependency.
- */
 export class Executor extends BaseExecutor{
 
   async start() {
@@ -172,7 +138,7 @@ export class Executor extends BaseExecutor{
       // for each asset, create a withdraw message
       Object.keys(collateralsWon).forEach((denom: string) =>
       msgs.push(executeContract(
-        makeWithdrawMessage(liquidatorAddress, denom, addresses.redBank).value as MsgExecuteContract
+        makeWithdrawMessage(liquidatorAddress, denom, this.config.contracts.redbank).value as MsgExecuteContract
       ))
     )
 
@@ -290,7 +256,7 @@ export class Executor extends BaseExecutor{
     }
   
     // Fetch position data
-    const positionData: DataResponse[] = await fetchRedbankBatch(positions, addresses.redBank, this.config.hiveEndpoint)
+    const positionData: DataResponse[] = await fetchRedbankBatch(positions, this.config.contracts.redbank, this.config.hiveEndpoint)
   
     console.log(`- found ${positionData.length} positions queued for liquidation.`)
     
