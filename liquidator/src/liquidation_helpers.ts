@@ -1,17 +1,8 @@
 import { Attribute } from '@cosmjs/stargate'
-import { LiquidationResult, LiquidationTx } from './types/liquidation.js'
-import { createLiquidationTx } from './liquidation_generator.js'
+import { LiquidationResult } from './types/liquidation.js'
 
-import { Collateral, Debt } from './hive.js'
 
-export interface ILiquidationHelper {
-  // Produce the ts required to liquidate a position
-  produceLiquidationTx(debts: Debt[], collaterals: Collateral[], address: string): LiquidationTx
-
-  // todo parse liquidation result
-}
-
-export class LiquidationHelper implements ILiquidationHelper {
+export class LiquidationHelper {
   private liquidatorAddress: string
   private liquidationFilterContract: string
 
@@ -77,10 +68,6 @@ export class LiquidationHelper implements ILiquidationHelper {
     })
 
     return results
-  }
-
-  produceLiquidationTx(debts: Debt[], collaterals: Collateral[], address: string): LiquidationTx {
-    return createLiquidationTx(debts, collaterals, address)
   }
 
   getLiquidationFiltererContract(): string {
