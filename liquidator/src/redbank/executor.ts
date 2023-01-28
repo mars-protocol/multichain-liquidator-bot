@@ -29,19 +29,6 @@ import { Pool } from '../types/Pool.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
 import { BaseExecutor } from '../BaseExecutor.js'
 
-
-const PREFIX = process.env.PREFIX!
-const RPC_ENDPOINT = process.env.RPC_ENDPOINT!
-const LCD_ENDPOINT = process.env.LCD_ENDPOINT!
-const HIVE_ENDPOINT = process.env.HIVE_ENDPOINT!
-const LIQUIDATION_FILTERER_CONTRACT = process.env.LIQUIDATION_FILTERER_CONTRACT!
-const LIQUIDATABLE_ASSETS: string[] = JSON.parse(process.env.LIQUIDATABLE_ASSETS!)
-const ORACLE_ADDRESS = process.env.ORACLE_ADDRESS!
-const REDBANK_ADDRESS = process.env.REDBANK_ADDRESS!
-const NEUTRAL_ASSET_DENOM = process.env.NEUTRAL_ASSET_DENOM!
-
-const ROUTES: Routes = JSON.parse(process.env.ROUTES!)
-
 const {
   swapExactAmountIn
 } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
@@ -150,7 +137,7 @@ export class Executor extends BaseExecutor{
         liquidationHelper.getLiquidatorAddress(),
         denom,
         amount.toFixed(0),
-        REDBANK_ADDRESS)))
+        this.config.contracts.redbank)))
     return borrowTxs
   }
 
@@ -197,7 +184,7 @@ export class Executor extends BaseExecutor{
     //Swap to neutral
     collateralsWon.forEach((collateral) => {
       const collateralAmount = new BigNumber(collateral.amount)
-      const routeOptions = this.ammRouter.getRoutes(collateral.denom, NEUTRAL_ASSET_DENOM)
+      const routeOptions = this.ammRouter.getRoutes(collateral.denom, this.config.neutralAssetDenom)
       
       const bestRoute = routeOptions.sort(
         (routeA, routeB) => {
@@ -212,7 +199,7 @@ export class Executor extends BaseExecutor{
           swapExactAmountIn({
             sender:liquidatorAddress,
             // cast to long because osmosis felt it neccessary to create their own Long rather than use the js one
-            routes:bestRoute?.map((route) => {return {poolId: route.poolId as Long, tokenOutDenom: NEUTRAL_ASSET_DENOM}}),
+            routes:bestRoute?.map((route) => {return {poolId: route.poolId as Long, tokenOutDenom: this.config.neutralAssetDenom}}),
             tokenIn: collateral,
             // allow for 0.5%% slippage from what we estimated
             tokenOutMinAmount: this.ammRouter.getOutput(new BigNumber(collateral.amount), bestRoute).multipliedBy(0.995).toFixed(0), 
@@ -226,7 +213,7 @@ export class Executor extends BaseExecutor{
   appendSwapToDebtMessages(debtsRepaid: Map<string, Coin>, liquidatorAddress: string, msgs: EncodeObject[]) {
     debtsRepaid.forEach((debt) => {
       const debtAmount = new BigNumber(debt.amount)
-      const routeOptions = this.ammRouter.getRoutes(NEUTRAL_ASSET_DENOM, debt.denom)
+      const routeOptions = this.ammRouter.getRoutes(this.config.neutralAssetDenom, debt.denom)
       
       const bestRoute = routeOptions.sort(
         (routeA, routeB) => {
@@ -243,8 +230,8 @@ export class Executor extends BaseExecutor{
             swapExactAmountIn({
               sender:liquidatorAddress,
               // cast to long because osmosis felt it neccessary to create their own Long rather than use the js one
-              routes:bestRoute?.map((route) => {return {poolId: route.poolId as Long, tokenOutDenom: NEUTRAL_ASSET_DENOM}}),
-              tokenIn: {denom : NEUTRAL_ASSET_DENOM, amount: bestRouteAmount.toFixed(0)},
+              routes:bestRoute?.map((route) => {return {poolId: route.poolId as Long, tokenOutDenom: this.config.neutralAssetDenom}}),
+              tokenIn: {denom : this.config.neutralAssetDenom, amount: bestRouteAmount.toFixed(0)},
               // allow for 1% slippage for debt what we estimated
               tokenOutMinAmount: debtAmount.toFixed(0), 
             }))
@@ -259,7 +246,7 @@ export class Executor extends BaseExecutor{
       msgs.push(makeRepayMessage(
         liquidatorAddress,
         debtKey,
-        REDBANK_ADDRESS,
+        this.config.contracts.redbank,
         [{
           denom:debtKey, 
           amount:debtsToRepay.get(debtKey)?.toFixed(0) || "0"}
@@ -271,12 +258,12 @@ export class Executor extends BaseExecutor{
   }
 
   async appendDepositMessages(liquidatorAddress: string, msgs: EncodeObject[]) : Promise<EncodeObject[]> {
-    const balance = await this.getWasmQueryClient().getBalance(liquidatorAddress, NEUTRAL_ASSET_DENOM)
+    const balance = await this.getWasmQueryClient().getBalance(liquidatorAddress, this.config.neutralAssetDenom)
     msgs.push(
       makeDepositMessage(
         liquidatorAddress,
-        NEUTRAL_ASSET_DENOM,
-        REDBANK_ADDRESS,
+        this.config.neutralAssetDenom,
+        this.config.contracts.redbank,
         [
           balance
         ]
@@ -303,7 +290,7 @@ export class Executor extends BaseExecutor{
     }
   
     // Fetch position data
-    const positionData: DataResponse[] = await fetchRedbankBatch(positions, addresses.redBank, HIVE_ENDPOINT)
+    const positionData: DataResponse[] = await fetchRedbankBatch(positions, addresses.redBank, this.config.hiveEndpoint)
   
     console.log(`- found ${positionData.length} positions queued for liquidation.`)
     
