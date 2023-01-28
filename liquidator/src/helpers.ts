@@ -11,6 +11,7 @@ import {
   MsgSwapExactAmountIn,
   SwapAmountInRoute,
 } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
+import camelcaseKeys from 'camelcase-keys'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -22,7 +23,8 @@ export function readAddresses(deployConfigPath: string): ProtocolAddresses {
   try {
     const data = readFileSync(deployConfigPath, 'utf8')
     const deployData: { addresses: ProtocolAddresses } = JSON.parse(data)
-    const result: ProtocolAddresses = deployData.addresses
+    const result: ProtocolAddresses = camelcaseKeys(deployData.addresses)
+
     return result
   } catch (e) {
     console.error(`Failed to load artifacts path - could not find ${deployConfigPath}`)
@@ -249,6 +251,10 @@ export const deposit = async (
     },
   ]
 
+  console.log({
+    redbank: addresses.redBank,
+    msg
+  })
   return await client.execute(sender, addresses.redBank, msg, 'auto', undefined, coins)
 }
 
