@@ -1,7 +1,7 @@
 import { LiquidationHelper } from './liquidation_helpers.js'
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
-import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
+import { coins, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { CosmWasmClient, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { RedisInterface } from './redis.js'
 import BigNumber from 'bignumber.js'
@@ -23,11 +23,6 @@ interface Price {
   price: number
   denom: string
 }
-
-const prices: Map<string, number> = new Map()
-const balances: Map<string, number> = new Map()
-let client: SigningStargateClient
-let queryClient: CosmWasmClient
 
 const getDefaultSecretManager = (): SecretManager => {
   return {
@@ -53,11 +48,28 @@ export class BaseExecutor {
   public sm: SecretManager
   public ammRouter: AMMRouter
   public redis: RedisInterface
+  public prices: Map<string, number> = new Map()
+  public balances: Map<string, number> = new Map()
+
+  private client: SigningStargateClient | undefined = undefined
+  private queryClient: CosmWasmClient | undefined = undefined
 
   constructor(sm?: SecretManager) {
     this.sm = !sm ? getDefaultSecretManager() : sm
     this.ammRouter = new AMMRouter()
     this.redis = new RedisInterface()
+  }
+
+  getSigningClient = () : SigningStargateClient => {
+    if (!this.client) throw Error("Client not initialsed. Call initiate() to initiate clients")
+  
+    return this.client!
+  }
+
+  getWasmQueryClient = () : CosmWasmClient => {
+    if (!this.queryClient) throw Error("Client not initialsed. Call initiate() to initiate clients")
+
+    return this.queryClient!
   }
 
   async initiate(): Promise<{
@@ -75,24 +87,24 @@ export class BaseExecutor {
     //The liquidator account should always be the first under that seed, although we could set the index as a parameter in the .env
     const liquidatorAddress = (await liquidator.getAccounts())[0].address
 
-    queryClient = await SigningCosmWasmClient.connectWithSigner(RPC_ENDPOINT, liquidator)
+    this.queryClient = await SigningCosmWasmClient.connectWithSigner(RPC_ENDPOINT, liquidator)
 
-    client = await SigningStargateClient.connectWithSigner(RPC_ENDPOINT, liquidator)
+    this.client = await SigningStargateClient.connectWithSigner(RPC_ENDPOINT, liquidator)
 
     const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
 
-    client.registry.register(executeTypeUrl, MsgExecuteContract)
+    this.client.registry.register(executeTypeUrl, MsgExecuteContract)
 
     const liquidationHelper = new LiquidationHelper(
       liquidatorAddress,
       LIQUIDATION_FILTERER_CONTRACT,
     )
 
-    await this.setBalances(queryClient, liquidatorAddress)
+    await this.setBalances(liquidatorAddress)
 
     // todo if gas is low, notify here
 
-    await this.setPrices(queryClient)
+    await this.setPrices()
 
     return {
       redis: this.redis,
@@ -100,23 +112,23 @@ export class BaseExecutor {
     }
   }
 
-  setBalances = async (client: CosmWasmClient, liquidatorAddress: string) => {
+  setBalances = async (liquidatorAddress: string) => {
     for (const denom in LIQUIDATABLE_ASSETS) {
-      const balance = await client.getBalance(liquidatorAddress, LIQUIDATABLE_ASSETS[denom])
-      balances.set(LIQUIDATABLE_ASSETS[denom], Number(balance.amount))
+      const balance = await this.getWasmQueryClient().getBalance(liquidatorAddress, LIQUIDATABLE_ASSETS[denom])
+      this.balances.set(LIQUIDATABLE_ASSETS[denom], Number(balance.amount))
     }
   }
 
-  setPrices = async (client: CosmWasmClient) => {
-    const result: Price[] = await client.queryContractSmart(ORACLE_ADDRESS, {
+  setPrices = async () => {
+    const result: Price[] = await this.getWasmQueryClient().queryContractSmart(ORACLE_ADDRESS, {
       prices: {},
     })
 
-    result.forEach((price: Price) => prices.set(price.denom, price.price))
+    result.forEach((price: Price) => this.prices.set(price.denom, price.price))
   }
 
   getMaxBorrow = async (liquidatorAddress: string): Promise<BigNumber> => {
-    const result = await queryClient.queryContractSmart(REDBANK_ADDRESS, {
+    const result = await this.getWasmQueryClient().queryContractSmart(REDBANK_ADDRESS, {
       user_position: { user_addr: liquidatorAddress },
     })
 
@@ -127,5 +139,15 @@ export class BaseExecutor {
     const response = await fetch(`${LCD_ENDPOINT}/osmosis/gamm/v1beta1/pools`)
     const pools: Pool[] = (await response.json()) as Pool[]
     return pools
+  }
+  
+  getFee = async(msgs: EncodeObject[], address: string) => {
+    const gasEstimated = await this.getSigningClient().simulate(address, msgs, '');
+    const fee = {
+      amount: coins(0.01, 'uosmo'),
+      gas: Number(gasEstimated*1.3).toString()
+    }
+  
+    return fee
   }
 }

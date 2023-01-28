@@ -6,7 +6,7 @@ import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import { coins, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
-import { CosmWasmClient, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
+
 import {
   makeBorrowMessage,
   makeDepositMessage,
@@ -78,11 +78,7 @@ const addresses: ProtocolAddresses = {
   rewardsCollector: '',
 }
 
-const prices : Map<string, number> = new Map()
-const balances: Map<string, number> = new Map()
 let maxBorrow : BigNumber = new BigNumber(0)
-let client : SigningStargateClient
-let queryClient : CosmWasmClient
 
 /**
  * Executor class is the entry point for the executor service
@@ -129,7 +125,7 @@ export class Executor extends BaseExecutor{
         position.debts.find((debt: Debt) => debt.denom === debtDenom)?.amount || 0,
       )
 
-      const newDebt = totalDebtValue.plus(new BigNumber(amount.multipliedBy(prices.get(debtDenom)!)))
+      const newDebt = totalDebtValue.plus(new BigNumber(amount.multipliedBy(this.prices.get(debtDenom)!)))
   
       // ensure we are well under max borrow
       if (maxBorrow > newDebt.multipliedBy(1.05)) {
@@ -275,7 +271,7 @@ export class Executor extends BaseExecutor{
   }
 
   async appendDepositMessages(liquidatorAddress: string, msgs: EncodeObject[]) : Promise<EncodeObject[]> {
-    const balance = await client.getBalance(liquidatorAddress, NEUTRAL_ASSET_DENOM)
+    const balance = await this.getWasmQueryClient().getBalance(liquidatorAddress, NEUTRAL_ASSET_DENOM)
     msgs.push(
       makeDepositMessage(
         liquidatorAddress,
@@ -292,6 +288,7 @@ export class Executor extends BaseExecutor{
 
   async run(liquidationHelper: LiquidationHelper, redis: IRedisInterface) {
 
+    const client = this.getSigningClient()
     // Find our limit we can borrow. Denominated in 
     maxBorrow = await this.getMaxBorrow(liquidationHelper.getLiquidatorAddress())
 
@@ -321,7 +318,7 @@ export class Executor extends BaseExecutor{
     const borrowTxs = this.produceBorrowTxs(debtsToRepay, liquidationHelper)
 
     // dispatch liquidation tx along with borrows, and recieve and object with results on it
-    const results = await sendBorrowAndLiquidateTx(txs, borrowTxs, debtCoins, liquidationHelper)
+    const results = await this.sendBorrowAndLiquidateTx(txs, borrowTxs, debtCoins, liquidationHelper)
   
     // Log the amount of liquidations executed
     redis.incrementBy('executor.liquidations.executed', results.length)
@@ -346,49 +343,43 @@ export class Executor extends BaseExecutor{
     await client.signAndBroadcast(
       liquidatorAddress,
       msgs,
-      await getFee(msgs, liquidationHelper.getLiquidationFiltererContract())
+      await this.getFee(msgs, liquidationHelper.getLiquidationFiltererContract())
     )
     
     console.log(`- Lquidation Process Complete.`)
   }
-}
 
-const getFee = async(msgs: EncodeObject[], address: string) => {
-  const gasEstimated = await client.simulate(address, msgs, '');
-  const fee = {
-    amount: coins(0.01, 'uosmo'),
-    gas: Number(gasEstimated*1.3).toString()
-  }
-
-  return fee
-}
-
-const sendBorrowAndLiquidateTx = async(txs: LiquidationTx[], borrowMessages: EncodeObject[], coins: Coin[], liquidationHelper : LiquidationHelper): Promise<LiquidationResult[]> => {
-  const liquidateMsg = JSON.stringify({liquidate_many: {liquidations: txs}})
-
-  const msg = toUtf8(liquidateMsg)
-
-  const msgs: EncodeObject[] = borrowMessages
-
-  msgs.push(
-    executeContract(
-      makeExecuteContractMessage(
-        liquidationHelper.getLiquidatorAddress(), 
-        liquidationHelper.getLiquidationFiltererContract(), 
-        msg,
-        coins).value as MsgExecuteContract
-  ))
-
-  if (!msgs || msgs.length === 0) return []
-
-  const result = await client.signAndBroadcast(
-    liquidationHelper.getLiquidatorAddress(),
-    msgs,
-    await getFee(msgs,liquidationHelper.getLiquidationFiltererContract())
-  )
-
-  if (!result || !result.rawLog) return []
-  const events = JSON.parse(result.rawLog)[0]
+  sendBorrowAndLiquidateTx = async(
+    txs: LiquidationTx[], 
+    borrowMessages: EncodeObject[], 
+    coins: Coin[], 
+    liquidationHelper : LiquidationHelper): Promise<LiquidationResult[]> => {
+    const liquidateMsg = JSON.stringify({liquidate_many: {liquidations: txs}})
   
-  return liquidationHelper.parseLiquidationResult(events.events)
+    const msg = toUtf8(liquidateMsg)
+  
+    const msgs: EncodeObject[] = borrowMessages
+  
+    msgs.push(
+      executeContract(
+        makeExecuteContractMessage(
+          liquidationHelper.getLiquidatorAddress(), 
+          liquidationHelper.getLiquidationFiltererContract(), 
+          msg,
+          coins).value as MsgExecuteContract
+    ))
+  
+    if (!msgs || msgs.length === 0) return []
+  
+    const result = await this.getSigningClient().signAndBroadcast(
+      liquidationHelper.getLiquidatorAddress(),
+      msgs,
+      await this.getFee(msgs,liquidationHelper.getLiquidationFiltererContract())
+    )
+  
+    if (!result || !result.rawLog) return []
+    const events = JSON.parse(result.rawLog)[0]
+    
+    return liquidationHelper.parseLiquidationResult(events.events)
+  }
 }
