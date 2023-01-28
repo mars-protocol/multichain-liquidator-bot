@@ -177,6 +177,24 @@ export class LiquidationActionGenerator {
             : this.produceLiquidateVault(debtCoin,liquidateeAccountId, vaultPositionType!, {address: requestCoinDenom})
     }
 
+    /**
+     * Swap the 
+     * @param collateralDenom The collateral we recieve from the liquidation
+     * @param debtDenom The debt we need to repay
+     */
+    generateRepayActions = (collateralDenom: string, debtDenom: string) : Action[] => {
+        const actions = []
+
+        // Swap if required
+        if (collateralDenom !== debtDenom) {
+            actions.push(this.produceSwapAction(collateralDenom, debtDenom))
+        }
+
+        actions.push(this.produceRepayAction(debtDenom))
+        
+        return actions
+    }
+
     private produceLiquidateCoin = (debtCoin: Coin, liquidateeAccountId : string, requestCoinDenom: string) : Action => {
         return {
             liquidate_coin: {
@@ -200,6 +218,16 @@ export class LiquidationActionGenerator {
                 request_vault: requestVault,
             }
           }
+    }
+
+
+    private produceRepayAction =(denom: string) : Action => {
+
+        return {
+            repay : {
+                denom:denom
+            }
+        }
     }
 
     private produceSwapAction = (denomIn: string, denomOut : string, slippage : string = "0.005") : Action => {
