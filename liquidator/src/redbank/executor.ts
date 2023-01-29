@@ -20,11 +20,12 @@ import { osmosis, cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
 import { DataResponse, Debt, fetchRedbankBatch } from '../hive.js'
-import { IRedisInterface } from '../redis.js'
+import { IRedisInterface, RedisInterface } from '../redis.js'
 import { SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx.js'
 import BigNumber from 'bignumber.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
-import { BaseExecutor } from '../BaseExecutor.js'
+import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor.js'
+import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 
 const {
   swapExactAmountIn
@@ -36,17 +37,96 @@ const {
 
 let maxBorrow : BigNumber = new BigNumber(0)
 
+export interface RedbankExecutorConfig extends BaseExecutorConfig {
+  liquidationFiltererAddress: string
+  liquidatableAssets: string[]
+}
+
 export class Executor extends BaseExecutor{
+
+  public config : RedbankExecutorConfig
+  private liquidationHelper: LiquidationHelper
+
+  constructor(config : RedbankExecutorConfig, client: SigningStargateClient, queryClient: CosmWasmClient) {
+    super(config, client, queryClient)
+    this.config = config
+    
+    // instantiate liquidation helper
+    this.liquidationHelper = new LiquidationHelper(
+      this.config.liquidatorMasterAddress,
+      this.config.liquidationFiltererAddress,
+    )
+  }
+
 
   async start() {
     
-    const {
-      redis,
-      liquidationHelper
-    } = await this.initiate()
+    await this.initiate()
 
     // run
-    while (true) await this.run(liquidationHelper, redis)
+    while (true) await this.run()
+  }
+
+  async run() {
+
+    // Find our limit we can borrow. Denominated in 
+    maxBorrow = await this.getMaxBorrow(this.liquidationHelper.getLiquidatorAddress())
+
+    console.log("Checking for liquidations")
+    const positions: Position[] = await this.redis.popUnhealthyPositions()
+    
+    if (positions.length == 0) {
+      //sleep to avoid spamming redis db when empty
+      await sleep(200)
+      console.log(' - No items for liquidation yet')
+      return
+    }
+  
+    // Fetch position data
+    const positionData: DataResponse[] = await fetchRedbankBatch(positions, this.config.redbankAddress, this.config.hiveEndpoint)
+  
+    console.log(`- found ${positionData.length} positions queued for liquidation.`)
+    
+    
+    // fetch debts, liquidation txs
+    const {txs, debtsToRepay } = this.produceLiquidationTxs(positionData, this.liquidationHelper)
+    
+    const debtCoins: Coin[] = []
+    debtsToRepay.forEach((amount, denom) => debtCoins.push({ denom, amount: amount.toFixed(0) }))
+  
+    // produce borrow tx's
+    const borrowTxs = this.produceBorrowTxs(debtsToRepay, this.liquidationHelper)
+
+    // dispatch liquidation tx along with borrows, and recieve and object with results on it
+    const results = await this.sendBorrowAndLiquidateTx(txs, borrowTxs, debtCoins, this.liquidationHelper)
+  
+    // Log the amount of liquidations executed
+    this.redis.incrementBy('executor.liquidations.executed', results.length)
+  
+    const liquidatorAddress = this.liquidationHelper.getLiquidatorAddress()
+  
+    console.log(`- Successfully liquidated ${results.length} positions`)
+      
+    // Parse results and react accordingly
+    const {collateralsWon, debtsRepaid} = this.parseResults(results)
+  
+    // second block of transactions
+    let msgs : EncodeObject[] = []
+    msgs = this.appendWithdrawMessages(collateralsWon, liquidatorAddress, msgs)
+    msgs = this.appendSwapToNeutralMessages(collateralsWon, liquidatorAddress, msgs)
+    msgs = this.appendSwapToDebtMessages(debtsRepaid, liquidatorAddress, msgs)
+    msgs = this.appendRepayMessages(debtsToRepay, liquidatorAddress, msgs)
+
+    // todo - maintain track of asset
+    msgs = await this.appendDepositMessages(liquidatorAddress, msgs)
+
+    await this.client.signAndBroadcast(
+      liquidatorAddress,
+      msgs,
+      await this.getFee(msgs, this.liquidationHelper.getLiquidationFiltererContract())
+    )
+    
+    console.log(`- Lquidation Process Complete.`)
   }
 
   produceLiquidationTxs(positionData : DataResponse[], liquidationHelper: LiquidationHelper) : {
@@ -100,7 +180,7 @@ export class Executor extends BaseExecutor{
         liquidationHelper.getLiquidatorAddress(),
         denom,
         amount.toFixed(0),
-        this.config.contracts.redbank)))
+        this.config.redbankAddress)))
     return borrowTxs
   }
 
@@ -135,7 +215,7 @@ export class Executor extends BaseExecutor{
       // for each asset, create a withdraw message
       Object.keys(collateralsWon).forEach((denom: string) =>
       msgs.push(executeContract(
-        makeWithdrawMessage(liquidatorAddress, denom, this.config.contracts.redbank).value as MsgExecuteContract
+        makeWithdrawMessage(liquidatorAddress, denom, this.config.redbankAddress).value as MsgExecuteContract
       ))
     )
 
@@ -209,7 +289,7 @@ export class Executor extends BaseExecutor{
       msgs.push(makeRepayMessage(
         liquidatorAddress,
         debtKey,
-        this.config.contracts.redbank,
+        this.config.redbankAddress,
         [{
           denom:debtKey, 
           amount:debtsToRepay.get(debtKey)?.toFixed(0) || "0"}
@@ -221,12 +301,12 @@ export class Executor extends BaseExecutor{
   }
 
   async appendDepositMessages(liquidatorAddress: string, msgs: EncodeObject[]) : Promise<EncodeObject[]> {
-    const balance = await this.getWasmQueryClient().getBalance(liquidatorAddress, this.config.neutralAssetDenom)
+    const balance = await this.queryClient.getBalance(liquidatorAddress, this.config.neutralAssetDenom)
     msgs.push(
       makeDepositMessage(
         liquidatorAddress,
         this.config.neutralAssetDenom,
-        this.config.contracts.redbank,
+        this.config.redbankAddress,
         [
           balance
         ]
@@ -234,69 +314,6 @@ export class Executor extends BaseExecutor{
     )
 
     return msgs
-  }
-
-  async run(liquidationHelper: LiquidationHelper, redis: IRedisInterface) {
-
-    const client = this.getSigningClient()
-    // Find our limit we can borrow. Denominated in 
-    maxBorrow = await this.getMaxBorrow(liquidationHelper.getLiquidatorAddress())
-
-    console.log("Checking for liquidations")
-    const positions: Position[] = await redis.popUnhealthyPositions()
-    
-    if (positions.length == 0) {
-      //sleep to avoid spamming redis db when empty
-      await sleep(200)
-      console.log(' - No items for liquidation yet')
-      return
-    }
-  
-    // Fetch position data
-    const positionData: DataResponse[] = await fetchRedbankBatch(positions, this.config.contracts.redbank, this.config.hiveEndpoint)
-  
-    console.log(`- found ${positionData.length} positions queued for liquidation.`)
-    
-    
-    // fetch debts, liquidation txs
-    const {txs, debtsToRepay } = this.produceLiquidationTxs(positionData, liquidationHelper)
-    
-    const debtCoins: Coin[] = []
-    debtsToRepay.forEach((amount, denom) => debtCoins.push({ denom, amount: amount.toFixed(0) }))
-  
-    // produce borrow tx's
-    const borrowTxs = this.produceBorrowTxs(debtsToRepay, liquidationHelper)
-
-    // dispatch liquidation tx along with borrows, and recieve and object with results on it
-    const results = await this.sendBorrowAndLiquidateTx(txs, borrowTxs, debtCoins, liquidationHelper)
-  
-    // Log the amount of liquidations executed
-    redis.incrementBy('executor.liquidations.executed', results.length)
-  
-    const liquidatorAddress = liquidationHelper.getLiquidatorAddress()
-  
-    console.log(`- Successfully liquidated ${results.length} positions`)
-      
-    // Parse results and react accordingly
-    const {collateralsWon, debtsRepaid} = this.parseResults(results)
-  
-    // second block of transactions
-    let msgs : EncodeObject[] = []
-    msgs = this.appendWithdrawMessages(collateralsWon, liquidatorAddress, msgs)
-    msgs = this.appendSwapToNeutralMessages(collateralsWon, liquidatorAddress, msgs)
-    msgs = this.appendSwapToDebtMessages(debtsRepaid, liquidatorAddress, msgs)
-    msgs = this.appendRepayMessages(debtsToRepay, liquidatorAddress, msgs)
-
-    // todo - maintain track of asset
-    msgs = await this.appendDepositMessages(liquidatorAddress, msgs)
-
-    await client.signAndBroadcast(
-      liquidatorAddress,
-      msgs,
-      await this.getFee(msgs, liquidationHelper.getLiquidationFiltererContract())
-    )
-    
-    console.log(`- Lquidation Process Complete.`)
   }
 
   sendBorrowAndLiquidateTx = async(
@@ -321,7 +338,7 @@ export class Executor extends BaseExecutor{
   
     if (!msgs || msgs.length === 0) return []
   
-    const result = await this.getSigningClient().signAndBroadcast(
+    const result = await this.client.signAndBroadcast(
       liquidationHelper.getLiquidatorAddress(),
       msgs,
       await this.getFee(msgs,liquidationHelper.getLiquidationFiltererContract())
