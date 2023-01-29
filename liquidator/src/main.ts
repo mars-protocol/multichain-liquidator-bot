@@ -1,7 +1,5 @@
-import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate"
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
-import { SigningStargateClient } from "@cosmjs/stargate"
-import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
+import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from "./helpers.js"
 import { Executor } from "./redbank/executor.js"
 
 export const main = async() => {
@@ -14,11 +12,8 @@ export const main = async() => {
   const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
 
   // produce clients 
-  const queryClient = await SigningCosmWasmClient.connectWithSigner(process.env.RPC_ENDPOINT!, liquidator)
-  const client = await SigningStargateClient.connectWithSigner(process.env.RPC_ENDPOINT!, liquidator)
-
-  const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
-  client.registry.register(executeTypeUrl, MsgExecuteContract)
+  const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!, liquidator)
+  const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
 
   await new Executor({
       gasDenom: 'uosmo',

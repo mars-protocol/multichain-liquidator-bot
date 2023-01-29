@@ -1,9 +1,11 @@
 import { CosmWasmClient, MsgExecuteContractEncodeObject, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { AccountData, Coin, EncodeObject } from '@cosmjs/proto-signing'
+import { AccountData, Coin, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { readFileSync } from 'fs'
 import { toUtf8 } from '@cosmjs/encoding'
 import { osmosis } from 'osmojs'
 import { MsgSwapExactAmountIn, SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
+import { SigningStargateClient } from '@cosmjs/stargate'
+import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -22,6 +24,20 @@ export function readAddresses(deployConfigPath: string): ProtocolAddresses {
     process.exit(1)
   }
 }
+
+export const produceSigningStargateClient = async(rpcEndpoint: string, liquidator: DirectSecp256k1HdWallet) : Promise<SigningStargateClient> => {
+  const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, liquidator)
+
+  const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
+  client.registry.register(executeTypeUrl, MsgExecuteContract)
+
+  return client
+}
+
+export const produceReadOnlyCosmWasmClient = async(rpcEndpoint : string, liquidator : DirectSecp256k1HdWallet) : Promise<CosmWasmClient> => {
+  return await SigningCosmWasmClient.connectWithSigner(rpcEndpoint, liquidator)
+}
+
 
 export const setPrice = async (
   client: SigningCosmWasmClient,
