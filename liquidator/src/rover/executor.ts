@@ -14,6 +14,7 @@ import { EncodeObject } from "@cosmjs/proto-signing";
 export interface RoverExecutorConfig extends BaseExecutorConfig{
     creditManagerAddress: string
     liquidatorAddress: string
+    accountNftAddress: string
     minGasTokens: number
   }
 
@@ -58,12 +59,9 @@ export class Executor extends BaseExecutor {
             }
         }
        
-        // Mint an account. This is somewhat questionable - it means that we generate
-        // a new credit account every time we boot up a new executor service. We may boot
-        // up and kill executors semi often, which can lead to them having several credit accounts.
-        // This will not result in leaking / stuck funds as they are all withdrawn after an 
-        // action but it is gas inefficient. A query for existing credit accounts first would be better.
-        const result = await this.client.signAndBroadcast(
+        let subAccounts = await this.queryClient.queryContractSmart(this.config.accountNftAddress, { tokens : { owner : this.config.liquidatorAddress }})
+        if (subAccounts.length === 0) {
+            const result = await this.client.signAndBroadcast(
             this.config.liquidatorAddress, 
             [
                 makeExecuteContractMessage(
@@ -73,10 +71,15 @@ export class Executor extends BaseExecutor {
             ]
             ,'auto')
 
-        // todo : parse credit account and get account id
-        if (result.code !== 0) {
-            throw new Error(`Failed to create credit account for ${this.config.liquidatorAddress}. TxHash: ${result.transactionHash}`)
+            if (result.code !== 0) {
+                throw new Error(`Failed to create credit account for ${this.config.liquidatorAddress}. TxHash: ${result.transactionHash}`)
+            }
         }
+        // todo parse result to get sub account id
+        subAccounts = await this.queryClient.queryContractSmart(this.config.accountNftAddress, { tokens : { owner : this.config.liquidatorAddress }})
+
+        this.liquidatorAccountId = subAccounts[0]
+        
         
         while (true) await this.run()
 
