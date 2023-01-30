@@ -9,9 +9,11 @@ import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
+
 export async function sleep(timeout: number) {
   await new Promise((resolve) => setTimeout(resolve, timeout))
 }
+
 // Reads json containing contract addresses located in /artifacts folder for specified network.
 export function readAddresses(deployConfigPath: string): ProtocolAddresses {
   try {
@@ -126,6 +128,25 @@ export const borrow = async (
   return await client.execute(sender, addresses.redBank, msg, 'auto')
 }
 
+export const makeExecuteContractMessage = (
+  sender: string,
+  contract: string,
+  msg: Uint8Array,
+funds: Coin[] = []
+) : MsgExecuteContractEncodeObject => {
+  const executeContractMsg: MsgExecuteContractEncodeObject = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: {
+      sender,
+      contract,
+      msg,
+      funds,
+    },
+  }
+
+  return executeContractMsg
+}
+
 export const makeDepositMessage = (
   sender: string,
   assetDenom: string,
@@ -158,25 +179,6 @@ export const makeBorrowMessage = (
       contract: redBankContractAddress,
       msg: toUtf8(`{ "borrow": { "denom": "${assetDenom}", "amount": "${amount}" }}`),
       funds: [],
-    },
-  }
-
-  return executeContractMsg
-}
-
-export const makeExecuteContractMessage = (
-  sender: string,
-  contractAddress: string,
-  msg: Uint8Array,
-  funds: Coin[]
-): MsgExecuteContractEncodeObject => {
-  const executeContractMsg: MsgExecuteContractEncodeObject = {
-    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
-    value: {
-      sender: sender,
-      contract: contractAddress,
-      msg: msg,
-      funds:funds,
     },
   }
 

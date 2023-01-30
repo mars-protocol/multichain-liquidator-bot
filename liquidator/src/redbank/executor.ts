@@ -73,7 +73,7 @@ export class Executor extends BaseExecutor{
     maxBorrow = await this.getMaxBorrow(this.liquidationHelper.getLiquidatorAddress())
 
     console.log("Checking for liquidations")
-    const positions: Position[] = await this.redis.popUnhealthyPositions()
+    const positions: Position[] = await this.redis.popUnhealthyRedbankPositions()
     
     if (positions.length == 0) {
       //sleep to avoid spamming redis db when empty
