@@ -4,7 +4,7 @@ import { Position } from './types/position'
 
 export interface IRedisInterface {
   connect(): Promise<RedisClientType>
-  popUnhealthyRedbankPositions(): Promise<Position[]>
+  popUnhealthyRedbankPositions(count: number): Promise<Position[]>
   incrementBy(key: string, value: number): Promise<number>
 }
 
@@ -40,7 +40,7 @@ export class RedisInterface implements IRedisInterface {
    * Note that the max this can return at 1 time is 1000, any more will be left in
    * the list
    */
-  async popUnhealthyRedbankPositions(count = 25): Promise<Position[]> {
+  async popUnhealthyRedbankPositions(count: number): Promise<Position[]> {
     if (!this.client) {
       console.log(`ERROR: redis client not connected`)
       return []

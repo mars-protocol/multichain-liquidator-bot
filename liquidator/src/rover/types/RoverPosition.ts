@@ -1,25 +1,24 @@
 export interface RoverPosition {
-    collaterals : Collateral[]
-    debts : Debt[]
-    accountId: string
+  collaterals: Collateral[]
+  debts: Debt[]
+  accountId: string
 }
 
 export enum PositionType {
-    COIN,
-    VAULT
+  COIN,
+  VAULT,
 }
 
 export interface Collateral {
-    type : PositionType
-    amount : number
-    denom : string
-    price : number
-    closeFactor: number
-
+  type: PositionType
+  amount: number
+  denom: string
+  price: number
+  closeFactor: number
 }
 
 export interface Debt {
-    amount : number
-    denom : string
-    price : number
+  amount: number
+  denom: string
+  price: number
 }

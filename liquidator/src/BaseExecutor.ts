@@ -7,11 +7,13 @@ import { RedisInterface } from './redis.js'
 import BigNumber from 'bignumber.js'
 import { AMMRouter } from './amm_router.js'
 import fetch from 'node-fetch'
-import { Pool } from './types/Pool.js'
+import { Pagination, Pool } from './types/Pool.js'
 import 'dotenv/config.js'
 import { MarketInfo } from './rover/types/MarketInfo.js'
 import { RedbankExecutorConfig } from './redbank/executor.js'
 import { RoverExecutorConfig } from './rover/executor.js'
+import camelcaseKeys from 'camelcase-keys'
+import { CSVWriter, Row } from './CsvWriter.js'
 
 interface Price {
   price: number
@@ -42,7 +44,18 @@ export class BaseExecutor {
 
   public client: SigningStargateClient 
   public queryClient: CosmWasmClient 
-
+  
+  private csvLogger = new CSVWriter(
+    './results.csv',
+    [
+      {id: 'blockHeight', title: 'BlockHeight'},
+      {id: 'userAddress', title: 'User'},
+      {id: 'estimatedLtv', title: 'LiquidationLtv'},
+      {id: 'debtRepaid', title: 'debtRepaid'},
+      {id: 'collateral', title: 'collateral'},
+      {id: 'liquidatorBalance', title: 'liquidatorBalance' }
+    ]
+  )
   constructor(config: BaseExecutorConfig, client: SigningStargateClient, queryClient: CosmWasmClient) {
     this.config = config
     this.ammRouter = new AMMRouter()
@@ -74,6 +87,14 @@ export class BaseExecutor {
     }
   }
 
+  addCsvRow = (row : Row) => {
+    this.csvLogger.addRow(row)
+  }
+
+  writeCsv = async() => {
+    await this.csvLogger.writeToFile()
+  }
+
   setPrices = async () => {
     const result: Price[] = await this.queryClient.queryContractSmart(this.config.oracleAddress, {
       prices: {},
@@ -82,27 +103,38 @@ export class BaseExecutor {
     result.forEach((price: Price) => this.prices.set(price.denom, price.price))
   }
 
-  getMaxBorrow = async (liquidatorAddress: string): Promise<BigNumber> => {
-    const result = await this.queryClient.queryContractSmart(this.config.redbankAddress, {
-      user_position: { user_addr: liquidatorAddress },
-    })
-
-    return new BigNumber(result.weighted_max_ltv_collateral)
+  refreshData = async () => {
+    await this.setMarkets()
+    await this.setBalances(this.config.liquidatorMasterAddress)
+    await this.setPrices()
+    const pools = await this.loadPools()
+    this.ammRouter.setPools(pools)
   }
 
   loadPools = async (): Promise<Pool[]> => {
-    const response = await fetch(`${this.config.lcdEndpoint}/osmosis/gamm/v1beta1/pools`)
-    const pools: Pool[] = (await response.json()) as Pool[]
-    return pools
-  }
-  
-  getFee = async(msgs: EncodeObject[], address: string) => {
-    const gasEstimated = await this.client.simulate(address, msgs, '');
-    const fee = {
-      amount: coins(0.01, this.config.gasDenom),
-      gas: Number(gasEstimated*1.3).toString()
+    let fetchedAllPools = false
+    let nextKey = ''
+    let pools : Pool[] = []
+    let totalPoolCount = 0
+    while (!fetchedAllPools) {
+      const response = await fetch(`${this.config.lcdEndpoint}/osmosis/gamm/v1beta1/pools${nextKey}`)
+      const responseJson: any = await response.json()
+      const pagination = camelcaseKeys(responseJson.pagination as Pagination)
+      
+      // osmosis lcd query returns total pool count as 0 after page 1 (but returns the correct count on page 1), so we need to only set it once
+      if (totalPoolCount === 0) {
+        totalPoolCount = pagination.total
+      }
+
+      pools = pools.concat(camelcaseKeys(responseJson.pools as Pool[]))
+
+      nextKey = `?pagination.key=${pagination.nextKey}`
+      if (pools.length >= totalPoolCount) {
+        fetchedAllPools = true
+      }
+
     }
-  
-    return fee
+
+    return pools
   }
 }

@@ -1,3 +1,3 @@
 interface SecretManager {
-    getSeedPhrase() : Promise<string>
+  getSeedPhrase(): Promise<string>
 }

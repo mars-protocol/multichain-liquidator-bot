@@ -6,6 +6,7 @@ import { osmosis } from 'osmojs'
 import { MsgSwapExactAmountIn, SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
+import camelcaseKeys from 'camelcase-keys'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -19,7 +20,8 @@ export function readAddresses(deployConfigPath: string): ProtocolAddresses {
   try {
     const data = readFileSync(deployConfigPath, 'utf8')
     const deployData: { addresses: ProtocolAddresses } = JSON.parse(data)
-    const result: ProtocolAddresses = deployData.addresses
+    const result: ProtocolAddresses = camelcaseKeys(deployData.addresses)
+
     return result
   } catch (e) {
     console.error(`Failed to load artifacts path - could not find ${deployConfigPath}`)
@@ -190,14 +192,13 @@ export const makeWithdrawMessage = (
   assetDenom: string,
   redBankContractAddress: string,
 ): MsgExecuteContractEncodeObject => {
-
   const msg = toUtf8(`
       { 
         "withdraw": { 
           "denom": "${assetDenom}"
         } 
       }`)
-  return makeExecuteContractMessage(sender, redBankContractAddress, msg,[])
+  return makeExecuteContractMessage(sender, redBankContractAddress, msg, [])
 }
 
 interface MsgSwapEncodeObject {
@@ -207,7 +208,6 @@ interface MsgSwapEncodeObject {
 
 export const makeRepayMessage = (
   sender: string,
-  assetDenom: string,
   redBankContractAddress: string,
   coins: Coin[],
 ): MsgExecuteContractEncodeObject => {
@@ -216,7 +216,7 @@ export const makeRepayMessage = (
     value: {
       sender: sender,
       contract: redBankContractAddress,
-      msg: toUtf8(`{ "repay" : { "denom": "${assetDenom}" } }`),
+      msg: toUtf8(`{ "repay" : {} }`),
       funds: coins,
     },
   }
@@ -229,7 +229,6 @@ export const makeSwapMessage = (
   tokenIn: Coin,
   route: SwapAmountInRoute[],
 ): MsgSwapEncodeObject => {
-
   // create the message
   const msg = swapExactAmountIn({
     sender: liquidatorAddress,
@@ -263,6 +262,10 @@ export const deposit = async (
     },
   ]
 
+  console.log({
+    redbank: addresses.redBank,
+    msg
+  })
   return await client.execute(sender, addresses.redBank, msg, 'auto', undefined, coins)
 }
 
@@ -306,8 +309,6 @@ export interface ProtocolAddresses {
 export function readArtifact(name: string = 'artifact') {
   try {
     const data = readFileSync(name, 'utf8')
-    console.log(`loaded data`)
-    console.log(data)
     return JSON.parse(data)
   } catch (e) {
     return {}
@@ -321,6 +322,6 @@ export interface Seed {
 
 export const loadSeeds = (): Seed[] => {
   const data = readArtifact(`seeds.json`)
-  console.log(data)
+
   return data
 }

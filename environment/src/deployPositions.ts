@@ -1,14 +1,14 @@
-import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from "@cosmjs/cosmwasm-stargate";
 import { HdPath } from "@cosmjs/crypto";
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
-import { GasPrice } from "@cosmjs/stargate";
+
 import { RedisClientType } from "redis";
 import { Coin, makeCosmoshubPath } from "@cosmjs/amino";
 import { RedisInterface } from "../../liquidator/src/redis.js"
-import { borrow, deposit, loadSeeds, makeBorrowMessage, makeDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../liquidator/src/helpers.js"
-import { requiredEnvironmentVariables } from "./helpers.js";
+import { deposit, loadSeeds, makeBorrowMessage, makeDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../liquidator/src/helpers.js"
+import { createClient, recoverWallet, requiredEnvironmentVariables } from "./helpers.js";
 import 'dotenv/config.js'
 import path from "path";
+import { SigningCosmWasmClient } from "@cosmjs/cosmwasm-stargate";
 
 requiredEnvironmentVariables([
     "DEPLOYER_SEED",
@@ -30,17 +30,15 @@ const QUEUE_NAME = process.env.QUEUE_NAME
 const redisInterface = new RedisInterface(QUEUE_NAME)
 
 // Assets
-const ATOM_DENOM = process.env.ATOM_DENOM!
+
 const OSMO_DENOM = process.env.OSMO_DENOM!
+const USDC_DENOM = process.env.USDC_DENOM!
 
 // throttle with this
 const MAX_THREADS = Number(process.env.MAX_THREADS!)
 
 const MAX_SEEDS = Number(process.env.MAX_SEEDS || '1000')
 const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
-
-// TODO set me via .env?
-const borrowAmount = "3000000"
 
 // @ts-ignore
 let redisClient : RedisClientType
@@ -53,7 +51,7 @@ export const main = async() => {
 
     // gather required data
     const seeds = loadSeeds() 
-    const protocolAddresses = readAddresses(deployDetails) 
+    const protocolAddresses = readAddresses(deployDetails)
 
     console.log(protocolAddresses)
     
@@ -72,17 +70,16 @@ const run = async(seeds : Seed[], protocolAddresses : ProtocolAddresses, deploye
     
     let batchToProcess : Promise<void>[] = []
 
-    const osmoToSend : Coin = {"amount": "1000_000_000", "denom": OSMO_DENOM}
-    const atomToSend : Coin = {"amount": "1000_000_000", "denom": ATOM_DENOM}
+    const osmoToSend : Coin = {"amount": "100000_500_000", "denom": OSMO_DENOM}
+    // const atomToSend : Coin = {"amount": "1000_500_000", "denom": USDC_DENOM}
 
     let sendTokenMsgs = []
 
     console.log(`seeding initial parent addresses`)
 
-
     // TODO rework this section so that we only need one loop
 
-    // seed 1000 `parents` (the first account under a seed)
+    // seed the `parents` (the first account under a seed)
     for (const seedIndex in seeds) {
         const seed = seeds[seedIndex]
         if (Number(seedIndex) > MAX_SEEDS) break
@@ -92,13 +89,13 @@ const run = async(seeds : Seed[], protocolAddresses : ProtocolAddresses, deploye
             value: {
                 fromAddress: deployerAddress,
                 toAddress: seed.address,
-                amount: [atomToSend, osmoToSend],
+                amount: [ osmoToSend],
             },
         }
       
         sendTokenMsgs.push(msg)
 
-        if (sendTokenMsgs.length >= 100) {
+        if (sendTokenMsgs.length >= MAX_SEEDS) {
             await deployerClient.signAndBroadcast(
                 deployerAddress,
                 sendTokenMsgs,
@@ -108,45 +105,51 @@ const run = async(seeds : Seed[], protocolAddresses : ProtocolAddresses, deploye
         }
     }
 
-    // optimise this by making it one loop?
+    let ltv = 0.55
     for (const seedIndex in seeds) {        
         const index = Number(seedIndex)
+        ltv -= 0.025
 
-        batchToProcess.push(createPositions(ACCOUNTS_PER_SEED, seeds[seedIndex], protocolAddresses))
-        if (index > 0 && index % MAX_THREADS === 0) {
-            await Promise.all(batchToProcess)
-            batchToProcess = []
-            console.log(`Created ${index * ACCOUNTS_PER_SEED} total positions`)
+        if (ltv > 0.04) {
+            console.log(`creating ${ACCOUNTS_PER_SEED} positions with ltv of ${ltv}`)
+
+            batchToProcess.push(createPositions(ACCOUNTS_PER_SEED, seeds[seedIndex], protocolAddresses, ltv))
+            if (index > 0 && index % MAX_THREADS === 0) {
+                await Promise.all(batchToProcess)
+                batchToProcess = []
+                console.log(`Created ${index * ACCOUNTS_PER_SEED} total positions`)
+            }
         }
     }
 }
 
-const recoverWallet = async(seed: string) : Promise<DirectSecp256k1HdWallet> => {
-    return await DirectSecp256k1HdWallet.fromMnemonic(seed, { prefix: 'osmo'} );
-}
 
-const createClient = async(wallet : DirectSecp256k1HdWallet) : Promise<SigningCosmWasmClient> => {
-    const clientOption: SigningCosmWasmClientOptions = {
-        gasPrice: GasPrice.fromString("0.1uosmo")
-      }
-
-    return await SigningCosmWasmClient.connectWithSigner(RPC_URL, wallet, clientOption);
-}
 
 const preFlightChecks = async(client: SigningCosmWasmClient, addresses: ProtocolAddresses, deployerAddress : string) => {
 
-    // TODO REMOVE ME ONCE CONTRACT UPDATED - have this here to be able to liquidate successfully
-   await client.sendTokens(deployerAddress, addresses.filterer, [{"amount": "1000000000", "denom":ATOM_DENOM}], "auto")
- 
+    //uncomment me if you need to set prices
    // set prices, both at 1
-   console.log(`setting prices @ $1`)
-   await setPrice(client,deployerAddress,OSMO_DENOM, "1", addresses)
-   await setPrice(client,deployerAddress,ATOM_DENOM, "1", addresses)
- 
+//    console.log(`setting prices @ $1`)
+   //
+//     //@ts-ignore
+//    await setPrice(client,deployerAddress,OSMO_DENOM, "1", addresses)
+//     //@ts-ignore
+//    await setPrice(client,deployerAddress,USDC_DENOM, "1", addresses)
+//    //@ts-ignore
+//    await setPrice(client,deployerAddress,USDC_DENOM, "1", addresses)   
+
    console.log(`seeding redbank with intial deposit`)
+
+   // update asset to have greater deposits
+
+
    // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
-   await deposit(client, deployerAddress, ATOM_DENOM, "100000_000_000", addresses)
-   await deposit(client, deployerAddress, OSMO_DENOM, "100000_000_000", addresses)
+    //@ts-ignore
+   await deposit(client, deployerAddress, USDC_DENOM, "6500000_000_000", addresses)
+    //@ts-ignore
+   console.log({deposit: await deposit(client, deployerAddress, OSMO_DENOM, "2000_000_000", addresses)})
+
+   console.log("DEPOSITS DONE")
 }
 
 // Creates n number of accounts under a seed, and creates a position for every account.
@@ -154,7 +157,8 @@ const preFlightChecks = async(client: SigningCosmWasmClient, addresses: Protocol
 const createPositions = async(
     maxPositions: number, 
     seed: Seed, 
-    addresses : ProtocolAddresses) => {
+    addresses : ProtocolAddresses,
+    targetLtv : number) => {
 
     // build a wallet with n number accounts
     const accountNumbers: number[] = [];
@@ -163,28 +167,31 @@ const createPositions = async(
         accountNumbers.push(accountNumbers.length)
     }
 
-    const hdPaths : HdPath[] = accountNumbers.map((value) => makeCosmoshubPath(value));
-    const wallet = await DirectSecp256k1HdWallet.fromMnemonic(seed.mnemonic, { hdPaths: hdPaths, prefix: 'osmo' });
+    const hdPaths : HdPath[] = accountNumbers.map((value) => makeCosmoshubPath(value))
+    //@ts-ignore
+    const wallet = await DirectSecp256k1HdWallet.fromMnemonic(seed.mnemonic, { hdPaths: hdPaths, prefix: 'osmo' })
     const accounts = await wallet.getAccounts()
 
     const client = await createClient(wallet)
 
     // seed addresses with value
-    const osmoToSend : Coin = {"amount": "10050000", "denom": OSMO_DENOM}
-    const atomToSend : Coin = {"amount": "10000000", "denom": ATOM_DENOM}
+    const osmoToSend : Coin = {"amount" : "1010050000", "denom": OSMO_DENOM}
+    // const atomToSend : Coin = {"amount" : "1000000", "denom": ATOM_DENOM}
 
-    const osmoToDeposit : Coin = {"amount": "10000000", "denom": OSMO_DENOM}
+    const depositAmount = 1000000000
+    const osmoToDeposit : Coin = {"amount": depositAmount.toFixed(0), "denom": OSMO_DENOM}
 
-    const useableAddresses = await seedAddresses(client, accounts[0].address, accounts, [atomToSend, osmoToSend])
+    //@ts-ignore
+    const useableAddresses = await seedAddresses(client, accounts[0].address, accounts, [osmoToSend])
    
-   const length = useableAddresses.length
+    const length = useableAddresses.length
 
-   let index = 0
+    let index = 0
 
-   while (index < length) {
-     try {
+    while (index < length) {
+        try {
         const address = useableAddresses[index]
-
+        console.log(`DEPOSITING : ${depositAmount} osmo`)
         const depositMsg = makeDepositMessage(
             address,
             OSMO_DENOM,
@@ -192,15 +199,22 @@ const createPositions = async(
             [osmoToDeposit]
         )
 
+        const borrowAmount = (depositAmount * targetLtv).toFixed(0)
+
+        console.log(`BORROWING ${borrowAmount} USDC`)
+
+        // make borrow message based off of ltv
         const borrowMsg = makeBorrowMessage(
             address,
-            ATOM_DENOM,
+            USDC_DENOM,
             borrowAmount,
             addresses.redBank
         )
 
+        console.log({address})
+        // console.log(await client.queryContractSmart(addresses.redBank, {user_position: {user:address}}))
         // Dispatch deposit and borrow as one asset
-        await client.signAndBroadcast(
+        const result = await client.signAndBroadcast(
             address,
             [
                 depositMsg,
@@ -208,6 +222,8 @@ const createPositions = async(
             ],
             "auto",
           ) 
+          console.log(result)
+          console.log(await client.queryContractSmart(addresses.redBank, {user_position: {user:address}}))
 
      } catch(e) {
 
@@ -219,15 +235,6 @@ const createPositions = async(
    }
 
    // dispatch all msgs 
-}
-
-const sendPositionMessage = async(client: SigningCosmWasmClient, address: string, addresses: ProtocolAddresses) => {
-
-    
-    
-    await deposit(client, address, OSMO_DENOM, "10000000", addresses)
-    await borrow(client, address, ATOM_DENOM, "3000000", addresses)
-    console.log(`created position for address ${address}`)
 }
 
 // run

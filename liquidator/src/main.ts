@@ -19,7 +19,7 @@ export const main = async() => {
       gasDenom: 'uosmo',
       hiveEndpoint: process.env.HIVE_ENDPOINT!,
       lcdEndpoint: process.env.LCD_ENDPOINT!,
-      liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!),
+      liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
       neutralAssetDenom: process.env.NEUTRAL_ASSET_DENOM!,
       liquidatorMasterAddress: liquidatorMasterAddress,
       liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
@@ -29,12 +29,6 @@ export const main = async() => {
     client,
     queryClient).start()
 }
-
-
-main().catch((e) => {
-  console.log(e)
-  process.exit(1)
-})
 
 const getDefaultSecretManager = (): SecretManager => {
   return {
@@ -49,3 +43,10 @@ const getDefaultSecretManager = (): SecretManager => {
     },
   }
 }
+
+main().catch((e) => {
+  console.log(e)
+  process.exit(1)
+})
+
+
