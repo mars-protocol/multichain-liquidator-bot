@@ -3,7 +3,11 @@
 The multichain liquidator bot is a scalable liquidation bot that ensures accounts
 are liquidated in a timely fashion.
 
-The bot is composed of 4 distinct parts and more details are [available in this Notion document](https://www.notion.so/delphilabs/Query-Liquidation-Bot-d88aa1dfd0134ca88baa4c6add452fef)
+It is built to support both the [RedBank](https://github.com/mars-protocol/red-bank) and [Rover](https://github.com/mars-protocol/rover).
+
+The bot is composed of 4 distinct parts. As an overview of the architecture, please refer to this image. Each part is explained in more detail below.
+
+![architecture](./liquidator/doc/cloud-native-liquidations-bot.png)
 
 1. Collector
 
