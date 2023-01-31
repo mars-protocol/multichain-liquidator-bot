@@ -1,6 +1,6 @@
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
-import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from "./helpers.js"
-import { Executor } from "./redbank/executor.js"
+import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from "../helpers.js"
+import { Executor } from "./executor.js"
 
 export const main = async() => {
   
@@ -11,25 +11,35 @@ export const main = async() => {
 
   const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
 
+  const liquidatorAddress = (await liquidator.getAccounts())[Number(process.env.ACCOUNT_INDEX!)].address
+
   // produce clients 
   const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!, liquidator)
   const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
 
   await new Executor({
-      gasDenom: 'uosmo',
-      hiveEndpoint: process.env.HIVE_ENDPOINT!,
-      lcdEndpoint: process.env.LCD_ENDPOINT!,
-      liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
-      neutralAssetDenom: process.env.NEUTRAL_ASSET_DENOM!,
-      liquidatorMasterAddress: liquidatorMasterAddress,
-      liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
-      oracleAddress: process.env.ORACLE_ADDRESS!,
-      redbankAddress: process.env.REDBANK_ADDRESS!
-    },
-    client,
-    queryClient).start()
+    gasDenom: process.env.GAS_DENOM!,
+    hiveEndpoint: process.env.HIVE_ENDPOINT!,
+    lcdEndpoint: process.env.LCD_ENDPOINT!,
+    neutralAssetDenom: process.env.NEUTRAL_ASSET_DENOM!,
+    oracleAddress: process.env.ORACLE_ADDRESS!,
+    redbankAddress: process.env.REDBANK_ADDRESS!,
+    creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS!,
+    liquidatorMasterAddress: liquidatorMasterAddress,
+    liquidatorAddress: liquidatorAddress,
+    minGasTokens: Number(process.env.MIN_GAS_TOKENS!)
+  },
+  client,
+  queryClient).start()
 }
 
+
+main().catch((e) => {
+  console.log(e)
+  process.exit(1)
+})
+
+// todo extract to helper
 const getDefaultSecretManager = (): SecretManager => {
   return {
     getSeedPhrase: async () => {
@@ -43,10 +53,3 @@ const getDefaultSecretManager = (): SecretManager => {
     },
   }
 }
-
-main().catch((e) => {
-  console.log(e)
-  process.exit(1)
-})
-
-

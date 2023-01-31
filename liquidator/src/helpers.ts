@@ -1,23 +1,20 @@
-import {
-  CosmWasmClient,
-  MsgExecuteContractEncodeObject,
-  SigningCosmWasmClient,
-} from '@cosmjs/cosmwasm-stargate'
-import { AccountData, Coin, EncodeObject } from '@cosmjs/proto-signing'
+import { CosmWasmClient, MsgExecuteContractEncodeObject, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
+import { AccountData, Coin, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { readFileSync } from 'fs'
 import { toUtf8 } from '@cosmjs/encoding'
 import { osmosis } from 'osmojs'
-import {
-  MsgSwapExactAmountIn,
-  SwapAmountInRoute,
-} from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
+import { MsgSwapExactAmountIn, SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
+import { SigningStargateClient } from '@cosmjs/stargate'
+import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import camelcaseKeys from 'camelcase-keys'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
+
 export async function sleep(timeout: number) {
   await new Promise((resolve) => setTimeout(resolve, timeout))
 }
+
 // Reads json containing contract addresses located in /artifacts folder for specified network.
 export function readAddresses(deployConfigPath: string): ProtocolAddresses {
   try {
@@ -31,6 +28,20 @@ export function readAddresses(deployConfigPath: string): ProtocolAddresses {
     process.exit(1)
   }
 }
+
+export const produceSigningStargateClient = async(rpcEndpoint: string, liquidator: DirectSecp256k1HdWallet) : Promise<SigningStargateClient> => {
+  const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, liquidator)
+
+  const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
+  client.registry.register(executeTypeUrl, MsgExecuteContract)
+
+  return client
+}
+
+export const produceReadOnlyCosmWasmClient = async(rpcEndpoint : string, liquidator : DirectSecp256k1HdWallet) : Promise<CosmWasmClient> => {
+  return await SigningCosmWasmClient.connectWithSigner(rpcEndpoint, liquidator)
+}
+
 
 export const setPrice = async (
   client: SigningCosmWasmClient,
@@ -119,6 +130,25 @@ export const borrow = async (
   return await client.execute(sender, addresses.redBank, msg, 'auto')
 }
 
+export const makeExecuteContractMessage = (
+  sender: string,
+  contract: string,
+  msg: Uint8Array,
+funds: Coin[] = []
+) : MsgExecuteContractEncodeObject => {
+  const executeContractMsg: MsgExecuteContractEncodeObject = {
+    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+    value: {
+      sender,
+      contract,
+      msg,
+      funds,
+    },
+  }
+
+  return executeContractMsg
+}
+
 export const makeDepositMessage = (
   sender: string,
   assetDenom: string,
@@ -151,25 +181,6 @@ export const makeBorrowMessage = (
       contract: redBankContractAddress,
       msg: toUtf8(`{ "borrow": { "denom": "${assetDenom}", "amount": "${amount}" }}`),
       funds: [],
-    },
-  }
-
-  return executeContractMsg
-}
-
-export const makeExecuteContractMessage = (
-  sender: string,
-  contractAddress: string,
-  msg: Uint8Array,
-  funds: Coin[],
-): MsgExecuteContractEncodeObject => {
-  const executeContractMsg: MsgExecuteContractEncodeObject = {
-    typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
-    value: {
-      sender: sender,
-      contract: contractAddress,
-      msg: msg,
-      funds: funds,
     },
   }
 

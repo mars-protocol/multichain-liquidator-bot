@@ -4,7 +4,7 @@ import { Position } from './types/position'
 
 export interface IRedisInterface {
   connect(): Promise<RedisClientType>
-  popUnhealthyPositions(): Promise<Position[]>
+  popUnhealthyRedbankPositions(count: number): Promise<Position[]>
   incrementBy(key: string, value: number): Promise<number>
 }
 
@@ -22,13 +22,25 @@ export class RedisInterface implements IRedisInterface {
     this.key = !key ? process.env.LIQUIDATION_QUEUE_NAME! : key
   }
 
+  async popUnhealthyRoverAccountId(): Promise<string> {
+    if (!this.client) {
+      throw new Error()
+    }
+
+    const record = await this.client.lPopCount(this.key, 1)
+
+    if (!record) return ''
+
+    return record[0]
+  }
+
   /**
    * Fetch all addresses out of UNHEALTHY_QUEUE redis list
    *
    * Note that the max this can return at 1 time is 1000, any more will be left in
    * the list
    */
-  async popUnhealthyPositions(count = 25): Promise<Position[]> {
+  async popUnhealthyRedbankPositions(count: number): Promise<Position[]> {
     if (!this.client) {
       console.log(`ERROR: redis client not connected`)
       return []
