@@ -39,24 +39,25 @@ export class BaseExecutor {
   public redis: RedisInterface
   public prices: Map<string, number> = new Map()
   public balances: Map<string, number> = new Map()
-  public markets : MarketInfo[] = []
+  public markets: MarketInfo[] = []
   public config: BaseExecutorConfig
 
-  public client: SigningStargateClient 
-  public queryClient: CosmWasmClient 
-  
-  private csvLogger = new CSVWriter(
-    './results.csv',
-    [
-      {id: 'blockHeight', title: 'BlockHeight'},
-      {id: 'userAddress', title: 'User'},
-      {id: 'estimatedLtv', title: 'LiquidationLtv'},
-      {id: 'debtRepaid', title: 'debtRepaid'},
-      {id: 'collateral', title: 'collateral'},
-      {id: 'liquidatorBalance', title: 'liquidatorBalance' }
-    ]
-  )
-  constructor(config: BaseExecutorConfig, client: SigningStargateClient, queryClient: CosmWasmClient) {
+  public client: SigningStargateClient
+  public queryClient: CosmWasmClient
+
+  private csvLogger = new CSVWriter('./results.csv', [
+    { id: 'blockHeight', title: 'BlockHeight' },
+    { id: 'userAddress', title: 'User' },
+    { id: 'estimatedLtv', title: 'LiquidationLtv' },
+    { id: 'debtRepaid', title: 'debtRepaid' },
+    { id: 'collateral', title: 'collateral' },
+    { id: 'liquidatorBalance', title: 'liquidatorBalance' },
+  ])
+  constructor(
+    config: BaseExecutorConfig,
+    client: SigningStargateClient,
+    queryClient: CosmWasmClient,
+  ) {
     this.config = config
     this.ammRouter = new AMMRouter()
     this.redis = new RedisInterface()
@@ -71,27 +72,28 @@ export class BaseExecutor {
     await this.setPrices()
   }
 
-  setMarkets = async() => {
-    const newMarkets = await this.queryClient.queryContractSmart(this.config.redbankAddress, {markets: {}})
+  setMarkets = async () => {
+    const newMarkets = await this.queryClient.queryContractSmart(this.config.redbankAddress, {
+      markets: {},
+    })
     if (newMarkets.length > 0) {
       this.markets = newMarkets
     }
   }
 
   setBalances = async (liquidatorAddress: string) => {
-
-    const coinBalances : readonly Coin[] = await this.client.getAllBalances(liquidatorAddress)
+    const coinBalances: readonly Coin[] = await this.client.getAllBalances(liquidatorAddress)
     for (const index in coinBalances) {
       const coin = coinBalances[index]
       this.balances.set(coin.denom, Number(coin.amount))
     }
   }
 
-  addCsvRow = (row : Row) => {
+  addCsvRow = (row: Row) => {
     this.csvLogger.addRow(row)
   }
 
-  writeCsv = async() => {
+  writeCsv = async () => {
     await this.csvLogger.writeToFile()
   }
 
@@ -114,13 +116,15 @@ export class BaseExecutor {
   loadPools = async (): Promise<Pool[]> => {
     let fetchedAllPools = false
     let nextKey = ''
-    let pools : Pool[] = []
+    let pools: Pool[] = []
     let totalPoolCount = 0
     while (!fetchedAllPools) {
-      const response = await fetch(`${this.config.lcdEndpoint}/osmosis/gamm/v1beta1/pools${nextKey}`)
+      const response = await fetch(
+        `${this.config.lcdEndpoint}/osmosis/gamm/v1beta1/pools${nextKey}`,
+      )
       const responseJson: any = await response.json()
       const pagination = camelcaseKeys(responseJson.pagination as Pagination)
-      
+
       // osmosis lcd query returns total pool count as 0 after page 1 (but returns the correct count on page 1), so we need to only set it once
       if (totalPoolCount === 0) {
         totalPoolCount = pagination.total
@@ -132,7 +136,6 @@ export class BaseExecutor {
       if (pools.length >= totalPoolCount) {
         fetchedAllPools = true
       }
-
     }
 
     return pools

@@ -2,8 +2,6 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  transform: {
-   
-  },
+  transform: {},
   transformIgnorePatterns: ['<rootDir>/node_modules/*'],
 }

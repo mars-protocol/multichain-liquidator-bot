@@ -156,17 +156,17 @@ const pushPositionsToRedis = async (addresses: string[], redisClient: RedisClien
   for (const index in addresses) {
     console.log(`pushing position to redis: ${addresses[index]}`)
     const position: Position = {
-      Address: addresses[index]
+      Address: addresses[index],
     }
 
     await redisClient.lPush(redisQueueName, JSON.stringify(position))
   }
 }
 
-const dispatchLiquidations = async (liquidationHelper : LiquidationHelper) => {
+const dispatchLiquidations = async (liquidationHelper: LiquidationHelper) => {
   const executor = new Executor()
 
-  const {redis} = await executor.initiate()
+  const { redis } = await executor.initiate()
   await executor.run(liquidationHelper, redis)
 }
 

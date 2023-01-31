@@ -6,6 +6,7 @@ Unhealthy positions are flagged by the health checker and placed into the Liqudi
 which the liquidator pulls from to liquidate.
 
 ## Redbank
+
 Liquidations are then dispatched to the `liquidation-filterer` contract, which handles multiple liquidations
 per block and filters positions if they are no longer unhealthy to prevent failing transactions.
 
@@ -13,8 +14,9 @@ After successfull liquidation, the liquidator service will read from the blockch
 
 ## Rover
 
-Rover executor service differs from the redbank in a few ways. 
-* It dispatches one liquidation at a time. To meet demand, when there is more than one liquidation per block to be processed, the manager process will spin up more executor services.
-* It does not require its own capital to liquidate, but instead facilitates 'flash loan' style liquidations using a collection of actions via the rover contracts.
+Rover executor service differs from the redbank in a few ways.
+
+- It dispatches one liquidation at a time. To meet demand, when there is more than one liquidation per block to be processed, the manager process will spin up more executor services.
+- It does not require its own capital to liquidate, but instead facilitates 'flash loan' style liquidations using a collection of actions via the rover contracts.
 
 Please note that this service is still in active development

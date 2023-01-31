@@ -1,21 +1,23 @@
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
-import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from "./helpers.js"
-import { Executor } from "./redbank/executor.js"
+import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
+import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from './helpers.js'
+import { Executor } from './redbank/executor.js'
 
-export const main = async() => {
-  
+export const main = async () => {
   // If you wish to use a secret manager, construct it here
   const sm = getDefaultSecretManager()
 
-  const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(await sm.getSeedPhrase(), { prefix: process.env.PREFIX! })
+  const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(await sm.getSeedPhrase(), {
+    prefix: process.env.PREFIX!,
+  })
 
   const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
 
-  // produce clients 
+  // produce clients
   const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!, liquidator)
   const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
 
-  await new Executor({
+  await new Executor(
+    {
       gasDenom: 'uosmo',
       hiveEndpoint: process.env.HIVE_ENDPOINT!,
       lcdEndpoint: process.env.LCD_ENDPOINT!,
@@ -24,10 +26,11 @@ export const main = async() => {
       liquidatorMasterAddress: liquidatorMasterAddress,
       liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
       oracleAddress: process.env.ORACLE_ADDRESS!,
-      redbankAddress: process.env.REDBANK_ADDRESS!
+      redbankAddress: process.env.REDBANK_ADDRESS!,
     },
     client,
-    queryClient).start()
+    queryClient,
+  ).start()
 }
 
 const getDefaultSecretManager = (): SecretManager => {
@@ -48,5 +51,3 @@ main().catch((e) => {
   console.log(e)
   process.exit(1)
 })
-
-
