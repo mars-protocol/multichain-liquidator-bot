@@ -49,13 +49,10 @@ describe("Rover Executor Tests", () => {
         }
 
         //@ts-ignore - parameters not used for testing
-        const liquidationActionGenerator = new LiquidationActionGenerator({}, [])
-        const executor = new Executor(liquidationActionGenerator, "123456")
+        const executor = new Executor({}, {}, {})
         const collateralState = executor.findBestCollateral([collateral1], [collateral2, collateral3])
         
         expect(collateralState.amount).toBe(600)
-        // find
-        // ensure its the correct one
     }),
 
     test("Can find largest collateral when it is an unlocked position", () => {

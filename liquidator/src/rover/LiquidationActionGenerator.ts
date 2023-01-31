@@ -9,14 +9,12 @@ import { NO_ROUTE_FOR_SWAP, NO_VALID_MARKET } from "./constants/Errors";
 export class LiquidationActionGenerator {
     
     private router : AMMRouter
-    private markets: MarketInfo[]
-
+    
     constructor(
-        osmosisRouter : AMMRouter,
-        markets : MarketInfo[]
+        osmosisRouter : AMMRouter
     ) {
         this.router = osmosisRouter
-        this.markets = markets
+
     }
 
     /**
@@ -33,7 +31,7 @@ export class LiquidationActionGenerator {
      * @param debt The largest debt in the position
      * @param collateral The largest collateral in the position
      */
-    produceBorrowActions = (debt: Debt, collateral: Collateral) : Action[] => {
+    produceBorrowActions = (debt: Debt, collateral: Collateral, markets: MarketInfo[]) : Action[] => {
 
         // estimate our debt to repay - this depends on collateral amount and close factor
         const maxRepayValue = collateral.amount * collateral.price * collateral.closeFactor
@@ -49,9 +47,9 @@ export class LiquidationActionGenerator {
         }
         
         // if asset is not enabled, or we have less than 50% the required liquidity, do alternative borrow       
-        const marketInfo : MarketInfo | undefined = this.markets.find((market)=> market.denom === debt.denom)
+        const marketInfo : MarketInfo | undefined = markets.find((market)=> market.denom === debt.denom)
         if (!marketInfo || !marketInfo.borrow_enabled || (marketInfo.available_liquidity / debtAmount) < 0.5) {
-            return this.borrowWithoutLiquidity(debtCoin)
+            return this.borrowWithoutLiquidity(debtCoin, markets)
         }
 
         // if we have some liquidity but not enough, scale down
@@ -73,7 +71,7 @@ export class LiquidationActionGenerator {
      * @param debtCoin The debt that we are required to repay to perform the liquidation
      * @returns an array of actions that will update the state to have the requested coin.
      */
-    borrowWithoutLiquidity = (debtCoin : Coin) : Action[] => {
+    borrowWithoutLiquidity = (debtCoin : Coin, markets: MarketInfo[]) : Action[] => {
 
         // Assign inner coin variables for ease of use, as we use many times
         const debtAmount = new BigNumber(debtCoin.amount)
@@ -81,7 +79,7 @@ export class LiquidationActionGenerator {
 
         // filter out disabled markets + our debt denom to avoid corrupted swap messages
         // sort the markets by best -> worst swap in terms of redbank liqudity and cost, and return the best.
-        const bestMarket = this.markets.filter((market) =>  market.borrow_enabled && market.denom !== debtdenom).sort(
+        const bestMarket = markets.filter((market) =>  market.borrow_enabled && market.denom !== debtdenom).sort(
             (marketA, marketB) => {
                 // find best routes for each market we are comparing. Best meaning cheapest input amount to get our required output 
                 const marketARoute = this.router.getBestRouteGivenOutput(marketA.denom, debtCoin.denom, debtAmount)
@@ -170,15 +168,18 @@ export class LiquidationActionGenerator {
         return route.map((hop: RouteHop) => this.produceSwapAction(hop.tokenInDenom, hop.tokenOutDenom, process.env.SLIPPAGE_LIMIT) )
     }
 
+    generateWithdrawAction = (denom: string) : Action[] => {
+        return [{ withdraw : { denom, amount: "AccountBalance" } }]
+    }
 
-    generateLiquidationAction = (positionType : PositionType, debtCoin: Coin, liquidateeAccountId : string, requestCoinDenom : string, vaultPositionType? : VaultPositionType) : Action=> {
+
+    produceLiquidationAction = (positionType : PositionType, debtCoin: Coin, liquidateeAccountId : string, requestCoinDenom : string, vaultPositionType? : VaultPositionType) : Action=> {
         return positionType === PositionType.COIN 
             ? this.produceLiquidateCoin(debtCoin, liquidateeAccountId, requestCoinDenom) 
             : this.produceLiquidateVault(debtCoin,liquidateeAccountId, vaultPositionType!, {address: requestCoinDenom})
     }
 
     /**
-     * Swap the 
      * @param collateralDenom The collateral we recieve from the liquidation
      * @param debtDenom The debt we need to repay
      */
@@ -220,11 +221,11 @@ export class LiquidationActionGenerator {
           }
     }
 
-
     private produceRepayAction =(denom: string) : Action => {
 
         return {
             repay : {
+                amount: "AccountBalance",
                 denom:denom
             }
         }
@@ -233,6 +234,7 @@ export class LiquidationActionGenerator {
     private produceSwapAction = (denomIn: string, denomOut : string, slippage : string = "0.005") : Action => {
         return {
             swap_exact_in: {
+                coin_in: { denom: denomIn, amount: "AccountBalance" },
                 denom_out: denomOut,
                 slippage: slippage
             }
