@@ -20,12 +20,9 @@ import { osmosis, cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
 import { DataResponse, Debt, fetchRedbankBatch } from '../hive.js'
-import { IRedisInterface, RedisInterface } from '../redis.js'
+import { IRedisInterface } from '../redis.js'
 import { SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx.js'
 import BigNumber from 'bignumber.js'
-import { AMMRouter } from '../amm_router.js'
-import fetch from 'node-fetch'
-import { Pool } from '../types/Pool.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
 import { BaseExecutor } from '../BaseExecutor.js'
 
