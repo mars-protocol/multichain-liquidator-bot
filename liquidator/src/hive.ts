@@ -1,4 +1,6 @@
 import { Position } from './types/position'
+import { Positions } from "@marsjs-types/creditmanager/mars-credit-manager/MarsCreditManager.types"
+
 
 enum QueryType {
   DEBTS,
@@ -45,6 +47,17 @@ const produceUserPositionQuery = (user: string, redbankAddress: string): string 
     }`
 }
 
+const produceRoverAccountPositionQuery = (account_id: string, cmAddress: string): string => {
+  return `{
+        wasm {
+          position: contractQuery(
+            contractAddress: "${cmAddress}"
+            query: { positions: { account_id: "${account_id}" } }
+        )
+        }
+    }`
+}
+
 const producePositionQuerySection = (
   user: string,
   queryType: QueryType,
@@ -59,7 +72,22 @@ const producePositionQuerySection = (
     `
 }
 
-export const fetchBatch = async (
+export const fetchRoverPosition = async (
+    accountId : string,
+    creditManagerAddress: string
+  ) : Promise<Positions> => {
+   const query = produceRoverAccountPositionQuery(accountId, creditManagerAddress)
+  // post to hive endpoint
+  const response = await fetch(process.env.HIVE_ENDPOINT!, {
+    method: 'post',
+    body: JSON.stringify(query),
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+    return (await response.json()).wasm.position
+}
+
+export const fetchRedbankBatch = async (
   positions: Position[],
   redbankAddress: string,
   hiveEndpoint: string,
@@ -70,6 +98,7 @@ export const fetchBatch = async (
     }
   })
 
+  
   // post to hive endpoint
   const response = await fetch(hiveEndpoint, {
     method: 'post',
