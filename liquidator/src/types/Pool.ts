@@ -12,6 +12,6 @@ export interface Pool {
 }
 
 export interface Pagination {
-    nextKey : string
-    total: number
+  nextKey: string
+  total: number
 }

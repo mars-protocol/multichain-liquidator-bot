@@ -1,38 +1,41 @@
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing"
-import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from "../helpers.js"
-import { Executor } from "./executor.js"
+import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
+import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from '../helpers.js'
+import { Executor } from './executor.js'
 
-export const main = async() => {
-  
+export const main = async () => {
   // If you wish to use a secret manager, construct it here
   const sm = getDefaultSecretManager()
 
-  const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(await sm.getSeedPhrase(), { prefix: process.env.PREFIX! })
+  const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(await sm.getSeedPhrase(), {
+    prefix: process.env.PREFIX!,
+  })
 
   const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
 
-  const liquidatorAddress = (await liquidator.getAccounts())[Number(process.env.ACCOUNT_INDEX!)].address
+  const liquidatorAddress = (await liquidator.getAccounts())[Number(process.env.ACCOUNT_INDEX!)]
+    .address
 
-  // produce clients 
+  // produce clients
   const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!, liquidator)
   const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
 
-  await new Executor({
-    gasDenom: process.env.GAS_DENOM!,
-    hiveEndpoint: process.env.HIVE_ENDPOINT!,
-    lcdEndpoint: process.env.LCD_ENDPOINT!,
-    neutralAssetDenom: process.env.NEUTRAL_ASSET_DENOM!,
-    oracleAddress: process.env.ORACLE_ADDRESS!,
-    redbankAddress: process.env.REDBANK_ADDRESS!,
-    creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS!,
-    liquidatorMasterAddress: liquidatorMasterAddress,
-    liquidatorAddress: liquidatorAddress,
-    minGasTokens: Number(process.env.MIN_GAS_TOKENS!)
-  },
-  client,
-  queryClient).start()
+  await new Executor(
+    {
+      gasDenom: process.env.GAS_DENOM!,
+      hiveEndpoint: process.env.HIVE_ENDPOINT!,
+      lcdEndpoint: process.env.LCD_ENDPOINT!,
+      neutralAssetDenom: process.env.NEUTRAL_ASSET_DENOM!,
+      oracleAddress: process.env.ORACLE_ADDRESS!,
+      redbankAddress: process.env.REDBANK_ADDRESS!,
+      creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS!,
+      liquidatorMasterAddress: liquidatorMasterAddress,
+      liquidatorAddress: liquidatorAddress,
+      minGasTokens: Number(process.env.MIN_GAS_TOKENS!),
+    },
+    client,
+    queryClient,
+  ).start()
 }
-
 
 main().catch((e) => {
   console.log(e)

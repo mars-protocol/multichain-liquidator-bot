@@ -6,7 +6,7 @@ export const generateRandomAsset = (): AssetResponse => {
   return {
     denom: Math.random().toString(),
     amount: Math.random().toFixed(0),
-    amount_scaled: '0'
+    amount_scaled: '0',
   }
 }
 

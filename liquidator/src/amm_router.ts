@@ -133,7 +133,6 @@ export class AMMRouter implements AMMRouterInterface {
 
     // all pairs that have our sell asset, and are not previously in our route
     const possibleStartingPairs = pools.filter((pool) => {
-      
       return (
         // todo  - support stableswap
         pool.poolAssets?.length > 1 &&
@@ -207,15 +206,13 @@ export class AMMRouter implements AMMRouterInterface {
 
         newRoute.push(nextHop)
 
-
-          this.buildRoutesForTrade(
-            tokenOut.token.denom!,
-            targetTokenOutDenom,
-            pools,
-            newRoute,
-            routes,
-          )
-
+        this.buildRoutesForTrade(
+          tokenOut.token.denom!,
+          targetTokenOutDenom,
+          pools,
+          newRoute,
+          routes,
+        )
       })
     }
     return routes

@@ -1,7 +1,6 @@
 import { Attribute } from '@cosmjs/stargate'
 import { LiquidationResult } from './types/liquidation.js'
 
-
 export class LiquidationHelper {
   private liquidatorAddress: string
   private liquidationFilterContract: string

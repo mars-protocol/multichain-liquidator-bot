@@ -1,9 +1,16 @@
-import { CosmWasmClient, MsgExecuteContractEncodeObject, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
+import {
+  CosmWasmClient,
+  MsgExecuteContractEncodeObject,
+  SigningCosmWasmClient,
+} from '@cosmjs/cosmwasm-stargate'
 import { AccountData, Coin, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { readFileSync } from 'fs'
 import { toUtf8 } from '@cosmjs/encoding'
 import { osmosis } from 'osmojs'
-import { MsgSwapExactAmountIn, SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
+import {
+  MsgSwapExactAmountIn,
+  SwapAmountInRoute,
+} from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import camelcaseKeys from 'camelcase-keys'
@@ -29,7 +36,10 @@ export function readAddresses(deployConfigPath: string): ProtocolAddresses {
   }
 }
 
-export const produceSigningStargateClient = async(rpcEndpoint: string, liquidator: DirectSecp256k1HdWallet) : Promise<SigningStargateClient> => {
+export const produceSigningStargateClient = async (
+  rpcEndpoint: string,
+  liquidator: DirectSecp256k1HdWallet,
+): Promise<SigningStargateClient> => {
   const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, liquidator)
 
   const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
@@ -38,10 +48,12 @@ export const produceSigningStargateClient = async(rpcEndpoint: string, liquidato
   return client
 }
 
-export const produceReadOnlyCosmWasmClient = async(rpcEndpoint : string, liquidator : DirectSecp256k1HdWallet) : Promise<CosmWasmClient> => {
+export const produceReadOnlyCosmWasmClient = async (
+  rpcEndpoint: string,
+  liquidator: DirectSecp256k1HdWallet,
+): Promise<CosmWasmClient> => {
   return await SigningCosmWasmClient.connectWithSigner(rpcEndpoint, liquidator)
 }
-
 
 export const setPrice = async (
   client: SigningCosmWasmClient,
@@ -134,8 +146,8 @@ export const makeExecuteContractMessage = (
   sender: string,
   contract: string,
   msg: Uint8Array,
-funds: Coin[] = []
-) : MsgExecuteContractEncodeObject => {
+  funds: Coin[] = [],
+): MsgExecuteContractEncodeObject => {
   const executeContractMsg: MsgExecuteContractEncodeObject = {
     typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
     value: {
@@ -264,7 +276,7 @@ export const deposit = async (
 
   console.log({
     redbank: addresses.redBank,
-    msg
+    msg,
   })
   return await client.execute(sender, addresses.redBank, msg, 'auto', undefined, coins)
 }
