@@ -27,7 +27,7 @@ import {
 import { Position } from '../../src/types/position'
 import path from 'path'
 import 'dotenv/config.js'
-import { Executor } from '../../src/executor.js'
+import { Executor } from '../../src/redbank/executor.js'
 
 const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
 
