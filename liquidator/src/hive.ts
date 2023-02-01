@@ -1,5 +1,5 @@
 import { Position } from './types/position'
-import { Positions } from '@marsjs-types/creditmanager/mars-credit-manager/MarsCreditManager.types'
+import { Positions } from './types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 
 enum QueryType {
   DEBTS,
