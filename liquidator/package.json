@@ -13,7 +13,6 @@
     "@cosmjs/proto-signing": "^0.29.4",
     "@cosmjs/stargate": "^0.29.4",
     "@cosmology/core": "^1.10.0",
-    "@marsjs-types": "file:../../mars-types/marsjs-types-v1.0.0.tgz",
     "bignumber": "^1.1.0",
     "bignumber.js": "^9.1.0",
     "camelcase-keys": "^8.0.2",

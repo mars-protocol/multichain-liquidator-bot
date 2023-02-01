@@ -2,7 +2,7 @@ import { Coin } from '@cosmjs/amino'
 import {
   VaultPosition,
   VaultUnlockingPosition,
-} from '@marsjs-types/creditmanager/mars-credit-manager/MarsCreditManager.types'
+} from '../../../src/types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { Executor } from '../../../src/rover/executor'
 import { LiquidationActionGenerator } from '../../../src/rover/LiquidationActionGenerator'
 

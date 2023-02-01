@@ -8,7 +8,7 @@ import {
   VaultPosition,
   VaultPositionAmount,
   VaultUnlockingPosition,
-} from '@marsjs-types/creditmanager/mars-credit-manager/MarsCreditManager.types'
+} from '../types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
 import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import { SigningStargateClient } from '@cosmjs/stargate'

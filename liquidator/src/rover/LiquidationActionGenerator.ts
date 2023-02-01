@@ -6,7 +6,7 @@ import {
   Coin,
   VaultPositionType,
   VaultBaseForString,
-} from '@marsjs-types/creditmanager/mars-credit-manager/MarsCreditManager.types'
+} from '../types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
 import { RouteHop } from '../types/RouteHop'
 import { NO_ROUTE_FOR_SWAP, NO_VALID_MARKET } from './constants/Errors'
