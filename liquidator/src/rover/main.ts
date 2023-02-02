@@ -27,6 +27,7 @@ export const main = async () => {
       neutralAssetDenom: process.env.NEUTRAL_ASSET_DENOM!,
       oracleAddress: process.env.ORACLE_ADDRESS!,
       redbankAddress: process.env.REDBANK_ADDRESS!,
+      accountNftAddress: process.env.ACCOUNT_NFT_ADDRESS!,
       creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS!,
       liquidatorMasterAddress: liquidatorMasterAddress,
       liquidatorAddress: liquidatorAddress,

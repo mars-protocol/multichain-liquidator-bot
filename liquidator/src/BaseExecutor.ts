@@ -1,4 +1,4 @@
-import { LiquidationHelper } from './liquidation_helpers.js'
+import { LiquidationHelper } from './liquidationHelpers.js'
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import { Coin, coins, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
