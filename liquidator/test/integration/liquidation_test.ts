@@ -8,12 +8,12 @@
 //
 
 import { makeCosmoshubPath } from '@cosmjs/amino'
-import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from '@cosmjs/cosmwasm-stargate'
+import { CosmWasmClient, SigningCosmWasmClient, SigningCosmWasmClientOptions } from '@cosmjs/cosmwasm-stargate'
 import { HdPath } from '@cosmjs/crypto'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
-import { GasPrice } from '@cosmjs/stargate'
+import { GasPrice, SigningStargateClient } from '@cosmjs/stargate'
 import { RedisClientType } from 'redis'
-import { LiquidationHelper } from '../../src/liquidation_helpers.js'
+import { LiquidationHelper } from '../../src/liquidationHelpers.js'
 import { RedisInterface } from '../../src/redis.js'
 import {
   borrow,
@@ -27,7 +27,7 @@ import {
 import { Position } from '../../src/types/position'
 import path from 'path'
 import 'dotenv/config.js'
-import { Executor } from '../../src/redbank/executor.js'
+import { Executor, RedbankExecutorConfig } from '../../src/redbank/executor.js'
 
 const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
 
@@ -36,10 +36,10 @@ const osmoDenom = 'uosmo'
 const atomDenom = 'uion'
 const redisQueueName = 'testQueue'
 const deployerSeed =
-  'notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius'
+  'you seed goes here'
 
 // preferentially run tests on local ososis
-const localOsmosisRPC = 'http://localhost:26659'
+const localOsmosisRPC = 'http://localhost:26657'
 
 const redisInterface = new RedisInterface()
 
@@ -67,33 +67,50 @@ const runTest = async () => {
     gasPrice: GasPrice.fromString('0.1uosmo'),
   }
 
-  const client = await SigningCosmWasmClient.connectWithSigner(
+  const cwClient = await SigningCosmWasmClient.connectWithSigner(
     localOsmosisRPC,
     wallet,
     clientOption,
   )
+
+  const sgClient = await SigningStargateClient.connectWithSigner(
+    localOsmosisRPC,
+    wallet,
+    clientOption
+  )
   const deployerAddress = accounts[0].address
 
-  const liquidationHelper = new LiquidationHelper(deployerAddress, addresses.filterer)
+  const config = {
+    gasDenom: 'uosmo',
+    hiveEndpoint: "http://localhost:8085/graphql",
+    lcdEndpoint: "http://127.0.0.1:1317/graphql",
+    liquidatableAssets: ["osmo", "atom", "usdc"],
+    neutralAssetDenom: "usdc",
+    liquidatorMasterAddress: deployerAddress,
+    liquidationFiltererAddress: addresses.filterer,
+    oracleAddress: addresses.oracle,
+    redbankAddress: addresses.redBank,
+  
+}
 
   const osmoToSend = { amount: '11000000', denom: osmoDenom }
   const atomToSend = { amount: '10000000', denom: atomDenom }
 
   // seed addresses with value
-  const useableAddresses = await seedAddresses(client, deployerAddress, accounts, [
+  const useableAddresses = await seedAddresses(cwClient, deployerAddress, accounts, [
     atomToSend,
     osmoToSend,
   ])
 
   // set prices, both at 1
   console.log(`setting prices`)
-  await setPrice(client, deployerAddress, osmoDenom, '1', addresses)
-  await setPrice(client, deployerAddress, atomDenom, '1', addresses)
+  await setPrice(cwClient, deployerAddress, osmoDenom, '1', addresses)
+  await setPrice(cwClient, deployerAddress, atomDenom, '1', addresses)
 
   console.log(`seeding redbank with intial deposit`)
 
   // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
-  await deposit(client, deployerAddress, atomDenom, '100_000_000', addresses)
+  await deposit(cwClient, deployerAddress, atomDenom, '100_000_000', addresses)
   // await deposit(client, deployerAddress, osmoDenom, "100_000_000", addresses)
 
   console.log('Setting up positions')
@@ -102,8 +119,8 @@ const runTest = async () => {
   while (index < length) {
     try {
       const address = useableAddresses[index]
-      await deposit(client, address, osmoDenom, '10000000', addresses)
-      await borrow(client, address, atomDenom, '3000000', addresses)
+      await deposit(cwClient, address, osmoDenom, '10000000', addresses)
+      await borrow(cwClient, address, atomDenom, '3000000', addresses)
       console.log(`created position for address ${address}`)
     } catch {}
 
@@ -116,18 +133,18 @@ const runTest = async () => {
   await pushPositionsToRedis(useableAddresses, redisClient)
 
   // manipulate price
-  await setPrice(client, deployerAddress, atomDenom, '3', addresses)
+  await setPrice(cwClient, deployerAddress, atomDenom, '3', addresses)
 
   const initialBalance = {
-    uosmo: await client.getBalance(deployerAddress, osmoDenom),
-    atom: await client.getBalance(deployerAddress, atomDenom),
+    uosmo: await cwClient.getBalance(deployerAddress, osmoDenom),
+    atom: await cwClient.getBalance(deployerAddress, atomDenom),
   }
   console.log(`================= executing liquidations =================`)
   // execute liquidations
-  await dispatchLiquidations(liquidationHelper)
+  await dispatchLiquidations(sgClient, cwClient, config)
 
   for (const index in useableAddresses) {
-    const health = await queryHealth(client, useableAddresses[index], addresses)
+    const health = await queryHealth(cwClient, useableAddresses[index], addresses)
     if (Number(health.health_status.borrowing.liq_threshold_hf) < 1) {
       console.log(`${useableAddresses[index]} is still unhealthy`)
     } else {
@@ -136,8 +153,8 @@ const runTest = async () => {
   }
 
   const updatedBalance = {
-    uosmo: await client.getBalance(deployerAddress, osmoDenom),
-    atom: await client.getBalance(deployerAddress, atomDenom),
+    uosmo: await cwClient.getBalance(deployerAddress, osmoDenom),
+    atom: await cwClient.getBalance(deployerAddress, atomDenom),
   }
 
   const gains = Number(updatedBalance.atom.amount) - Number(initialBalance.atom.amount)
@@ -163,25 +180,20 @@ const pushPositionsToRedis = async (addresses: string[], redisClient: RedisClien
   }
 }
 
-const dispatchLiquidations = async (liquidationHelper: LiquidationHelper) => {
-  const executor = new Executor()
+const dispatchLiquidations = async (
+  client: SigningStargateClient, 
+  cwClient : CosmWasmClient,
+  config: RedbankExecutorConfig) => {
+  const executor = new Executor(
+    config,
+    client,
+    cwClient
+  )
 
-  const { redis } = await executor.initiate()
-  await executor.run(liquidationHelper, redis)
+  await executor.initiate()
+  await executor.run()
 }
 
-// // used for debugging tests
-// const getFirstAddresses = (accounts: readonly AccountData[]) => {
-//   const seededAddresses: string[] = []
-//   let index = 1
-
-//   while (index <= 10) {
-//     seededAddresses.push(accounts[index].address)
-//     index += 1
-//   }
-
-//   return seededAddresses
-// }
 
 runTest().catch((e) => {
   console.log(e)

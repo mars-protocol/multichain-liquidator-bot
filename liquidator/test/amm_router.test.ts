@@ -1,26 +1,28 @@
 import { AMMRouter } from '../src/amm_router'
 import { Coin } from '@cosmjs/amino'
-import { Pool } from '../src/types/Pool'
+import { Pool, PoolAsset } from '../src/types/Pool'
 import Long from 'long'
 import BigNumber from 'bignumber.js'
 
 const generateRandomPoolAsset = (
   denom: string = Math.random().toString(),
   amount: string = Math.random().toString(),
-): Coin => {
-  return {
-    denom: denom,
-    amount: amount,
+): PoolAsset => {
+  return { 
+    token :{
+      denom: denom,
+      amount: amount,
+    }
   }
 }
 
-const generateRandomPool = (poolAssets?: Coin[]): Pool => {
+const generateRandomPool = (poolAssets?: PoolAsset[]): Pool => {
   if (!poolAssets) poolAssets = [generateRandomPoolAsset(), generateRandomPoolAsset()]
   const pool: Pool = {
     address: 'osmo1j4xmzkea5t8s077t0s39vs5psp6f6dacpjswn64ln2v4pncwxg3qjs30zl',
     id: (Math.random() * 10000000) as unknown as Long,
     swapFee: '0.002',
-    poolAssets: poolAssets,
+    poolAssets: poolAssets!,
   }
   return pool
 }
@@ -218,8 +220,8 @@ describe('Osmosis Router Tests', () => {
 
     expect(routes.length).toBe(2)
 
-    const route1Cost = router.getEstimatedOutput(new BigNumber(1), routes[0])
-    const route2cost = router.getEstimatedOutput(new BigNumber(1), routes[1])
+    const route1Cost = router.getOutput(new BigNumber(1), routes[0])
+    const route2cost = router.getOutput(new BigNumber(1), routes[1])
 
     // our first route should have better pricing
     expect(route1Cost.toNumber()).toBeGreaterThan(route2cost.toNumber())
