@@ -5,6 +5,8 @@ are liquidated in a timely fashion.
 
 It is built to support both the [RedBank](https://github.com/mars-protocol/red-bank) and [Rover](https://github.com/mars-protocol/rover).
 
+NOTE: For questions, issues or support, feel free to join the `liquidators` channel in the mars discord
+
 The bot is composed of 4 distinct parts. As an overview of the architecture, please refer to this image. Each part is explained in more detail below.
 
 
@@ -15,16 +17,16 @@ The bot is composed of 4 distinct parts. As an overview of the architecture, ple
 The Collector service is responsible for fetching all the user addresses that
 have debts in the Mars Red Bank and passes them on to the Health Checker. More info in [collector](./collector/README.md)
 
-1. Health Checker
+2. Health Checker
 
 Health Checker is responsible for fetching the health status for positions, 
 and flagging unhealthy positions for liquidation. More info in [health-checker](./health-checker/README.md)
 
-1. Liquidator
+3. Liquidator
 
 The Liquidator service is responsible for handling liquidations of unhealthy positions. There are liquidation services (called `executors`) for both Redbank and rover (wip). More info in [liquidator](./liquidator/README.md).
 
-1. Manager
+4. Manager
 
 The Manager service is responsible for ensuring all the data is processed within
 a timeframe. By default, the timeframe is a single block. It is also responsible for booting up new services (i.e health checker, executor) to meet demand. More info in [manager/README](manager)
