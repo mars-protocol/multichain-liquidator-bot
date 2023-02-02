@@ -4,7 +4,9 @@
 
 .PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean
 
-IMAGE_NAME := "multichain-health-checker:latest"
+IMAGE_NAME := "<your-container-repo>/multichain-health-checker:latest"
+REDBANK_ADDRESS := "osmo1...234"
+CHAIN_ID := "localosmosis"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
 
 # This makes the APP_NAME be the name of the current directory
@@ -27,10 +29,10 @@ run: build ## Build and run the service binary
 	LOG_LEVEL=debug \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
 	LIQUIDATOR_QUEUE_NAME=executor \
-	REDBANK_ADDRESS=osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv \
+	REDBANK_ADDRESS=${REDBANK_ADDRESS} \
 	ADDRESS_PER_JOB=10 \
 	JOBS_PER_WORKER=10 \
-	CHAIN_ID=localosmosis \
+	CHAIN_ID=${CHAIN_ID} \
 	REDIS_DATABASE=0 \
 	REDIS_METRICS_DATABASE=0 \
 	HEALTH_CHECK_QUEUE_NAME=health_check \
@@ -42,7 +44,7 @@ run_race: ## Run the service with race condition checking enabled
 	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
-	CHAIN_ID="localosmosis" \
+	CHAIN_ID=${CHAIN_ID} \
 	go run -race ./src/*.go
 
 docker_build: build ## Build the service Docker container
@@ -53,7 +55,7 @@ docker_run: ## Run the Docker container in interactive mode
 		-e LOG_LEVEL=debug \
 		-e LOG_FORMAT=text \
 		-e SERVICE_NAME="bot-collector" \
-		-e CHAIN_ID="localosmosis" \
+		-e CHAIN_ID=${CHAIN_ID} \
 		${IMAGE_NAME}
 
 docker_push: ## Push the Docker container to the registry

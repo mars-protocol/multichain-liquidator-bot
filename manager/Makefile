@@ -6,7 +6,14 @@
 
 IMAGE_NAME := "multichain-manager:latest"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
-
+REDBANK_ADDRESS := "osmo1...2345"
+AWS_ACCESS_KEY := "123456"
+AWS_ACCESS_KEY_SECRET := ""
+HIVE_URL := "http://127.0.0.1:8080/graphql"
+LCD_ENDPOINT := "http://127.0.0.1:12317"
+RPC_ENDPOINT := "http://127.0.0.1:26657"
+RPC_WEBSOCKET_ENDPOINT := "ws://127.0.0.1:26657/websocket"
+AWS_CLUSTER_ARN := ""
 # This makes the APP_NAME be the name of the current directory
 # Ex. in path /home/dev/app/my-app the APP_NAME will be set to my-app
 APP_NAME := $(notdir $(CURDIR))
@@ -31,10 +38,10 @@ run: build .start_redis ## Build and run the service binary
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-manager" \
 	CHAIN_ID="localosmosis" \
-	HIVE_ENDPOINT="http://127.0.0.1:8080/graphql " \
-	LCD_ENDPOINT="http://127.0.0.1:12317" \
-	RPC_ENDPOINT="http://127.0.0.1:26657" \
-	RPC_WEBSOCKET_ENDPOINT="ws://127.0.0.1:26657/websocket" \
+	HIVE_ENDPOINT=${HIVE_URL} \
+	LCD_ENDPOINT=${LCD_ENDPOINT} \
+	RPC_ENDPOINT=${RPC_ENDPOINT} \
+	RPC_WEBSOCKET_ENDPOINT=${RPC_WEBSOCKET_ENDPOINT} \
 	REDIS_DATABASE=0 \
 	REDIS_METRICS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
@@ -47,10 +54,10 @@ run: build .start_redis ## Build and run the service binary
 	HEALTH_CHECKER_IMAGE=multichain-health-checker:latest \
 	EXECUTOR_IMAGE=multichain-liquidator:latest \
 	SCALING_TYPE="watermark" \
-	COLLECTOR_CONTRACT="osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv" \
-	AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
-	AWS_SECRET_ACCESS_KEY="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" \
-	AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
+	COLLECTOR_CONTRACT=${REDBANK_ADDRESS} \
+	AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY} \
+	AWS_SECRET_ACCESS_KEY=${AWS_ACCESS_KEY_SECRET} \
+	AWS_CLUSTER_ARN=${AWS_CLUSTER_ARN} \
 	AWS_SERVICE_CPU_UNITS=512 \
 	AWS_SERVICE_MEMORY_MB=1024 \
 	AWS_SERVICE_SUBNETS="subnet-14ef644c" \
@@ -69,10 +76,10 @@ run_race: .start_redis ## Run the service with race condition checking enabled
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-manager" \
 	CHAIN_ID="phoenix-1" \
-	HIVE_ENDPOINT="https://terra2-delphi-1.simply-vc.com.mt/ZC79CHN02DSI/terra-hive/graphql " \
-	LCD_ENDPOINT="http://127.0.0.1:12317" \
-	RPC_ENDPOINT="http://127.0.0.1:26657" \
-	RPC_WEBSOCKET_ENDPOINT="ws://127.0.0.1:26657/websocket" \
+	HIVE_ENDPOINT=${HIVE_ENDPOINT} \
+	LCD_ENDPOINT=${LCD_ENDPOINT} \
+	RPC_ENDPOINT=${RPC_ENDPOINT} \
+	RPC_WEBSOCKET_ENDPOINT=${RPC_WEBSOCKET_ENDPOINT} \
 	REDIS_DATABASE=0 \
 	REDIS_METRICS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
@@ -85,10 +92,10 @@ run_race: .start_redis ## Run the service with race condition checking enabled
 	HEALTH_CHECKER_IMAGE=redis:latest \
 	EXECUTOR_IMAGE=redis:latest \
 	SCALING_TYPE="watermark" \
-	COLLECTOR_CONTRACT="osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv" \
-	AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
-	AWS_SECRET_ACCESS_KEY="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" \
-	AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
+	COLLECTOR_CONTRACT=${REDBANK_ADDRESS} \
+	AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY} \
+	AWS_SECRET_ACCESS_KEY=${AWS_ACCESS_KEY_SECRET} \
+	AWS_CLUSTER_ARN=${AWS_CLUSTER_ARN} \
 	AWS_SERVICE_CPU_UNITS=512 \
 	AWS_SERVICE_MEMORY_MB=1024 \
 	AWS_SERVICE_SUBNETS="subnet-14ef644c" \
@@ -111,10 +118,10 @@ docker_run: ## Run the Docker container in interactive mode
 		-e LOG_FORMAT=text \
 		-e SERVICE_NAME="bot-manager" \
 		-e CHAIN_ID="phoenix-1" \
-		-e HIVE_ENDPOINT="https://terra2-delphi-1.simply-vc.com.mt/ZC79CHN02DSI/terra-hive/graphql " \
-		-e LCD_ENDPOINT="http://127.0.0.1:12317" \
-		-e RPC_ENDPOINT="http://127.0.0.1:26657" \
-		-e RPC_WEBSOCKET_ENDPOINT="ws://127.0.0.1:26657/websocket" \
+		-e HIVE_ENDPOINT=${HIVE_ENDPOINT} \
+		-e LCD_ENDPOINT=${LCD_ENDPOINT} \
+		-e RPC_ENDPOINT=${RPC_ENDPOINT} \
+		-e RPC_WEBSOCKET_ENDPOINT=${RPC_WEBSOCKET_ENDPOINT} \
 		-e REDIS_DATABASE=0 \
 		-e REDIS_METRICS_DATABASE=0 \
 		-e REDIS_ENDPOINT="127.0.0.1:6379" \
@@ -127,10 +134,10 @@ docker_run: ## Run the Docker container in interactive mode
 		-e HEALTH_CHECKER_IMAGE=redis:latest \
 		-e EXECUTOR_IMAGE=redis:latest \
 		-e SCALING_TYPE="watermark" \
-		-e COLLECTOR_CONTRACT="osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv" \
-		-e AWS_ACCESS_KEY_ID="AKIAYCXJKTF2S35NVQD7" \
-		-e AWS_SECRET_ACCESS_KEY="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" \
-		-e AWS_CLUSTER_ARN="arn:aws:ecs:us-east-1:555613854069:cluster/test-cluster" \
+		-e COLLECTOR_CONTRACT=${REDBANK_ADDRESS} \
+		-e AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY} \
+		-e AWS_SECRET_ACCESS_KEY=${AWS_ACCESS_KEY_SECRET} \
+		-e AWS_CLUSTER_ARN=${AWS_CLUSTER_ARN} \
 		-e AWS_SERVICE_CPU_UNITS=512 \
 		-e AWS_SERVICE_MEMORY_MB=1024 \
 		-e AWS_SERVICE_SUBNETS="subnet-14ef644c" \

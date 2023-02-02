@@ -26,14 +26,19 @@ describe('Liquidation Actions generator Unit Tests', () => {
     address: 'abc',
     id: new Long(Math.random() * 10000),
     poolAssets: [
-      {
-        denom: otherDenom,
-        amount: randomAssetAmount.toString(),
+        {
+          token : {
+          denom: otherDenom,
+          amount: randomAssetAmount.toString(),
+        }
       },
       {
-        denom: debtDenom,
-        amount: (randomAssetAmount * debtToRandomAssetPrice).toString(),
-      },
+        token: {
+          denom: debtDenom,
+          amount: (randomAssetAmount * debtToRandomAssetPrice).toString(),
+        }
+      }
+      ,
     ],
     swapFee: '0.002',
   }

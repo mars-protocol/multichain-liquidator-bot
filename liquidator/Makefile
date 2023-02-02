@@ -6,7 +6,8 @@
 
 IMAGE_NAME := "multichain-liquidator:latest"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
-
+REDBANK_ADDRESS := "osmo1...2345"
+ORACLE_ADDRESS := "osmo1....2345"
 # This makes the APP_NAME be the name of the current directory
 # Ex. in path /home/dev/app/my-app the APP_NAME will be set to my-app
 APP_NAME := $(notdir $(CURDIR))
@@ -32,18 +33,13 @@ docker_run: ## Run the Docker container in interactive mode
 	docker run -it --rm --network="host" \
 	-e GAS_PRICE="0.001uosmo" \
 	-e RPC_ENDPOINT="http://localhost:26657" \
-	-e SEED="notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius" \
-	-e ACCOUNTS_PER_SEED="100" \
+	-e SEED="your seed goes here" \
 	-e RPC_URL="http://localhost:26657" \
-	-e QUEUE_NAME="throughput_test" \
 	-e LIQUIDATION_QUEUE_NAME="executor" \
-	-e ATOM_DENOM="uion" \
-	-e OSMO_DENOM="uosmo" \
 	-e MAX_THREADS="20" \
-	-e OUTPOST_ARTIFACTS_PATH="/Users/<usernamezz>/outposts/artifacts/" \
 	-e CHAIN_ID="localosmosis" \
-	-e CONTRACT_REDBANK_ADDRESS="osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv" \
-	-e CONTRACT_ORACLE_ADDRESS="osmo1vhndln95yd7rngslzvf6sax6axcshkxqpmpr886ntelh28p9ghuqqgjjmc" \
+	-e CONTRACT_REDBANK_ADDRESS=${REDBANK_ADDRESS} \
+	-e CONTRACT_ORACLE_ADDRESS=${ORACLE_ADDRESS} \
 		${IMAGE_NAME}
 
 docker_push: ## Push the Docker container to the registry

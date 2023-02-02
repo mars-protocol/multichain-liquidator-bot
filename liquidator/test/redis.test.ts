@@ -19,7 +19,7 @@ describe('Redis Tests', () => {
     await redisClient.lPush(queueName, JSON.stringify(position))
     await redisClient.lPush(queueName, JSON.stringify(position2))
 
-    const returnedPositions = await redisInterface.fetchUnhealthyPositions()
+    const returnedPositions = await redisInterface.popUnhealthyRedbankPositions(25)
     // // first in last out - so index is 1
     expect(returnedPositions[1].Address).toBe(position.Address)
   })

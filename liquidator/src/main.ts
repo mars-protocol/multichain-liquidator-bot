@@ -1,10 +1,11 @@
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from './helpers.js'
 import { Executor } from './redbank/executor.js'
+import { getSecretManager } from './SecretManager.js'
 
 export const main = async () => {
-  // If you wish to use a secret manager, construct it here
-  const sm = getDefaultSecretManager()
+
+  const sm = getSecretManager()
 
   const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(await sm.getSeedPhrase(), {
     prefix: process.env.PREFIX!,
@@ -31,20 +32,6 @@ export const main = async () => {
     client,
     queryClient,
   ).start()
-}
-
-const getDefaultSecretManager = (): SecretManager => {
-  return {
-    getSeedPhrase: async () => {
-      const seed = process.env.SEED
-      if (!seed)
-        throw Error(
-          'Failed to find SEED environment variable. Add your seed phrase to the SEED environment variable or implement a secret manager instance',
-        )
-
-      return seed
-    },
-  }
 }
 
 main().catch((e) => {
