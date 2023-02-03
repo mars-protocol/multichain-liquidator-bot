@@ -5,8 +5,8 @@
 .PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean
 
 IMAGE_NAME := "<your-container-repo>/multichain-health-checker:latest"
-REDBANK_ADDRESS := "osmo1...234"
-CHAIN_ID := "localosmosis"
+REDBANK_ADDRESS := "osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv"
+CHAIN_ID := "liq_test"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
 
 # This makes the APP_NAME be the name of the current directory
@@ -25,7 +25,7 @@ run: build ## Build and run the service binary
 	# Add your environment variable here
 	LOG_FORMAT=text \
 	SERVICE_NAME=bot-health-checker \
-	BATCH_SIZE=1 \
+	BATCH_SIZE=10 \
 	LOG_LEVEL=debug \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
 	LIQUIDATOR_QUEUE_NAME=executor \
