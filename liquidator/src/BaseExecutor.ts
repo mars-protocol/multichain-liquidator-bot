@@ -10,8 +10,6 @@ import fetch from 'node-fetch'
 import { Pagination, Pool } from './types/Pool.js'
 import 'dotenv/config.js'
 import { MarketInfo } from './rover/types/MarketInfo.js'
-import { RedbankExecutorConfig } from './redbank/executor.js'
-import { RoverExecutorConfig } from './rover/executor.js'
 import camelcaseKeys from 'camelcase-keys'
 import { CSVWriter, Row } from './CsvWriter.js'
 
@@ -28,6 +26,7 @@ export interface BaseExecutorConfig {
   liquidatorMasterAddress: string
   gasDenom: string
   neutralAssetDenom: string
+  logResults : boolean
 }
 
 /**
