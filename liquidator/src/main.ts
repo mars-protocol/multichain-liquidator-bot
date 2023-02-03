@@ -1,7 +1,7 @@
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from './helpers.js'
 import { Executor } from './redbank/executor.js'
-import { getSecretManager } from './SecretManager.js'
+import { getSecretManager } from './secretManager.js'
 
 export const main = async () => {
 
@@ -28,6 +28,7 @@ export const main = async () => {
       liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
       oracleAddress: process.env.ORACLE_ADDRESS!,
       redbankAddress: process.env.REDBANK_ADDRESS!,
+      logResults:true
     },
     client,
     queryClient,
