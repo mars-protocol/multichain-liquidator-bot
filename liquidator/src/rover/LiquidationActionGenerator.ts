@@ -6,7 +6,7 @@ import {
   Coin,
   VaultPositionType,
   VaultBaseForString,
-} from '../types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+} from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
 import { RouteHop } from '../types/RouteHop'
 import { NO_ROUTE_FOR_SWAP, NO_VALID_MARKET } from './constants/Errors'
@@ -276,6 +276,7 @@ export class LiquidationActionGenerator {
   ): Action => {
     return {
       swap_exact_in: {
+        // @ts-expect-error - to be fixed when marsjs-types updated
         coin_in: { denom: denomIn, amount: 'AccountBalance' },
         denom_out: denomOut,
         slippage: slippage,
