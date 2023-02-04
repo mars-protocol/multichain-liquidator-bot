@@ -19,7 +19,7 @@ export const main = async () => {
 
   await new Executor(
     {
-      gasDenom: 'uosmo',
+      gasDenom: process.env.GAS_DENOM!,
       hiveEndpoint: process.env.HIVE_ENDPOINT!,
       lcdEndpoint: process.env.LCD_ENDPOINT!,
       liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
@@ -28,7 +28,8 @@ export const main = async () => {
       liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
       oracleAddress: process.env.ORACLE_ADDRESS!,
       redbankAddress: process.env.REDBANK_ADDRESS!,
-      logResults:true
+      logResults:true,
+      safetyMargin: 0.05
     },
     client,
     queryClient,

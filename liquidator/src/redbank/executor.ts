@@ -35,6 +35,7 @@ const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 export interface RedbankExecutorConfig extends BaseExecutorConfig {
   liquidationFiltererAddress: string
   liquidatableAssets: string[]
+  safetyMargin : number
 }
 
 /**
@@ -99,7 +100,7 @@ export class Executor extends BaseExecutor {
         // total debt value is calculated in base denom (i.e uosmo). 
         // We scale down to ensure we have space for slippage etc in the swap
         // transactions that follow
-        const remainingAvailableSize = availableValue.multipliedBy(0.95).minus(totalDebtValue)
+        const remainingAvailableSize = availableValue.multipliedBy(1-this.config.safetyMargin).minus(totalDebtValue)
 
         if (remainingAvailableSize.isGreaterThan(1000)) {
           // we will always have a value here as we filter for the largest above
