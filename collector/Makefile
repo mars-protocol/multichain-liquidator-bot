@@ -10,6 +10,7 @@ GIT_COMMIT := $(shell git rev-list -1 HEAD)
 # This makes the APP_NAME be the name of the current directory
 # Ex. in path /home/dev/app/my-app the APP_NAME will be set to my-app
 APP_NAME := $(notdir $(CURDIR))
+CHAIN_ID := "liq_test"
 
 .start_redis: ## Start Redis if it isn't running
 ifeq ($(shell docker ps | grep redis:latest 2> /dev/null),)
@@ -30,7 +31,7 @@ run: build .start_redis ## Build and run the service binary
 	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
-	CHAIN_ID="pisco-1" \
+	CHAIN_ID=${CHAIN_ID} \
 	REDIS_DATABASE=0 \
 	REDIS_METRICS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
@@ -43,7 +44,7 @@ run_race: ## Run the service with race condition checking enabled
 	LOG_LEVEL=debug \
 	LOG_FORMAT=text \
 	SERVICE_NAME="bot-collector" \
-	CHAIN_ID="pisco-1" \
+	CHAIN_ID=${CHAIN_ID} \
 	REDIS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
 	COLLECTOR_QUEUE_NAME="collector" \
@@ -58,7 +59,7 @@ docker_run: ## Run the Docker container in interactive mode
 		-e LOG_LEVEL=debug \
 		-e LOG_FORMAT=text \
 		-e SERVICE_NAME="bot-collector" \
-		-e CHAIN_ID="pisco-1" \
+		-e CHAIN_ID=${CHAIN_ID} \
 		-e REDIS_DATABASE=0 \
 		-e REDIS_ENDPOINT="127.0.0.1:6379" \
 		-e COLLECTOR_QUEUE_NAME="collector" \

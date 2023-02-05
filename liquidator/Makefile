@@ -3,11 +3,15 @@
 #
 
 .PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean
-
+# Add your image name here. For instance, if you are pushing to ECR, use <your-ecr>/multichain-liquidator:latest
 IMAGE_NAME := "multichain-liquidator:latest"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
-REDBANK_ADDRESS := "osmo1...2345"
-ORACLE_ADDRESS := "osmo1....2345"
+
+# Required contract addresses. Refer to mars github documentation for mainnet addresses
+REDBANK_ADDRESS := "osmo1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s0p34vn"
+ORACLE_ADDRESS := "osmo1466nf3zuxpya8q9emxukd7vftaf6h4psr0a07srl5zw74zh84yjqkk0zfx"
+CHAIN_ID := "liq_test"
+
 # This makes the APP_NAME be the name of the current directory
 # Ex. in path /home/dev/app/my-app the APP_NAME will be set to my-app
 APP_NAME := $(notdir $(CURDIR))
@@ -37,7 +41,7 @@ docker_run: ## Run the Docker container in interactive mode
 	-e RPC_URL="http://localhost:26657" \
 	-e LIQUIDATION_QUEUE_NAME="executor" \
 	-e MAX_THREADS="20" \
-	-e CHAIN_ID="localosmosis" \
+	-e CHAIN_ID=${CHAIN_ID} \
 	-e CONTRACT_REDBANK_ADDRESS=${REDBANK_ADDRESS} \
 	-e CONTRACT_ORACLE_ADDRESS=${ORACLE_ADDRESS} \
 		${IMAGE_NAME}

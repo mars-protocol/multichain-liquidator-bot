@@ -32,6 +32,7 @@ export const main = async () => {
       liquidatorMasterAddress: liquidatorMasterAddress,
       liquidatorAddress: liquidatorAddress,
       minGasTokens: Number(process.env.MIN_GAS_TOKENS!),
+      logResults: true
     },
     client,
     queryClient,

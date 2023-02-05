@@ -90,7 +90,8 @@ const runTest = async () => {
     liquidationFiltererAddress: addresses.filterer,
     oracleAddress: addresses.oracle,
     redbankAddress: addresses.redBank,
-  
+    safetyMargin: 0.05,
+    logResults: true
 }
 
   const osmoToSend = { amount: '11000000', denom: osmoDenom }

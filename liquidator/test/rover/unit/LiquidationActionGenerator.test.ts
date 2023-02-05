@@ -5,7 +5,7 @@ import { generateRandomMarket } from './helpers'
 import {
   Coin,
   Decimal,
-} from '../../../src/types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+} from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { Collateral, Debt, PositionType } from '../../../src/rover/types/RoverPosition'
 import { Pool } from '../../../src/types/Pool'
 import Long from 'long'

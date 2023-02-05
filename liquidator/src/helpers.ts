@@ -2,16 +2,17 @@ import {
   CosmWasmClient,
   MsgExecuteContractEncodeObject,
   SigningCosmWasmClient,
+  SigningCosmWasmClientOptions,
 } from '@cosmjs/cosmwasm-stargate'
-import { AccountData, Coin, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
+import { AccountData, Coin, DirectSecp256k1HdWallet, EncodeObject, GeneratedType, Registry } from '@cosmjs/proto-signing'
 import { readFileSync } from 'fs'
 import { toUtf8 } from '@cosmjs/encoding'
-import { osmosis } from 'osmojs'
+import { cosmosAminoConverters, cosmosProtoRegistry, cosmwasmAminoConverters, cosmwasmProtoRegistry, ibcAminoConverters, ibcProtoRegistry, osmosis, osmosisAminoConverters, osmosisProtoRegistry } from 'osmojs'
 import {
   MsgSwapExactAmountIn,
   SwapAmountInRoute,
 } from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
-import { SigningStargateClient } from '@cosmjs/stargate'
+import { AminoTypes, GasPrice, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import camelcaseKeys from 'camelcase-keys'
 
@@ -39,13 +40,32 @@ export function readAddresses(deployConfigPath: string): ProtocolAddresses {
 export const produceSigningStargateClient = async (
   rpcEndpoint: string,
   liquidator: DirectSecp256k1HdWallet,
+  gasPrice: string = "0.1osmo"
 ): Promise<SigningStargateClient> => {
-  const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, liquidator)
 
-  const executeTypeUrl = '/cosmwasm.wasm.v1.MsgExecuteContract'
-  client.registry.register(executeTypeUrl, MsgExecuteContract)
+    const protoRegistry: ReadonlyArray<[string, GeneratedType]> = [
+      ...cosmosProtoRegistry,
+      ...cosmwasmProtoRegistry,
+      ...ibcProtoRegistry,
+      ...osmosisProtoRegistry
+  ];
 
-  return client
+  const aminoConverters = {
+      ...cosmosAminoConverters,
+      ...cosmwasmAminoConverters,
+      ...ibcAminoConverters,
+      ...osmosisAminoConverters
+  };
+
+  const registry = new Registry(protoRegistry);
+  const aminoTypes = new AminoTypes(aminoConverters);
+  const clientOption: SigningCosmWasmClientOptions = {
+    gasPrice: GasPrice.fromString(gasPrice),
+    registry,
+    aminoTypes
+  }
+
+  return await SigningStargateClient.connectWithSigner(rpcEndpoint, liquidator, clientOption)
 }
 
 export const produceReadOnlyCosmWasmClient = async (
