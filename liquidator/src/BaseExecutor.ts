@@ -27,6 +27,7 @@ export interface BaseExecutorConfig {
   gasDenom: string
   neutralAssetDenom: string
   logResults : boolean
+  redisEndpoint: string
 }
 
 /**
@@ -65,7 +66,8 @@ export class BaseExecutor {
   }
 
   async initiate(): Promise<void> {
-    await this.redis.connect()
+    console.log(this.config.redisEndpoint)
+    await this.redis.connect(this.config.redisEndpoint)
     await this.setMarkets()
     await this.setBalances(this.config.liquidatorMasterAddress)
     await this.setPrices()
