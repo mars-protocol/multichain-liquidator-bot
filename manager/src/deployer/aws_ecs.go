@@ -197,7 +197,7 @@ func (dep *AWSECS) RemoveAll() error {
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Second*10)
 	defer cancel()
 
-	requestedServiceCount := 0
+	requestedServiceCount := int32(0)
 	_, err = dep.client.UpdateService(ctx, &ecs.UpdateServiceInput{
 		DesiredCount: aws.Int32(requestedServiceCount),
 		Service:      aws.String(dep.service),
