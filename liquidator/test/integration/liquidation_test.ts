@@ -91,7 +91,8 @@ const runTest = async () => {
     oracleAddress: addresses.oracle,
     redbankAddress: addresses.redBank,
     safetyMargin: 0.05,
-    logResults: true
+    logResults: true,
+    redisEndpoint: "",
 }
 
   const osmoToSend = { amount: '11000000', denom: osmoDenom }

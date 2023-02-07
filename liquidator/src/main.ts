@@ -29,7 +29,8 @@ export const main = async () => {
       oracleAddress: process.env.ORACLE_ADDRESS!,
       redbankAddress: process.env.REDBANK_ADDRESS!,
       logResults:true,
-      safetyMargin: 0.05
+      safetyMargin: 0.05,
+      redisEndpoint:process.env.REDIS_ENDPOINT!,
     },
     client,
     queryClient,
