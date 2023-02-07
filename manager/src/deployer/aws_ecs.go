@@ -131,9 +131,15 @@ func (dep *AWSECS) Increase() error {
 	defer cancel()
 
 	requestedServiceCount := service.RunningCount + 1
-	dep.client.UpdateService(ctx, &ecs.UpdateServiceInput{
+	_, err = dep.client.UpdateService(ctx, &ecs.UpdateServiceInput{
 		DesiredCount: aws.Int32(requestedServiceCount),
+		Service:      aws.String(dep.service),
+		Cluster:      aws.String(dep.clusterARN),
 	})
+
+	if err != nil {
+		return err
+	}
 
 	dep.logger.WithFields(logrus.Fields{
 		"name":           dep.service,
@@ -160,9 +166,15 @@ func (dep *AWSECS) Decrease() error {
 	defer cancel()
 
 	requestedServiceCount := service.RunningCount - 1
-	dep.client.UpdateService(ctx, &ecs.UpdateServiceInput{
+	_, err = dep.client.UpdateService(ctx, &ecs.UpdateServiceInput{
 		DesiredCount: aws.Int32(requestedServiceCount),
+		Service:      aws.String(dep.service),
+		Cluster:      aws.String(dep.clusterARN),
 	})
+
+	if err != nil {
+		return err
+	}
 
 	dep.logger.WithFields(logrus.Fields{
 		"name":           dep.service,
@@ -186,9 +198,15 @@ func (dep *AWSECS) RemoveAll() error {
 	defer cancel()
 
 	requestedServiceCount := 0
-	dep.client.UpdateService(ctx, &ecs.UpdateServiceInput{
-		DesiredCount: aws.Int32(int32(requestedServiceCount)),
+	_, err = dep.client.UpdateService(ctx, &ecs.UpdateServiceInput{
+		DesiredCount: aws.Int32(requestedServiceCount),
+		Service:      aws.String(dep.service),
+		Cluster:      aws.String(dep.clusterARN),
 	})
+
+	if err != nil {
+		return err
+	}
 
 	dep.logger.WithFields(logrus.Fields{
 		"removed":        service.RunningCount,
@@ -382,6 +400,7 @@ func getService(
 			Services: []string{serviceName},
 			Cluster:  aws.String(clusterARN),
 		})
+
 	if err == nil {
 		for _, service := range servicesDetails.Services {
 			// We only query a single service, we should only receive a single item
