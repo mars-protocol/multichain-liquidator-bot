@@ -2,7 +2,6 @@ package scaler
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/sirupsen/logrus"
 
@@ -118,7 +117,7 @@ func (qwm *QueueWatermark) ScaleAutomatic() (string, bool, error) {
 	// If low watermark is zero, we'll never scale down
 
 	// If the item count has dropped below the low watermark, we can scale down
-	if itemCount < qwm.lowWaterMark {
+	if itemCount <= qwm.lowWaterMark {
 		return "down", true, qwm.ScaleDown()
 	}
 
@@ -159,12 +158,12 @@ func (qwm *QueueWatermark) ScaleDown() error {
 		return err
 	}
 	proposedServiceCount := currentServiceCount - 1
-	if proposedServiceCount < qwm.minimumServiceCount {
-		return fmt.Errorf(
-			"unable to scale down, proposed count of %d is lower than minimum of %d",
-			proposedServiceCount,
-			qwm.minimumServiceCount,
-		)
+	if proposedServiceCount <= qwm.minimumServiceCount {
+		qwm.logger.WithFields(logrus.Fields{
+			"proposedServiceCount": proposedServiceCount,
+			"minimumServiceCount":  qwm.minimumServiceCount,
+		}).Debug("Scale down failed as proposed service count was lower than minumum count")
+		return nil
 	}
 	return qwm.deployer.Decrease()
 }
