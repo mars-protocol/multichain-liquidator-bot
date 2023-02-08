@@ -158,7 +158,7 @@ func (qwm *QueueWatermark) ScaleDown() error {
 		return err
 	}
 	proposedServiceCount := currentServiceCount - 1
-	if proposedServiceCount <= qwm.minimumServiceCount {
+	if proposedServiceCount < qwm.minimumServiceCount {
 		qwm.logger.WithFields(logrus.Fields{
 			"proposedServiceCount": proposedServiceCount,
 			"minimumServiceCount":  qwm.minimumServiceCount,
