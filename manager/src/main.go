@@ -255,9 +255,9 @@ func main() {
 			queueProvider,
 			config.ExecutorQueueName,
 			executorDeployer,
-			0, // Scale down when we have no items in the queue
-			1, // Scale up when we have 1 or more items in the queue
-			1, // Minimum number of services
+			0,     // Scale down when we have no items in the queue
+			10000, // We do not want to scale up the executor
+			1,     // Minimum number of services
 			logger,
 		)
 		if err != nil {
