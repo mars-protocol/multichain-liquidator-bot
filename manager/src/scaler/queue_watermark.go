@@ -2,7 +2,6 @@ package scaler
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/sirupsen/logrus"
 
@@ -19,15 +18,16 @@ type QueueWatermark struct {
 	deployer  managerinterfaces.Deployer
 	// watermarkViolationCount keeps track of the amount of times
 	// the watermark was breached
-	watermarkViolationCount int
+	highWatermarkViolationCount int
+	lowWatermarkViolationCount  int
 	// watermarkViolationMax determines the maximum amount of times
 	// the watermark was violated before scaling
-	watermarkViolationMax int
-	lowWaterMark          int
-	highWaterMark         int
-	minimumServiceCount   int
-
-	logger *logrus.Entry
+	watermarkViolationMax               int
+	lowWaterMark                        int
+	highWaterMark                       int
+	minimumServiceCount                 int
+	consecutiveBlocksCompletedThreshold int
+	logger                              *logrus.Entry
 }
 
 // NewQueueWatermark creates a new instance of the scaler with the given
@@ -64,14 +64,15 @@ func NewQueueWatermark(
 	}
 
 	return &QueueWatermark{
-		queue:                   queue,
-		queueName:               queueName,
-		deployer:                deployer,
-		watermarkViolationCount: 0,
-		watermarkViolationMax:   10,
-		lowWaterMark:            lowWaterMark,
-		highWaterMark:           highWaterMark,
-		minimumServiceCount:     minimumServiceCount,
+		queue:                       queue,
+		queueName:                   queueName,
+		deployer:                    deployer,
+		highWatermarkViolationCount: 0,
+		lowWatermarkViolationCount:  0,
+		watermarkViolationMax:       10,
+		lowWaterMark:                lowWaterMark,
+		highWaterMark:               highWaterMark,
+		minimumServiceCount:         minimumServiceCount,
 		logger: logger.WithFields(logrus.Fields{
 			"subservice": "scaler",
 			"type":       "queuewatermark",
@@ -118,28 +119,42 @@ func (qwm *QueueWatermark) ScaleAutomatic() (string, bool, error) {
 	// If low watermark is zero, we'll never scale down
 
 	// If the item count has dropped below the low watermark, we can scale down
-	if itemCount < qwm.lowWaterMark {
-		return "down", true, qwm.ScaleDown()
+	if itemCount <= qwm.lowWaterMark {
+
+		qwm.lowWatermarkViolationCount++
+		qwm.logger.WithFields(logrus.Fields{
+			"new_value": qwm.lowWatermarkViolationCount,
+			"max_value": qwm.watermarkViolationMax,
+		}).Debug("Increased lower violation count")
+
+		if qwm.lowWatermarkViolationCount >= qwm.watermarkViolationMax {
+			qwm.logger.WithFields(logrus.Fields{
+				"value":     qwm.lowWatermarkViolationCount,
+				"max_value": qwm.watermarkViolationMax,
+			}).Debug("Watermark violation maximum exceeded")
+			qwm.lowWatermarkViolationCount = 0
+			return "down", true, qwm.ScaleDown()
+		}
 	}
 
 	// If the item count has risen above the high watermark, we can scale up
 	if itemCount >= qwm.highWaterMark {
-		qwm.watermarkViolationCount++
+		qwm.highWatermarkViolationCount++
 		qwm.logger.WithFields(logrus.Fields{
-			"new_value": qwm.watermarkViolationCount,
+			"new_value": qwm.highWatermarkViolationCount,
 			"max_value": qwm.watermarkViolationMax,
-		}).Debug("Increased violation count")
+		}).Debug("Increased upper violation count")
 
 		// To avoid scaling too aggressively we allow the watermark to be
 		// breached a few times before scaling
 		// This avoids scaling rapidly in case of a handful of query failures
 		// that leave a queue above the high watermark
-		if qwm.watermarkViolationCount >= qwm.watermarkViolationMax {
+		if qwm.highWatermarkViolationCount >= qwm.watermarkViolationMax {
 			qwm.logger.WithFields(logrus.Fields{
-				"value":     qwm.watermarkViolationCount,
+				"value":     qwm.highWatermarkViolationCount,
 				"max_value": qwm.watermarkViolationMax,
 			}).Debug("Watermark violation maximum exceeded")
-			qwm.watermarkViolationCount = 0
+			qwm.highWatermarkViolationCount = 0
 			return "up", true, qwm.ScaleUp()
 		}
 	}
@@ -160,11 +175,11 @@ func (qwm *QueueWatermark) ScaleDown() error {
 	}
 	proposedServiceCount := currentServiceCount - 1
 	if proposedServiceCount < qwm.minimumServiceCount {
-		return fmt.Errorf(
-			"unable to scale down, proposed count of %d is lower than minimum of %d",
-			proposedServiceCount,
-			qwm.minimumServiceCount,
-		)
+		qwm.logger.WithFields(logrus.Fields{
+			"proposedServiceCount": proposedServiceCount,
+			"minimumServiceCount":  qwm.minimumServiceCount,
+		}).Debug("Scale down failed as proposed service count was lower than minumum count")
+		return nil
 	}
 	return qwm.deployer.Decrease()
 }
