@@ -1,5 +1,5 @@
 import { Position } from './types/position'
-
+import fetch from 'node-fetch'
 import { Positions } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 enum QueryType {
   DEBTS,
@@ -48,13 +48,15 @@ const produceUserPositionQuery = (user: string, redbankAddress: string): string 
 
 const produceRoverAccountPositionQuery = (account_id: string, cmAddress: string): string => {
   return `{
-        wasm {
-          position: contractQuery(
-            contractAddress: "${cmAddress}"
-            query: { positions: { account_id: "${account_id}" } }
-        )
+          wasm {
+            position: contractQuery(
+              contractAddress: "${cmAddress}"
+              query: { positions: { account_id: "${account_id}" } }
+          )
+          }
         }
-    }`
+      
+    `
 }
 
 const producePositionQuerySection = (
@@ -74,16 +76,25 @@ const producePositionQuerySection = (
 export const fetchRoverPosition = async (
   accountId: string,
   creditManagerAddress: string,
+  hiveEndpoint: string
 ): Promise<Positions> => {
-  const query = produceRoverAccountPositionQuery(accountId, creditManagerAddress)
+  const query = {query:produceRoverAccountPositionQuery(accountId, creditManagerAddress)}
   // post to hive endpoint
-  const response = await fetch(process.env.HIVE_ENDPOINT!, {
+  console.log(query)
+  const response = await fetch(hiveEndpoint, {
     method: 'post',
     body: JSON.stringify(query),
     headers: { 'Content-Type': 'application/json' },
   })
 
-  return (await response.json()).wasm.position
+  const result = await response.json() as {
+    data : {
+      wasm : {
+        position : Positions
+      }
+    }
+  }
+  return result.data.wasm.position
 }
 
 export const fetchRedbankBatch = async (
@@ -97,12 +108,11 @@ export const fetchRedbankBatch = async (
     }
   })
 
-  // post to hive endpoint
   const response = await fetch(hiveEndpoint, {
     method: 'post',
     body: JSON.stringify(queries),
     headers: { 'Content-Type': 'application/json' },
   })
 
-  return await response.json()
+  return await response.json() as DataResponse[]
 }
