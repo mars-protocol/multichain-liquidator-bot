@@ -1,17 +1,15 @@
-import { LiquidationHelper } from './liquidationHelpers.js'
 import { SigningStargateClient } from '@cosmjs/stargate'
-import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
-import { Coin, coins, DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
-import { CosmWasmClient, SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
+import { Coin } from '@cosmjs/proto-signing'
+import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { RedisInterface } from './redis.js'
-import BigNumber from 'bignumber.js'
 import { AMMRouter } from './amm_router.js'
-import fetch from 'node-fetch'
+import fetch from 'cross-fetch'
 import { Pagination, Pool } from './types/Pool.js'
 import 'dotenv/config.js'
 import { MarketInfo } from './rover/types/MarketInfo.js'
-import camelcaseKeys from 'camelcase-keys'
 import { CSVWriter, Row } from './CsvWriter.js'
+import { camelCaseKeys } from './helpers.js'
+import BigNumber from 'bignumber.js'
 
 interface Price {
   price: number
@@ -26,7 +24,7 @@ export interface BaseExecutorConfig {
   liquidatorMasterAddress: string
   gasDenom: string
   neutralAssetDenom: string
-  logResults : boolean
+  logResults: boolean
   redisEndpoint: string
 }
 
@@ -66,20 +64,35 @@ export class BaseExecutor {
   }
 
   async initiate(): Promise<void> {
-    console.log(this.config.redisEndpoint)
-    await this.redis.connect(this.config.redisEndpoint)
-    await this.setMarkets()
-    await this.setBalances(this.config.liquidatorMasterAddress)
-    await this.setPrices()
+    await this.redis.connect()
+    await this.refreshData()
   }
 
   setMarkets = async () => {
     const newMarkets = await this.queryClient.queryContractSmart(this.config.redbankAddress, {
       markets: {},
     })
+
     if (newMarkets.length > 0) {
-      this.markets = newMarkets
+      this.markets = newMarkets.map((market : MarketInfo) => this.applyAvailableLiquidity(market))
     }
+  }
+
+  private applyAvailableLiquidity = (market : MarketInfo) : MarketInfo => {
+
+    // Available liquidity = deposits - borrows. However, we need to 
+    // compute the underlying uasset amounts from the scaled amounts.
+    const scalingFactor = 1e6
+    const scaledDeposits = new BigNumber(market.collateral_total_scaled)
+    const scaledBorrows = new BigNumber(market.debt_total_scaled)
+
+    const descaledDeposits = scaledDeposits.multipliedBy(market.liquidity_index).dividedBy(scalingFactor)
+    const descaledBorrows = scaledBorrows.multipliedBy(market.borrow_index).dividedBy(scalingFactor)
+
+    const availableLiquidity = descaledDeposits.minus(descaledBorrows)
+
+    market.available_liquidity = availableLiquidity.toNumber()
+    return market
   }
 
   setBalances = async (liquidatorAddress: string) => {
@@ -124,14 +137,16 @@ export class BaseExecutor {
         `${this.config.lcdEndpoint}/osmosis/gamm/v1beta1/pools${nextKey}`,
       )
       const responseJson: any = await response.json()
-      const pagination = camelcaseKeys(responseJson.pagination as Pagination)
+      const pagination = camelCaseKeys(responseJson.pagination) as Pagination
 
       // osmosis lcd query returns total pool count as 0 after page 1 (but returns the correct count on page 1), so we need to only set it once
       if (totalPoolCount === 0) {
         totalPoolCount = pagination.total
       }
 
-      pools = pools.concat(camelcaseKeys(responseJson.pools as Pool[]))
+      const poolsRaw = responseJson.pools as Pool[]
+
+      poolsRaw.forEach((pool) => pools.push(camelCaseKeys(pool) as Pool))
 
       nextKey = `?pagination.key=${pagination.nextKey}`
       if (pools.length >= totalPoolCount) {
