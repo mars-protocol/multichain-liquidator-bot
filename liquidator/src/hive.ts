@@ -1,44 +1,47 @@
 import { Position } from './types/position'
-import fetch from 'node-fetch'
+import fetch from 'cross-fetch'
 import { Positions } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+import { Coin } from '@cosmjs/amino'
+import { MarketInfo } from './rover/types/MarketInfo'
+import { PriceResponse } from './types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 enum QueryType {
-  DEBTS,
-  COLLATERALS,
+	DEBTS,
+	COLLATERALS,
 }
 
 const DEBTS = 'debts'
 const COLLATERALS = 'collaterals'
 
 export interface AssetResponse {
-  denom: string
-  amount_scaled: string
-  amount: string
+	denom: string
+	amount_scaled: string
+	amount: string
 }
 
 export interface Debt extends AssetResponse {
-  uncollateralised: boolean
+	uncollateralised: boolean
 }
 export interface Collateral extends AssetResponse {
-  enabled: boolean
+	enabled: boolean
 }
 
 export interface UserPositionData {
-  [key: string]: {
-    debts: Debt[]
-    collaterals: Collateral[]
-  }
+	[key: string]: {
+		debts: Debt[]
+		collaterals: Collateral[]
+	}
 }
 
 export interface DataResponse {
-  data: UserPositionData
+	data: UserPositionData
 }
 
 const getTypeString = (queryType: QueryType): string => {
-  return queryType == QueryType.COLLATERALS ? COLLATERALS : DEBTS
+	return queryType == QueryType.COLLATERALS ? COLLATERALS : DEBTS
 }
 
 const produceUserPositionQuery = (user: string, redbankAddress: string): string => {
-  return `{
+	return `{
         ${user}:wasm {
         ${producePositionQuerySection(user, QueryType.DEBTS, redbankAddress)},
         ${producePositionQuerySection(user, QueryType.COLLATERALS, redbankAddress)}
@@ -47,7 +50,7 @@ const produceUserPositionQuery = (user: string, redbankAddress: string): string 
 }
 
 const produceRoverAccountPositionQuery = (account_id: string, cmAddress: string): string => {
-  return `{
+	return `{
           wasm {
             position: contractQuery(
               contractAddress: "${cmAddress}"
@@ -60,12 +63,12 @@ const produceRoverAccountPositionQuery = (account_id: string, cmAddress: string)
 }
 
 const producePositionQuerySection = (
-  user: string,
-  queryType: QueryType,
-  redbankAddress: string,
+	user: string,
+	queryType: QueryType,
+	redbankAddress: string,
 ) => {
-  const typeString = getTypeString(queryType)
-  return `
+	const typeString = getTypeString(queryType)
+	return `
         ${typeString}:contractQuery(
             contractAddress: "${redbankAddress}"
             query: { user_${typeString}: { user: "${user}" } }
@@ -73,46 +76,85 @@ const producePositionQuerySection = (
     `
 }
 
-export const fetchRoverPosition = async (
-  accountId: string,
-  creditManagerAddress: string,
-  hiveEndpoint: string
-): Promise<Positions> => {
-  const query = {query:produceRoverAccountPositionQuery(accountId, creditManagerAddress)}
-  // post to hive endpoint
-  console.log(query)
-  const response = await fetch(hiveEndpoint, {
-    method: 'post',
-    body: JSON.stringify(query),
-    headers: { 'Content-Type': 'application/json' },
-  })
+export const fetchData = async(hiveEndpoint: string, address: string, redbankAddress: string, oracleAddress: string) : Promise<{
 
-  const result = await response.json() as {
-    data : {
-      wasm : {
-        position : Positions
+    bank: {
+      balance : Coin[]
+    }
+    wasm: {
+      markets: MarketInfo[],
+      prices: PriceResponse[]
+    }
+
+}> => {
+  const query = `{
+    bank {
+      balance(address:"${address}") {
+        denom,
+        amount
       }
     }
-  }
-  return result.data.wasm.position
+    wasm {
+        markets: contractQuery(
+            contractAddress: "${redbankAddress}"
+            query: { markets: {} }
+        ),
+        prices: contractQuery(
+            contractAddress: "${oracleAddress}"
+            query: { prices: {} }
+        )
+    }
+  }`
+
+  const response = await fetch(hiveEndpoint, {
+    method: 'post',
+    body: JSON.stringify({query}),
+    headers: { 'Content-Type': 'application/json' },
+  })
+  
+  return (await response.json()).data
+}
+
+export const fetchRoverPosition = async (
+	accountId: string,
+	creditManagerAddress: string,
+	hiveEndpoint: string,
+): Promise<Positions> => {
+	const query = { query: produceRoverAccountPositionQuery(accountId, creditManagerAddress) }
+	// post to hive endpoint
+	const response = await fetch(hiveEndpoint, {
+		method: 'post',
+		body: JSON.stringify(query),
+		headers: { 'Content-Type': 'application/json' },
+	})
+
+	const result = (await response.json()) as {
+		data: {
+			wasm: {
+				position: Positions
+			}
+		}
+	}
+
+	return result.data.wasm.position
 }
 
 export const fetchRedbankBatch = async (
-  positions: Position[],
-  redbankAddress: string,
-  hiveEndpoint: string,
+	positions: Position[],
+	redbankAddress: string,
+	hiveEndpoint: string,
 ): Promise<DataResponse[]> => {
-  const queries = positions.map((position) => {
-    return {
-      query: produceUserPositionQuery(position.Address, redbankAddress),
-    }
-  })
+	const queries = positions.map((position) => {
+		return {
+			query: produceUserPositionQuery(position.Address, redbankAddress),
+		}
+	})
 
-  const response = await fetch(hiveEndpoint, {
-    method: 'post',
-    body: JSON.stringify(queries),
-    headers: { 'Content-Type': 'application/json' },
-  })
+	const response = await fetch(hiveEndpoint, {
+		method: 'post',
+		body: JSON.stringify(queries),
+		headers: { 'Content-Type': 'application/json' },
+	})
 
-  return await response.json() as DataResponse[]
+	return (await response.json()) as DataResponse[]
 }
