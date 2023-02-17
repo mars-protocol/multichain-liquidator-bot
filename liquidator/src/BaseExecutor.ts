@@ -11,7 +11,7 @@ import { CSVWriter, Row } from './CsvWriter.js'
 import { camelCaseKeys } from './helpers.js'
 import BigNumber from 'bignumber.js'
 import { fetchData } from './hive.js'
-import { PriceResponse } from './types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types.js'
+import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types.js'
 
 export interface BaseExecutorConfig {
 	lcdEndpoint: string
@@ -35,6 +35,7 @@ export class BaseExecutor {
 	public prices: Map<string, number> = new Map()
 	public balances: Map<string, number> = new Map()
 	public markets: MarketInfo[] = []
+
 	public config: BaseExecutorConfig
 
 	public client: SigningStargateClient
@@ -65,7 +66,7 @@ export class BaseExecutor {
 		await this.refreshData()
 	}
 
-	private applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {
+	applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {
 		// Available liquidity = deposits - borrows. However, we need to
 		// compute the underlying uasset amounts from the scaled amounts.
 		const scalingFactor = 1e6
@@ -97,27 +98,21 @@ export class BaseExecutor {
 
 	writeCsv = async () => {
 		await this.csvLogger.writeToFile()
-  }
+	}
 
 	refreshData = async () => {
+		// dispatch hive request and parse it
+		const { wasm, bank } = await fetchData(
+			this.config.hiveEndpoint,
+			this.config.liquidatorMasterAddress,
+			this.config.redbankAddress,
+			this.config.oracleAddress,
+		)
 
-    // dispatch hive request and parse it
-    const {wasm, bank} = await fetchData(
-      this.config.hiveEndpoint, 
-      this.config.liquidatorMasterAddress, 
-      this.config.redbankAddress, 
-      this.config.oracleAddress
-    )
+		this.markets = wasm.markets.map((market: MarketInfo) => this.applyAvailableLiquidity(market))
+		bank.balance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
+		wasm.prices.forEach((price: PriceResponse) => this.prices.set(price.denom, Number(price.price)))
 
-    this.markets = wasm.markets.map((market: MarketInfo) => this.applyAvailableLiquidity(market))
-    bank.balance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)) )
-    wasm.prices.forEach((price: PriceResponse) => this.prices.set(price.denom, Number(price.price))) 
-
-    console.log({
-      prices: this.prices,
-      balances: this.balances,
-      markets: this.markets
-    })
 		const pools = await this.loadPools()
 		this.ammRouter.setPools(pools)
 	}
