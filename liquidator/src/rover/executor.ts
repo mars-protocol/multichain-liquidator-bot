@@ -1,10 +1,10 @@
-import { Coin } from '@cosmjs/amino'
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { makeExecuteContractMessage, sleep } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
 import { fetchRoverData, fetchRoverPosition, VaultInfo } from '../hive'
 import { LiquidationActionGenerator } from './LiquidationActionGenerator'
 import {
+	Coin,
 	VaultInfoResponse,
 	VaultPosition,
 	VaultPositionType,
@@ -19,7 +19,10 @@ import { SigningStargateClient } from '@cosmjs/stargate'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { MarketInfo } from './types/MarketInfo'
 import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/Errors'
-import { UncollateralizedLoanLimitResponse, UserDebtResponse } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
+import {
+	UncollateralizedLoanLimitResponse,
+	UserDebtResponse,
+} from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 
 export interface RoverExecutorConfig extends BaseExecutorConfig {
 	creditManagerAddress: string
@@ -32,8 +35,8 @@ export class Executor extends BaseExecutor {
 	private VAULT_RELOAD_WINDOW = 1800000
 	public config: RoverExecutorConfig
 	private liquidationActionGenerator: LiquidationActionGenerator
-  private creditLines : UserDebtResponse[] = []
-  private creditLineCaps : UncollateralizedLoanLimitResponse[] = []
+	private creditLines: UserDebtResponse[] = []
+	private creditLineCaps: UncollateralizedLoanLimitResponse[] = []
 
 	public liquidatorAccountId = ''
 	private whitelistedCoins: string[] = []
@@ -91,8 +94,8 @@ export class Executor extends BaseExecutor {
 		)
 		this.whitelistedCoins = roverData.whitelistedAssets! as string[]
 		this.vaultDetails = roverData.vaultInfo
-    this.creditLines = roverData.creditLines
-    this.creditLineCaps = roverData.creditLineCaps
+		this.creditLines = roverData.creditLines
+		this.creditLineCaps = roverData.creditLineCaps
 
 		const pools = await this.loadPools()
 		this.ammRouter.setPools(pools)
@@ -184,7 +187,11 @@ export class Executor extends BaseExecutor {
 			roverPosition.vaults,
 		)
 
-		const bestDebt: Debt = this.findBestDebt(roverPosition.debts)
+		const bestDebt: Debt = this.findBestDebt(
+			roverPosition.debts.map((debtAmount) => {
+				return { amount: debtAmount.amount, denom: debtAmount.denom }
+			}),
+		)
 
 		//  - do message construction
 		// borrow messages will include the swap if we cannot borrow debt asset directly
@@ -193,11 +200,11 @@ export class Executor extends BaseExecutor {
 			bestCollateral,
 			this.markets,
 			this.whitelistedCoins,
-      this.creditLines,
-      this.creditLineCaps
+			this.creditLines,
+			this.creditLineCaps,
 		)
 
-    const { borrow } = borrowActions[0] as { borrow: Coin }
+		const { borrow } = borrowActions[0] as { borrow: Coin }
 
 		const liquidateMessage = this.liquidationActionGenerator.produceLiquidationAction(
 			bestCollateral.type,
@@ -208,14 +215,12 @@ export class Executor extends BaseExecutor {
 		)
 
 		const vault = this.vaultDetails.get(bestCollateral.denom)
-		const collateralToDebtActions =
-			bestCollateral.type === PositionType.VAULT
-				? this.liquidationActionGenerator.produceVaultToDebtActions(vault!, borrow.denom)
-				: this.liquidationActionGenerator.generateSwapActions(
-						bestCollateral.denom,
-						borrow.denom,
-						bestDebt.amount.toFixed(0),
-				  )
+
+		const collateralToDebtActions = this.liquidationActionGenerator.convertCollateralToDebt(
+			bestCollateral.denom,
+			borrow,
+			vault,
+		)
 
 		const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
 
@@ -242,7 +247,7 @@ export class Executor extends BaseExecutor {
 			refundAll,
 		]
 
-    actions.forEach((action) => console.log(action))
+		actions.forEach((action) => console.log(action))
 
 		const msg = {
 			update_credit_account: { account_id: this.liquidatorAccountId, actions },
@@ -324,10 +329,8 @@ export class Executor extends BaseExecutor {
 	}
 
 	calculateVaultSharesValue = (shares: BigNumber, vaultAddress: string): BigNumber => {
-
-		
-    const vault = this.vaultDetails.get(vaultAddress)
-    if (!vault) throw new Error(UNSUPPORTED_VAULT)
+		const vault = this.vaultDetails.get(vaultAddress)
+		if (!vault) throw new Error(UNSUPPORTED_VAULT)
 		const positionLpShares = shares.multipliedBy(vault.lpShareToVaultShareRatio)
 		const lpSharePrice = this.prices.get(vault.baseToken) || 0
 		if (lpSharePrice === 0) throw new Error(UNSUPPORTED_ASSET)

@@ -17,7 +17,11 @@ import {
 } from './constants/Errors.js'
 import { GENERIC_BUFFER } from './constants/Variables.js'
 import { VaultInfo } from '../hive'
-import { UncollateralizedLoanLimitResponse, UserDebtResponse } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
+import {
+	UncollateralizedLoanLimitResponse,
+	UserDebtResponse,
+} from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
+import { findUnderlying } from '../helpers'
 
 export class LiquidationActionGenerator {
 	private router: AMMRouter
@@ -45,8 +49,8 @@ export class LiquidationActionGenerator {
 		collateral: Collateral,
 		markets: MarketInfo[],
 		whitelistedAssets: string[],
-    creditLines : UserDebtResponse[],
-    creditLineCaps : UncollateralizedLoanLimitResponse[]
+		creditLines: UserDebtResponse[],
+		creditLineCaps: UncollateralizedLoanLimitResponse[],
 	): Action[] => {
 		// estimate our debt to repay - this depends on collateral amount and close factor
 		const maxRepayValue = collateral.value * collateral.closeFactor
@@ -63,15 +67,22 @@ export class LiquidationActionGenerator {
 
 		// if asset is not enabled, or we have less than 50% the required liquidity, do alternative borrow
 		const marketInfo: MarketInfo | undefined = markets.find((market) => market.denom === debt.denom)
-    const creditLine : UserDebtResponse | undefined = creditLines.find((creditLine) => creditLine.uncollateralized && debt.denom === creditLine.denom)  
-    const creditLineCap : UncollateralizedLoanLimitResponse | undefined = creditLineCaps.find((creditLineCap) => creditLineCap.denom == debt.denom)
+		const creditLine: UserDebtResponse | undefined = creditLines.find(
+			(creditLine) => creditLine.uncollateralized && debt.denom === creditLine.denom,
+		)
+		const creditLineCap: UncollateralizedLoanLimitResponse | undefined = creditLineCaps.find(
+			(creditLineCap) => creditLineCap.denom == debt.denom,
+		)
 
-    const remainingCreditLine = creditLineCap && creditLine ? BigNumber(creditLineCap.limit).minus(creditLine.amount) : new BigNumber(0)
+		const remainingCreditLine =
+			creditLineCap && creditLine
+				? BigNumber(creditLineCap.limit).minus(creditLine.amount)
+				: new BigNumber(0)
 		if (
 			!marketInfo ||
 			!marketInfo.borrow_enabled ||
 			!whitelistedAssets.find((denom) => denom === debt.denom) ||
-      remainingCreditLine.dividedBy(2).isLessThan(debtAmount) ||
+			remainingCreditLine.dividedBy(2).isLessThan(debtAmount) ||
 			marketInfo.available_liquidity / debtAmount < 0.5
 		) {
 			return this.borrowWithoutLiquidity(debtCoin, markets, whitelistedAssets)
@@ -99,7 +110,7 @@ export class LiquidationActionGenerator {
 	borrowWithoutLiquidity = (
 		debtCoin: Coin,
 		markets: MarketInfo[],
-		whitelistedAssets: string[]
+		whitelistedAssets: string[],
 	): Action[] => {
 		// Assign inner coin variables for ease of use, as we use many times
 		const debtAmount = new BigNumber(debtCoin.amount)
@@ -137,8 +148,6 @@ export class LiquidationActionGenerator {
 				const marketBLiquiditySufficient =
 					marketBDenomInput.toNumber() < marketB.available_liquidity * GENERIC_BUFFER
 
-
-
 				// if neither market has liqudity, return which one has the larger share
 				if (!marketALiquiditySufficient && !marketBLiquiditySufficient) {
 					return (
@@ -147,9 +156,9 @@ export class LiquidationActionGenerator {
 					)
 				}
 
-        // todo factor in credit lines here
-        // const marketACreditLine = creditLines.find((creditLine) => creditLine.denom === marketA.denom)
-        // const marketBCreditLine = 
+				// todo factor in credit lines here
+				// const marketACreditLine = creditLines.find((creditLine) => creditLine.denom === marketA.denom)
+				// const marketBCreditLine =
 
 				// if market b does not have liqudity, prioritise a
 				if (marketALiquiditySufficient && !marketBLiquiditySufficient) {
@@ -250,13 +259,13 @@ export class LiquidationActionGenerator {
 			  })
 	}
 
-	produceVaultToDebtActions = (vault: VaultInfo, borrowDenom: string) : Action[] => {
+	produceVaultToDebtActions = (vault: VaultInfo, borrowDenom: string): Action[] => {
 		let vaultActions: Action[] = []
 		if (!vault) throw new Error(UNSUPPORTED_VAULT)
 
 		const lpTokenDenom = vault.baseToken
 		const poolId = lpTokenDenom.split('/').pop()
-    
+
 		// withdraw lp
 		const withdraw = this.produceWithdrawLiquidityAction(lpTokenDenom)
 
@@ -297,6 +306,46 @@ export class LiquidationActionGenerator {
 		const actions = []
 		actions.push(this.produceRepayAction(debtDenom))
 
+		return actions
+	}
+
+	convertCollateralToDebt = (
+		collateralDenom: string,
+		borrow: Coin,
+		vault: VaultInfo | undefined,
+	): Action[] => {
+		return vault !== undefined
+			? this.produceVaultToDebtActions(vault!, borrow.denom)
+			: this.swapCollateralCoinToBorrowActions(collateralDenom, borrow)
+	}
+
+	swapCollateralCoinToBorrowActions = (collateralDenom: string, borrowed: Coin): Action[] => {
+		let actions: Action[] = []
+		// if gamm token, we need to do a withdraw of the liquidity
+		if (collateralDenom.startsWith('gamm/')) {
+			// is this safe?
+			actions.push(this.produceWithdrawLiquidityAction(collateralDenom))
+
+
+			// find underlying tokens and swap to borrowed asset
+			const underlyingDenoms = findUnderlying(collateralDenom, this.router.getPools())
+      underlyingDenoms?.forEach((underlyingDenom) => console.log(underlyingDenom))
+			underlyingDenoms?.forEach(
+				(denom) => {
+          if (denom !== borrowed.denom) {
+            actions = actions.concat(
+              this.generateSwapActions(denom, borrowed.denom, borrowed.amount),
+            )
+          }
+        },
+			)
+		} else {
+			actions = actions.concat(
+				this.generateSwapActions(collateralDenom, borrowed.denom, borrowed.amount),
+			)
+		}
+
+    actions.forEach((action) => console.log(action))
 		return actions
 	}
 
