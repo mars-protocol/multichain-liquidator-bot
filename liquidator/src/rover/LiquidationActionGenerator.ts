@@ -326,26 +326,21 @@ export class LiquidationActionGenerator {
 			// is this safe?
 			actions.push(this.produceWithdrawLiquidityAction(collateralDenom))
 
-
 			// find underlying tokens and swap to borrowed asset
 			const underlyingDenoms = findUnderlying(collateralDenom, this.router.getPools())
-      underlyingDenoms?.forEach((underlyingDenom) => console.log(underlyingDenom))
-			underlyingDenoms?.forEach(
-				(denom) => {
-          if (denom !== borrowed.denom) {
-            actions = actions.concat(
-              this.generateSwapActions(denom, borrowed.denom, borrowed.amount),
-            )
-          }
-        },
-			)
+			underlyingDenoms?.forEach((underlyingDenom) => console.log(underlyingDenom))
+			underlyingDenoms?.forEach((denom) => {
+				if (denom !== borrowed.denom) {
+					actions = actions.concat(this.generateSwapActions(denom, borrowed.denom, borrowed.amount))
+				}
+			})
 		} else {
 			actions = actions.concat(
 				this.generateSwapActions(collateralDenom, borrowed.denom, borrowed.amount),
 			)
 		}
 
-    actions.forEach((action) => console.log(action))
+		actions.forEach((action) => console.log(action))
 		return actions
 	}
 
