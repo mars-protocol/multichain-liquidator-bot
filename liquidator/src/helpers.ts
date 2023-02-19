@@ -32,6 +32,7 @@ import {
 import { AminoTypes, GasPrice, MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { camelCase } from 'lodash'
 import { HdPath } from '@cosmjs/crypto'
+import { Pool } from './types/Pool'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -42,7 +43,7 @@ export async function sleep(timeout: number) {
 
 export const camelCaseKeys = (object: Object) => {
 	const newObject = {}
-  //@ts-expect-error tells us that we cannot 'use string to index {}' but we can :)
+	//@ts-ignore tells us that we cannot 'use string to index {}' but we can :)
 	Object.keys(object).forEach((key) => (newObject[camelCase(key)] = object[key]))
 	return newObject
 }
@@ -118,6 +119,14 @@ export const produceSigningCosmWasmClient = async (
 	return await SigningCosmWasmClient.connectWithSigner(rpcEndpoint, liquidator, {
 		gasPrice: GasPrice.fromString(gasPrice),
 	})
+}
+
+export const findUnderlying = (lpToken: string, pools: Pool[]) : string[] | undefined  => {
+  const poolId = lpToken.split("/").pop()
+  const pool = pools.find((pool)=> pool.id.toString() === poolId)
+  if (!pool) return undefined
+
+  return pool.poolAssets.map((pool)=> pool.token.denom)
 }
 
 export const setPrice = async (

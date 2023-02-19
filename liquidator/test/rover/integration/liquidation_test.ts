@@ -39,7 +39,7 @@ const runTests = async (testConfig : TestConfig) => {
 		unlockedVault: false,
 		coinBigger: false,
 		vaultBigger: false, 
-}
+	}
 	// set up master services + details
 	const { client, cwClient, address, wallet } = await createServices(
 		testConfig.rpcEndpoint,
@@ -57,6 +57,7 @@ const runTests = async (testConfig : TestConfig) => {
 	const config: RoverExecutorConfig = {
 		redbankAddress: testConfig.redbankAddress,
 		oracleAddress: testConfig.oracleAddress,
+		swapperAddress: testConfig.swapperAddress,
 		liquidatorAddress: address,
 		accountNftAddress: testConfig.accountNFTAddress,
 		gasDenom: testConfig.gasDenom,

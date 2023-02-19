@@ -9,6 +9,7 @@ export interface TestConfig {
     creditManagerAddress : string
     redbankAddress : string
     oracleAddress : string
+    swapperAddress: string
     rpcEndpoint : string
     prefix : string
     hiveEndpoint: string
@@ -40,6 +41,7 @@ export const config : TestConfig = {
     creditManagerAddress : 'osmo12lf593ekns80tyv9v5qqr2yhu070zrgwkkd8hqrn0eg9nl9yp27qv7djff',
     redbankAddress : 'osmo1t0dl6r27phqetfu0geaxrng0u9zn8qgrdwztapt5xr32adtwptaq6vwg36',
     oracleAddress : 'osmo1dqz2u3c8rs5e7w5fnchsr2mpzzsxew69wtdy0aq4jsd76w7upmsstqe0s8',
+    swapperAddress: 'osmo1fqnwlxk3a4rhp04srxu2tnujcq9w052t8dkmvzgv6n8rz2flcm4sdtlzjg',
     rpcEndpoint : 'https://rpc-test.osmosis.zone',
     prefix : 'osmo',
     hiveEndpoint:

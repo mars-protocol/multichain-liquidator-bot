@@ -11,6 +11,7 @@ import {
 	UserDebtResponse,
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import BigNumber from 'bignumber.js'
+import { SwapperRoute } from './types/swapper'
 
 enum QueryType {
 	DEBTS,
@@ -65,6 +66,7 @@ export interface RoverData {
 	whitelistedAssets: string[]
 	creditLines: UserDebtResponse[]
 	creditLineCaps: UncollateralizedLoanLimitResponse[]
+  routes: SwapperRoute[],
 	vaultInfo: Map<string, VaultInfo>
 }
 
@@ -78,8 +80,11 @@ interface CoreDataResponse {
 		whitelistedAssets: string[]
 		creditLines: UserDebtResponse[]
 		creditLineCaps: UncollateralizedLoanLimitResponse[]
+    routes: SwapperRoute[]
 	}
 }
+
+
 
 interface VaultInfoWasm {
 	totalSupply: string
@@ -188,6 +193,7 @@ const produceCoreRoverDataQuery = (
 	redbankAddress: string,
 	oracleAddress: string,
 	creditManagerAddress: string,
+  swapperAddress: string
 ) => {
 	return `{
     bank {
@@ -216,7 +222,11 @@ const produceCoreRoverDataQuery = (
         creditLineCaps: contractQuery(
           contractAddress: "${redbankAddress}"
           query: { uncollateralized_loan_limits: { user :"${creditManagerAddress}"} }
-        )
+        ),
+        routes: contractQuery(
+          contractAddress: "${swapperAddress}"
+          query: { routes: {} }
+        ),
       }
     }`
 }
@@ -227,6 +237,7 @@ export const fetchRoverData = async (
 	redbankAddress: string,
 	oracleAddress: string,
 	creditManagerAddress: string,
+  swapperAddress : string,
 	vaultAddresses: string[],
 ): Promise<RoverData> => {
 	const coreQuery = produceCoreRoverDataQuery(
@@ -234,6 +245,7 @@ export const fetchRoverData = async (
 		redbankAddress,
 		oracleAddress,
 		creditManagerAddress,
+    swapperAddress
 	)
 
 	const queries = vaultAddresses.map((vault) => {
@@ -263,13 +275,14 @@ export const fetchRoverData = async (
 		const vaultInfo: VaultInfo = produceVaultInfo(vaultResponse.data as VaultDataResponse)
 		vaultMap.set(vaultInfo.vaultAddress, vaultInfo)
 	})
-
+  
 	return {
 		markets: coreData.wasm.markets,
 		masterBalance: coreData.bank.balance,
 		prices: coreData.wasm.prices,
 		creditLines: coreData.wasm.creditLines.filter((debt) => debt.uncollateralized),
 		creditLineCaps: coreData.wasm.creditLineCaps,
+    routes: coreData.wasm.routes,
 		vaultInfo: vaultMap,
 		whitelistedAssets: coreData.wasm.whitelistedAssets,
 	}

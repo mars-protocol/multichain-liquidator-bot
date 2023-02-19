@@ -26,6 +26,7 @@ import {
 
 export interface RoverExecutorConfig extends BaseExecutorConfig {
 	creditManagerAddress: string
+	swapperAddress: string
 	liquidatorAddress: string
 	accountNftAddress: string
 	minGasTokens: number
@@ -82,6 +83,7 @@ export class Executor extends BaseExecutor {
 			this.config.redbankAddress,
 			this.config.oracleAddress,
 			this.config.creditManagerAddress,
+			this.config.swapperAddress,
 			this.vaults,
 		)
 
@@ -96,6 +98,8 @@ export class Executor extends BaseExecutor {
 		this.vaultDetails = roverData.vaultInfo
 		this.creditLines = roverData.creditLines
 		this.creditLineCaps = roverData.creditLineCaps
+		
+		this.liquidationActionGenerator.setSwapperRoutes(roverData.routes)
 
 		const pools = await this.loadPools()
 		this.ammRouter.setPools(pools)

@@ -22,12 +22,22 @@ import {
 	UserDebtResponse,
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import { findUnderlying } from '../helpers'
+import { SwapperRoute } from '../types/swapper'
 
 export class LiquidationActionGenerator {
 	private router: AMMRouter
+	private swapperRoutes : SwapperRoute[]
 
 	constructor(osmosisRouter: AMMRouter) {
 		this.router = osmosisRouter
+		this.swapperRoutes = []
+	}
+
+
+	setSwapperRoutes = (
+		swapperRoutes : SwapperRoute[]
+	) => {
+		this.swapperRoutes = swapperRoutes
 	}
 
 	/**
@@ -209,6 +219,15 @@ export class LiquidationActionGenerator {
 		return actions
 	}
 
+	private isViableRoute = (
+		route: RouteHop[]
+	) : boolean => {
+
+		// Filter to just routes that are viable in the swapper
+		return route.filter((hop)=>this.swapperRoutes.find(
+			(swapperRoute)=> swapperRoute.denom_in === hop.tokenInDenom 
+				&& swapperRoute.denom_out === hop.tokenOutDenom) !== undefined).length > 0
+	}
 	/**
 	 * Swap the coillateral we won to repay the debt we borrowed. This method calculates the
 	 * best route and returns an array of swap actions (on action per route hop) to execute
@@ -226,11 +245,14 @@ export class LiquidationActionGenerator {
 		assetOutDenom: string,
 		outAmount: string,
 	): Action[] => {
-		const route = this.router.getBestRouteGivenOutput(
-			assetInDenom,
-			assetOutDenom,
-			new BigNumber(outAmount),
-		)
+
+		const bnOut = new BigNumber(outAmount)
+		const routes : RouteHop[][] = this.router.getRoutes(assetInDenom, assetOutDenom)
+
+		// filter routes by those available in the swap router 
+		const enabledRoutes = routes.filter((route)=> this.isViableRoute(route))
+		const route = this.router.getRouteWithLowestInput(bnOut, enabledRoutes)
+			
 
 		if (route.length === 0) throw new Error(NO_ROUTE_FOR_SWAP)
 
