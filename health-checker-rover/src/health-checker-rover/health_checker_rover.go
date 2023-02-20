@@ -1,4 +1,4 @@
-package health_checker
+package health_checker_rover
 
 import (
 	"context"
@@ -16,37 +16,37 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type HealthChecker struct {
+var (
+	errDefault = errors.New("wrong argument type")
+)
+
+type HealthCheckerRover struct {
 	queue                interfaces.Queuer
 	metricsCache         interfaces.Cacher
-	hive                 Hive
+	hive                 RoverHive
 	healthCheckQueueName string
 	liquidationQueueName string
 	jobsPerWorker        int
 	addressesPerJob      int
-	redbankAddress       string
+	creditManagerAddress string
 
 	batchSize       int
 	logger          *logrus.Entry
 	continueRunning uint32
 }
 
-var (
-	errDefault = errors.New("wrong argument type")
-)
-
 func New(
 	queue interfaces.Queuer,
 	metricsCache interfaces.Cacher,
-	hive Hive,
+	hive RoverHive,
 	healthCheckQueueName string,
 	liquidationQueueName string,
 	jobsPerWorker int,
 	batchSize int,
 	addressesPerJob int,
-	redbankAddress string,
+	creditManagerAddress string,
 	logger *logrus.Entry,
-) (*HealthChecker, error) {
+) (*HealthCheckerRover, error) {
 
 	if queue == nil {
 		return nil, errors.New("queue must be set")
@@ -65,7 +65,7 @@ func New(
 		return nil, errors.New("AddressesPerJob cannot be 0")
 	}
 
-	return &HealthChecker{
+	return &HealthCheckerRover{
 		queue:                queue,
 		metricsCache:         metricsCache,
 		hive:                 hive,
@@ -74,25 +74,24 @@ func New(
 		jobsPerWorker:        jobsPerWorker,
 		batchSize:            batchSize,
 		addressesPerJob:      addressesPerJob,
-		redbankAddress:       redbankAddress,
+		creditManagerAddress: creditManagerAddress,
 		logger:               logger,
 		continueRunning:      0,
 	}, nil
 }
 
 // Generate an execute function for our Jobs
-func (s *HealthChecker) getExecuteFunction(redbankAddress string) func(ctx context.Context, args interface{}) (interface{}, error) {
+func (s *HealthCheckerRover) getExecuteFunction(creditManagerAddress string) func(ctx context.Context, args interface{}) (interface{}, error) {
 	execute := func(
 		ctx context.Context,
 		args interface{}) (interface{}, error) {
-		positions, ok := args.([]types.HealthCheckWorkItem)
+		positions, ok := args.([]types.RoverHealthCheckWorkItem)
 		if !ok {
 			s.logger.Error("Failed to load positions")
 			return nil, errDefault
 		}
 
-		batchResults, err := s.hive.FetchBatch(redbankAddress, positions)
-
+		batchResults, err := s.hive.FetchBatch(creditManagerAddress, positions)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +104,7 @@ func (s *HealthChecker) getExecuteFunction(redbankAddress string) func(ctx conte
 
 // Generate a list of jobs. Each job represents a batch of requests for N number
 // of address health status'
-func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, addressesPerJob int) []worker_pool.Job {
+func (s *HealthCheckerRover) generateJobs(positionList []types.RoverHealthCheckWorkItem, addressesPerJob int) []worker_pool.Job {
 
 	numberOfAddresses := len(positionList)
 	jobs := []worker_pool.Job{}
@@ -123,10 +122,10 @@ func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, a
 			jobs = append(jobs, worker_pool.Job{
 				Descriptor: worker_pool.JobDescriptor{
 					ID:       worker_pool.JobID(fmt.Sprintf("%v", i)),
-					JType:    "HealthStatusBatch",
+					JType:    "HealthStatusRoverBatch",
 					Metadata: nil,
 				},
-				ExecFn: s.getExecuteFunction(s.redbankAddress),
+				ExecFn: s.getExecuteFunction(s.creditManagerAddress),
 				Args:   positionsSubSlice,
 			})
 		}
@@ -136,19 +135,17 @@ func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, a
 
 // Filter unhealthy positions into array of byte arrays.
 // TODO handle different liquidation types (e.g redbank, rover). Currently we only store address
-func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte {
+func (s *HealthCheckerRover) produceUnhealthyPositions(results []UserResult) [][]byte {
 	var unhealthyPositions [][]byte
 	for _, userResult := range results {
-		ltv, err := strconv.ParseFloat(userResult.ContractQuery.HealthStatus.Borrowing.LiquidationThresholdHf, 32)
-		if err != nil {
-			s.logger.Errorf("An Error Occurred decoding health status. %v", err)
-		} else if ltv < 1 {
+		liquidatable := userResult.ContractQuery.Health.Liquidatable
+		if liquidatable {
 
 			positionDecoded, decodeError := json.Marshal(userResult)
 			if decodeError == nil {
 				unhealthyPositions = append(unhealthyPositions, positionDecoded)
 			} else {
-				s.logger.Errorf("An Error Occurred decoding user address. %v", err)
+				s.logger.Errorf("An Error Occurred decoding user address. %v", decodeError)
 			}
 		}
 	}
@@ -157,7 +154,7 @@ func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte
 }
 
 // Runs until interrupted
-func (s *HealthChecker) Run() error {
+func (s *HealthCheckerRover) Run() error {
 	err := s.queue.Connect()
 	if err != nil {
 		return err
@@ -195,9 +192,9 @@ func (s *HealthChecker) Run() error {
 
 		start := time.Now()
 
-		var positions []types.HealthCheckWorkItem
+		var positions []types.RoverHealthCheckWorkItem
 		for _, item := range items {
-			var position types.HealthCheckWorkItem
+			var position types.RoverHealthCheckWorkItem
 			err = json.Unmarshal(item, &position)
 			if err != nil {
 				s.logger.Error(err)
@@ -214,7 +211,7 @@ func (s *HealthChecker) Run() error {
 		// Dispatch workers to fetch position statuses
 		jobs := s.generateJobs(positions, s.addressesPerJob)
 		userResults, success := s.RunWorkerPool(jobs)
-		s.metricsCache.IncrementBy("health_checker.accounts.scanned", int64(len(userResults)))
+		s.metricsCache.IncrementBy("health_checker_rover.accounts.scanned", int64(len(userResults)))
 
 		// A warning incase we do not successfully load data for all positions.
 		// This will likely not occur but it it does is important we notice.
@@ -244,7 +241,7 @@ func (s *HealthChecker) Run() error {
 			}).Info("Found unhealthy positions")
 		}
 		// Log the total amount of unhealthy positions
-		s.metricsCache.IncrementBy("health_checker.unhealthy.total", int64(len(unhealthyPositions)))
+		s.metricsCache.IncrementBy("health_checker_rover.unhealthy.total", int64(len(unhealthyPositions)))
 
 		s.logger.WithFields(logrus.Fields{
 			"total":      len(positions),
@@ -256,7 +253,7 @@ func (s *HealthChecker) Run() error {
 	return nil
 }
 
-func (s *HealthChecker) RunWorkerPool(jobs []worker_pool.Job) ([]UserResult, bool) {
+func (s *HealthCheckerRover) RunWorkerPool(jobs []worker_pool.Job) ([]UserResult, bool) {
 	wp := worker_pool.InitiatePool(s.jobsPerWorker)
 
 	// prevent unneccesary work
@@ -303,7 +300,7 @@ func (s *HealthChecker) RunWorkerPool(jobs []worker_pool.Job) ([]UserResult, boo
 }
 
 // Stop the service gracefully
-func (s *HealthChecker) Stop() error {
+func (s *HealthCheckerRover) Stop() error {
 	// Block long running routines from continuing
 	atomic.StoreUint32(&s.continueRunning, 0)
 	s.logger.Info("Stopping")
