@@ -1,6 +1,6 @@
 import { AMMRouter } from '../ammRouter'
-import { MarketInfo } from './types/marketInfo'
-import { Collateral, Debt, PositionType } from './types/roverPosition.js'
+import { MarketInfo } from './types/MarketInfo'
+
 import {
 	Action,
 	Coin,
@@ -15,7 +15,7 @@ import {
 	POOL_NOT_FOUND,
 	UNSUPPORTED_VAULT,
 } from './constants/errors.js'
-import { GENERIC_BUFFER } from './constants/Variables.js'
+import { GENERIC_BUFFER } from './constants/variables'
 import { VaultInfo } from '../hive'
 import {
 	UncollateralizedLoanLimitResponse,
@@ -23,6 +23,7 @@ import {
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import { findUnderlying } from '../helpers'
 import { SwapperRoute } from '../types/swapper'
+import { Collateral, Debt, PositionType } from './types/RoverPosition'
 
 export class LiquidationActionGenerator {
 	private router: AMMRouter

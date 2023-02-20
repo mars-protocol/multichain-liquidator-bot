@@ -1,6 +1,6 @@
 import { AMMRouter } from '../../../src/ammRouter'
 import { LiquidationActionGenerator } from '../../../src/rover/liquidationActionGenerator'
-import { MarketInfo } from '../../../src/rover/types/marketInfo'
+import { MarketInfo } from '../../../src/rover/types/MarketInfo'
 import {
 	generateRandomCreditLine,
 	generateRandomCreditLineCap,
@@ -10,7 +10,7 @@ import {
 	Coin,
 	Decimal,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
-import { Collateral, Debt, PositionType } from '../../../src/rover/types/roverPosition'
+import { Collateral, Debt, PositionType } from '../../../src/rover/types/RoverPosition'
 import { Pool } from '../../../src/types/pool'
 import Long from 'long'
 import { NO_ROUTE_FOR_SWAP } from '../../../src/rover/constants/errors'

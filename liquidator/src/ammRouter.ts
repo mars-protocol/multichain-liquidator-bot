@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js'
-import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from './math.js'
+import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from './math'
 import { RouteHop } from './types/routeHop'
 import { Pool } from './types/pool'
 const BASE_ASSET_INDEX = 0

@@ -14,10 +14,10 @@ import {
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 
 import BigNumber from 'bignumber.js'
-import { Collateral, Debt, PositionType } from './types/roverPosition'
+import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { MarketInfo } from './types/marketInfo'
+import { MarketInfo } from './types/MarketInfo'
 import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/errors'
 import {
 	UncollateralizedLoanLimitResponse,

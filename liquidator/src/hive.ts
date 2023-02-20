@@ -2,7 +2,7 @@ import { Position } from './types/position'
 import fetch from 'cross-fetch'
 import { Positions } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { Coin } from '@cosmjs/amino'
-import { MarketInfo } from './rover/types/marketInfo'
+import { MarketInfo } from './rover/types/MarketInfo'
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 
 import { NO_ROVER_DATA } from './rover/constants/errors'
