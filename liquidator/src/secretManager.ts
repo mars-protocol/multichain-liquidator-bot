@@ -1,3 +1,6 @@
+export interface SecretManager {
+  getSeedPhrase() : Promise<string> 
+}
 
 export const getSecretManager = (): SecretManager => {
     return {

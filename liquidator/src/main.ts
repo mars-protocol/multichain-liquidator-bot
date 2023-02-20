@@ -1,7 +1,9 @@
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from './helpers.js'
+import { getConfig } from './redbank/config/osmosis.js'
 import { Executor } from './redbank/executor.js'
 import { getSecretManager } from './secretManager.js'
+import { Network } from './types/network.js'
 
 export const main = async () => {
 
@@ -14,24 +16,12 @@ export const main = async () => {
   const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
 
   // produce clients
-  const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!, liquidator)
+  const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!)
   const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
 
   await new Executor(
-    {
-      gasDenom: process.env.GAS_DENOM!,
-      hiveEndpoint: process.env.HIVE_ENDPOINT!,
-      lcdEndpoint: process.env.LCD_ENDPOINT!,
-      liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
-      neutralAssetDenom: process.env.NEUTRAL_ASSET_DENOM!,
-      liquidatorMasterAddress: liquidatorMasterAddress,
-      liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
-      oracleAddress: process.env.ORACLE_ADDRESS!,
-      redbankAddress: process.env.REDBANK_ADDRESS!,
-      logResults:true,
-      safetyMargin: 0.05,
-      redisEndpoint:process.env.REDIS_ENDPOINT!,
-    },
+    // Change network to fit your requirements
+    getConfig(liquidatorMasterAddress,Network.TESTNET),
     client,
     queryClient,
   ).start()
