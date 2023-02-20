@@ -55,26 +55,25 @@ type BatchEventsResponse []UserPosition
 // fetchHiveEvents fetches events from Hive for the given block numbers
 func (hive *RoverHive) FetchBatch(
 	contractAddress string,
-	positions []types.HealthCheckWorkItem,
+	positions []types.RoverHealthCheckWorkItem,
 ) ([]UserResult, error) {
 	var userResults []UserResult
 	var batchEvents BatchEventsResponse
-	positonMap := make(map[string]types.HealthCheckWorkItem)
+	positonMap := make(map[string]types.RoverHealthCheckWorkItem)
 
 	var queries []BatchQuery
 	for _, position := range positions {
-
 		// store addresses in this local map so that we can easily add debts and collateral later
-		positonMap[position.Address] = position
+		positonMap[position.AccountId] = position
 		batchQuery := BatchQuery{
-			Query: fmt.Sprintf(`query($contractAddress: String! $userAddress: String!) {
-                        %s:wasm {
-							contractQuery(contractAddress: $contractAddress, query: { health : { account_id: $userAddress } })
+			Query: fmt.Sprintf(`query($contractAddress: String! $accountId: String!) {
+                        account_%s:wasm {
+							contractQuery(contractAddress: $contractAddress, query: { health : { account_id: $accountId } })
 						}
-                    }`, position.Address),
+                    }`, position.AccountId),
 			Variables: map[string]interface{}{
 				"contractAddress": contractAddress,
-				"userAddress":     position.Address,
+				"accountId":       position.AccountId,
 			},
 		}
 		queries = append(queries, batchQuery)
@@ -105,13 +104,10 @@ func (hive *RoverHive) FetchBatch(
 	for _, event := range batchEvents {
 		// event.Data is now the address[contractQuery] map
 
-		for address, data := range event.Data {
-			position := positonMap[address]
+		for accountId, data := range event.Data {
 			userResults = append(userResults, UserResult{
-				Address:       address,
+				Address:       accountId,
 				ContractQuery: data.ContractQuery,
-				Debts:         position.Debts,
-				Collateral:    position.Collateral,
 			})
 		}
 	}

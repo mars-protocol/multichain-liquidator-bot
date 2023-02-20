@@ -84,14 +84,13 @@ func (s *HealthCheckerRover) getExecuteFunction(creditManagerAddress string) fun
 	execute := func(
 		ctx context.Context,
 		args interface{}) (interface{}, error) {
-		positions, ok := args.([]types.HealthCheckWorkItem)
+		positions, ok := args.([]types.RoverHealthCheckWorkItem)
 		if !ok {
 			s.logger.Error("Failed to load positions")
 			return nil, errDefault
 		}
 
 		batchResults, err := s.hive.FetchBatch(creditManagerAddress, positions)
-
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +103,7 @@ func (s *HealthCheckerRover) getExecuteFunction(creditManagerAddress string) fun
 
 // Generate a list of jobs. Each job represents a batch of requests for N number
 // of address health status'
-func (s *HealthCheckerRover) generateJobs(positionList []types.HealthCheckWorkItem, addressesPerJob int) []Job {
+func (s *HealthCheckerRover) generateJobs(positionList []types.RoverHealthCheckWorkItem, addressesPerJob int) []Job {
 
 	numberOfAddresses := len(positionList)
 	jobs := []Job{}
@@ -192,9 +191,9 @@ func (s *HealthCheckerRover) Run() error {
 
 		start := time.Now()
 
-		var positions []types.HealthCheckWorkItem
+		var positions []types.RoverHealthCheckWorkItem
 		for _, item := range items {
-			var position types.HealthCheckWorkItem
+			var position types.RoverHealthCheckWorkItem
 			err = json.Unmarshal(item, &position)
 			if err != nil {
 				s.logger.Error(err)

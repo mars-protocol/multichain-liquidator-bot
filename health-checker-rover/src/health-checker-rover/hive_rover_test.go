@@ -8,17 +8,15 @@ import (
 
 func Test_weCanQueryAccounts(t *testing.T) {
 
-	hiveEndpoint := "http://127.0.0.1:8085/graphql"
-	creditManagerAddress := "osmo1gsy3cm2n5mnmv9esz5ysm7np3xgxryktjmfgu22jldfwps2u3rksfzkkmw"
+	hiveEndpoint := "https://osmosis-delphi-testnet-1.simply-vc.com.mt/XF32UOOU55CX/osmosis-hive/graphql"
+	creditManagerAddress := "osmo12lf593ekns80tyv9v5qqr2yhu070zrgwkkd8hqrn0eg9nl9yp27qv7djff"
 	batchSize := 200
 
-	mockPosition := types.HealthCheckWorkItem{
-		Address:    "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9",
-		Debts:      []types.Asset{},
-		Collateral: []types.Asset{},
+	mockPosition := types.RoverHealthCheckWorkItem{
+		AccountId: "25",
 	}
 
-	positions := []types.HealthCheckWorkItem{}
+	positions := []types.RoverHealthCheckWorkItem{}
 
 	for i := 1; i <= batchSize; i++ {
 		positions = append(positions, mockPosition)
