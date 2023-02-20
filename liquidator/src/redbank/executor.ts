@@ -1,6 +1,4 @@
-import { LiquidationHelper } from '../liquidationHelpers.js'
-
-import { LiquidationResult, LiquidationTx } from '../types/liquidation.js'
+import {LiquidationTx } from '../types/liquidation.js'
 import { Position } from '../types/position'
 import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
@@ -8,25 +6,20 @@ import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import { coins, EncodeObject } from '@cosmjs/proto-signing'
 
 import {
-  makeBorrowMessage,
-  makeDepositMessage,
   makeExecuteContractMessage,
-  makeRepayMessage,
   makeWithdrawMessage,
-  ProtocolAddresses,
-  repay,
   sleep,
 } from '../helpers.js'
 import { osmosis, cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
-import { Collateral, DataResponse, Debt, fetchRedbankBatch } from '../hive.js'
+import { Collateral, DataResponse, fetchRedbankBatch } from '../hive.js'
 
 import BigNumber from 'bignumber.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
-import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor.js'
+import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { getLargestCollateral, getLargestDebt } from '../liquidation_generator.js'
+import { getLargestCollateral, getLargestDebt } from '../liquidation_generator'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 
@@ -46,7 +39,7 @@ export interface RedbankExecutorConfig extends BaseExecutorConfig {
  */
 export class Executor extends BaseExecutor {
   public config: RedbankExecutorConfig
-  private liquidationHelper: LiquidationHelper
+
 
   constructor(
     config: RedbankExecutorConfig,
@@ -55,12 +48,6 @@ export class Executor extends BaseExecutor {
   ) {
     super(config, client, queryClient)
     this.config = config
-
-    // instantiate liquidation helper
-    this.liquidationHelper = new LiquidationHelper(
-      this.config.liquidatorMasterAddress,
-      this.config.liquidationFiltererAddress,
-    )
   }
 
   async start() {
@@ -265,7 +252,7 @@ export class Executor extends BaseExecutor {
     return expectedDebtAssetsPostSwap
   }
 
-  async run() {
+  async run() : Promise<void> {
     const liquidatorAddress = this.config.liquidatorMasterAddress
 
     if (!this.queryClient || !this.client)
@@ -316,20 +303,20 @@ export class Executor extends BaseExecutor {
     firstMsgBatch.push(
       executeContract(
         makeExecuteContractMessage(
-          this.liquidationHelper.getLiquidatorAddress(),
-          this.liquidationHelper.getLiquidationFiltererContract(),
+          this.config.liquidatorMasterAddress,
+          this.config.liquidationFiltererAddress,
           msg,
           debtCoins,
         ).value as MsgExecuteContract,
       ),
     )
 
-    if (!firstMsgBatch || firstMsgBatch.length === 0 || txs.length === 0) return []
+    if (!firstMsgBatch || firstMsgBatch.length === 0 || txs.length === 0) return
 
     const result = await this.client.signAndBroadcast(
-      this.liquidationHelper.getLiquidatorAddress(),
+      this.config.liquidatorMasterAddress,
       firstMsgBatch,
-      await this.getFee(firstMsgBatch, this.liquidationHelper.getLiquidatorAddress()),
+      await this.getFee(firstMsgBatch, this.config.liquidatorMasterAddress),
     )
 
     this.redis.incrementBy('executor.liquidations.executed', txs.length)
@@ -405,46 +392,6 @@ export class Executor extends BaseExecutor {
     return result
   }
 
-  sendBorrowAndLiquidateTx = async (
-    txs: LiquidationTx[],
-    borrowMessages: EncodeObject[],
-    coins: Coin[],
-    liquidationHelper: LiquidationHelper,
-  ): Promise<LiquidationResult[]> => {
-    if (!this.client)
-      throw new Error(
-        'Stargate Client is undefined, ensure you call initiate at before calling this method',
-      )
-
-    const liquidateMsg = JSON.stringify({ liquidate_many: { liquidations: txs } })
-    const msg = toUtf8(liquidateMsg)
-    const msgs: EncodeObject[] = borrowMessages
-
-    msgs.push(
-      executeContract(
-        makeExecuteContractMessage(
-          liquidationHelper.getLiquidatorAddress(),
-          liquidationHelper.getLiquidationFiltererContract(),
-          msg,
-          coins,
-        ).value as MsgExecuteContract,
-      ),
-    )
-
-    if (!msgs || msgs.length === 0) return []
-
-    const result = await this.client.signAndBroadcast(
-      liquidationHelper.getLiquidatorAddress(),
-      msgs,
-      await this.getFee(msgs, liquidationHelper.getLiquidatorAddress()),
-    )
-
-    if (!result || !result.rawLog) return []
-
-    const events = JSON.parse(result.rawLog)[0]
-
-    return liquidationHelper.parseLiquidationResult(events.events)
-  }
   getFee = async (msgs: EncodeObject[], address: string) => {
     if (!this.client)
       throw new Error(
