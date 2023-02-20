@@ -12,6 +12,7 @@ import (
 
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/worker_pool"
 	"github.com/sirupsen/logrus"
 )
 
@@ -104,10 +105,10 @@ func (s *HealthChecker) getExecuteFunction(redbankAddress string) func(ctx conte
 
 // Generate a list of jobs. Each job represents a batch of requests for N number
 // of address health status'
-func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, addressesPerJob int) []Job {
+func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, addressesPerJob int) []worker_pool.Job {
 
 	numberOfAddresses := len(positionList)
-	jobs := []Job{}
+	jobs := []worker_pool.Job{}
 	// Slice our address into jobs, each job fetching N number of addresses
 	for i := 0; i < len(positionList); i += addressesPerJob {
 		remainingAddresses := float64(numberOfAddresses - i)
@@ -119,9 +120,9 @@ func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, a
 		if len(positionsSubSlice) > 0 {
 
 			// insert job
-			jobs = append(jobs, Job{
-				Descriptor: JobDescriptor{
-					ID:       JobID(fmt.Sprintf("%v", i)),
+			jobs = append(jobs, worker_pool.Job{
+				Descriptor: worker_pool.JobDescriptor{
+					ID:       worker_pool.JobID(fmt.Sprintf("%v", i)),
 					JType:    "HealthStatusBatch",
 					Metadata: nil,
 				},
@@ -255,8 +256,8 @@ func (s *HealthChecker) Run() error {
 	return nil
 }
 
-func (s *HealthChecker) RunWorkerPool(jobs []Job) ([]UserResult, bool) {
-	wp := InitiatePool(s.jobsPerWorker)
+func (s *HealthChecker) RunWorkerPool(jobs []worker_pool.Job) ([]UserResult, bool) {
+	wp := worker_pool.InitiatePool(s.jobsPerWorker)
 
 	// prevent unneccesary work
 	ctx, cancel := context.WithCancel(context.TODO())
