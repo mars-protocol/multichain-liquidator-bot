@@ -1,6 +1,6 @@
-import { AMMRouter } from '../amm_router'
-import { MarketInfo } from './types/MarketInfo'
-import { Collateral, Debt, PositionType } from './types/RoverPosition.js'
+import { AMMRouter } from '../ammRouter'
+import { MarketInfo } from './types/marketInfo'
+import { Collateral, Debt, PositionType } from './types/roverPosition.js'
 import {
 	Action,
 	Coin,
@@ -8,13 +8,13 @@ import {
 	VaultBaseForString,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
-import { RouteHop } from '../types/RouteHop'
+import { RouteHop } from '../types/routeHop'
 import {
 	NO_ROUTE_FOR_SWAP,
 	NO_VALID_MARKET,
 	POOL_NOT_FOUND,
 	UNSUPPORTED_VAULT,
-} from './constants/Errors.js'
+} from './constants/errors.js'
 import { GENERIC_BUFFER } from './constants/Variables.js'
 import { VaultInfo } from '../hive'
 import {
@@ -26,17 +26,14 @@ import { SwapperRoute } from '../types/swapper'
 
 export class LiquidationActionGenerator {
 	private router: AMMRouter
-	private swapperRoutes : SwapperRoute[]
+	private swapperRoutes: SwapperRoute[]
 
 	constructor(osmosisRouter: AMMRouter) {
 		this.router = osmosisRouter
 		this.swapperRoutes = []
 	}
 
-
-	setSwapperRoutes = (
-		swapperRoutes : SwapperRoute[]
-	) => {
+	setSwapperRoutes = (swapperRoutes: SwapperRoute[]) => {
 		this.swapperRoutes = swapperRoutes
 	}
 
@@ -219,14 +216,18 @@ export class LiquidationActionGenerator {
 		return actions
 	}
 
-	private isViableRoute = (
-		route: RouteHop[]
-	) : boolean => {
-
+	private isViableRoute = (route: RouteHop[]): boolean => {
 		// Filter to just routes that are viable in the swapper
-		return route.filter((hop)=>this.swapperRoutes.find(
-			(swapperRoute)=> swapperRoute.denom_in === hop.tokenInDenom 
-				&& swapperRoute.denom_out === hop.tokenOutDenom) !== undefined).length > 0
+		return (
+			route.filter(
+				(hop) =>
+					this.swapperRoutes.find(
+						(swapperRoute) =>
+							swapperRoute.denom_in === hop.tokenInDenom &&
+							swapperRoute.denom_out === hop.tokenOutDenom,
+					) !== undefined,
+			).length > 0
+		)
 	}
 	/**
 	 * Swap the coillateral we won to repay the debt we borrowed. This method calculates the
@@ -245,14 +246,12 @@ export class LiquidationActionGenerator {
 		assetOutDenom: string,
 		outAmount: string,
 	): Action[] => {
-
 		const bnOut = new BigNumber(outAmount)
-		const routes : RouteHop[][] = this.router.getRoutes(assetInDenom, assetOutDenom)
+		const routes: RouteHop[][] = this.router.getRoutes(assetInDenom, assetOutDenom)
 
-		// filter routes by those available in the swap router 
-		const enabledRoutes = routes.filter((route)=> this.isViableRoute(route))
+		// filter routes by those available in the swap router
+		const enabledRoutes = routes.filter((route) => this.isViableRoute(route))
 		const route = this.router.getRouteWithLowestInput(bnOut, enabledRoutes)
-			
 
 		if (route.length === 0) throw new Error(NO_ROUTE_FOR_SWAP)
 

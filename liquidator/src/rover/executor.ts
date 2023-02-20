@@ -1,8 +1,8 @@
-import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
+import { BaseExecutor, BaseExecutorConfig } from '../baseExecutor'
 import { makeExecuteContractMessage, sleep } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
 import { fetchRoverData, fetchRoverPosition, VaultInfo } from '../hive'
-import { LiquidationActionGenerator } from './LiquidationActionGenerator'
+import { LiquidationActionGenerator } from './liquidationActionGenerator'
 import {
 	Coin,
 	VaultInfoResponse,
@@ -14,11 +14,11 @@ import {
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 
 import BigNumber from 'bignumber.js'
-import { Collateral, Debt, PositionType } from './types/RoverPosition'
+import { Collateral, Debt, PositionType } from './types/roverPosition'
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { MarketInfo } from './types/MarketInfo'
-import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/Errors'
+import { MarketInfo } from './types/marketInfo'
+import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/errors'
 import {
 	UncollateralizedLoanLimitResponse,
 	UserDebtResponse,
@@ -98,7 +98,7 @@ export class Executor extends BaseExecutor {
 		this.vaultDetails = roverData.vaultInfo
 		this.creditLines = roverData.creditLines
 		this.creditLineCaps = roverData.creditLineCaps
-		
+
 		this.liquidationActionGenerator.setSwapperRoutes(roverData.routes)
 
 		const pools = await this.loadPools()

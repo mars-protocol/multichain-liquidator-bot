@@ -1,7 +1,7 @@
 import BigNumber from 'bignumber.js'
 import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from './math.js'
-import { RouteHop } from './types/RouteHop'
-import { Pool } from './types/Pool'
+import { RouteHop } from './types/routeHop'
+import { Pool } from './types/pool'
 const BASE_ASSET_INDEX = 0
 const QUOTE_ASSET_INDEX = 1
 
@@ -91,7 +91,7 @@ export class AMMRouter implements AMMRouterInterface {
 		return this.getRouteWithHighestOutput(amountIn, routeOptions)
 	}
 
-	getRouteWithHighestOutput(amountIn : BigNumber, routes: RouteHop[][]) : RouteHop[] {
+	getRouteWithHighestOutput(amountIn: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
 			.sort((routeA, routeB) => {
 				const routeAReturns = this.getOutput(amountIn, routeA)
@@ -103,21 +103,18 @@ export class AMMRouter implements AMMRouterInterface {
 		return bestRoute || []
 	}
 
-	getRouteWithLowestInput(
-		amountOut : BigNumber,
-		routes: RouteHop[][]
-	) : RouteHop[] {
+	getRouteWithLowestInput(amountOut: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
-		.sort((routeA, routeB) => {
-			const routeAReturns = this.getRequiredInput(amountOut, routeA)
-			const routeBReturns = this.getRequiredInput(amountOut, routeB)
+			.sort((routeA, routeB) => {
+				const routeAReturns = this.getRequiredInput(amountOut, routeA)
+				const routeBReturns = this.getRequiredInput(amountOut, routeB)
 
-			// route a is a better route if it returns
-			return routeAReturns.minus(routeBReturns).toNumber()
-		})
-		.pop()
+				// route a is a better route if it returns
+				return routeAReturns.minus(routeBReturns).toNumber()
+			})
+			.pop()
 
-	return bestRoute || []
+		return bestRoute || []
 	}
 
 	getBestRouteGivenOutput(

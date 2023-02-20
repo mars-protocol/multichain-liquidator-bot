@@ -1,6 +1,6 @@
-import { AMMRouter } from '../../../src/amm_router'
-import { LiquidationActionGenerator } from '../../../src/rover/LiquidationActionGenerator'
-import { MarketInfo } from '../../../src/rover/types/MarketInfo'
+import { AMMRouter } from '../../../src/ammRouter'
+import { LiquidationActionGenerator } from '../../../src/rover/liquidationActionGenerator'
+import { MarketInfo } from '../../../src/rover/types/marketInfo'
 import {
 	generateRandomCreditLine,
 	generateRandomCreditLineCap,
@@ -10,10 +10,10 @@ import {
 	Coin,
 	Decimal,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
-import { Collateral, Debt, PositionType } from '../../../src/rover/types/RoverPosition'
-import { Pool } from '../../../src/types/Pool'
+import { Collateral, Debt, PositionType } from '../../../src/rover/types/roverPosition'
+import { Pool } from '../../../src/types/pool'
 import Long from 'long'
-import { NO_ROUTE_FOR_SWAP } from '../../../src/rover/constants/Errors'
+import { NO_ROUTE_FOR_SWAP } from '../../../src/rover/constants/errors'
 
 describe('Liquidation Actions generator Unit Tests', () => {
 	const router: AMMRouter = new AMMRouter()

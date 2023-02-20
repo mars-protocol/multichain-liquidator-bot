@@ -25,8 +25,8 @@ import {
 import { toUtf8 } from '@cosmjs/encoding'
 import { config, TestConfig } from './config'
 
-const runTests = async (testConfig : TestConfig) => {
-    // Test results
+const runTests = async (testConfig: TestConfig) => {
+	// Test results
 	const results = {
 		simpleCoin: false,
 		marketDisabled: false,
@@ -38,7 +38,7 @@ const runTests = async (testConfig : TestConfig) => {
 		unlockingVault: false,
 		unlockedVault: false,
 		coinBigger: false,
-		vaultBigger: false, 
+		vaultBigger: false,
 	}
 	// set up master services + details
 	const { client, cwClient, address, wallet } = await createServices(
@@ -61,7 +61,7 @@ const runTests = async (testConfig : TestConfig) => {
 		liquidatorAddress: address,
 		accountNftAddress: testConfig.accountNFTAddress,
 		gasDenom: testConfig.gasDenom,
-        hiveEndpoint:testConfig.hiveEndpoint,
+		hiveEndpoint: testConfig.hiveEndpoint,
 		lcdEndpoint: testConfig.lcdEndpoint,
 		liquidatorMasterAddress: masterAddress,
 		creditManagerAddress: testConfig.creditManagerAddress,
@@ -78,11 +78,9 @@ const runTests = async (testConfig : TestConfig) => {
 	executorLiquidator.liquidatorAccountId = tokenId
 	await executorLiquidator.refreshData()
 
-	
-
 	if (testConfig.tests.lockedVault) {
 		results.lockedVault = await runLockedVaultTest(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -94,7 +92,7 @@ const runTests = async (testConfig : TestConfig) => {
 
 	if (testConfig.tests.lpTokenCollateral) {
 		results.lpTokenCollateral = await lpCoinLiquidate(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -106,7 +104,7 @@ const runTests = async (testConfig : TestConfig) => {
 
 	if (testConfig.tests.unlockingVault) {
 		results.unlockingVault = await runUnlockingVaultTest(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -122,7 +120,7 @@ const runTests = async (testConfig : TestConfig) => {
 
 	if (testConfig.tests.simpleCoin) {
 		results.simpleCoin = await runCoinBorrowTest(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -133,7 +131,7 @@ const runTests = async (testConfig : TestConfig) => {
 
 	if (testConfig.tests.marketDisabled) {
 		results.marketDisabled = await liquidateCoinWithMarketDisabled(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -144,7 +142,7 @@ const runTests = async (testConfig : TestConfig) => {
 
 	if (testConfig.tests.illiquidRedbank) {
 		results.illiquidRedbank = await runIlliquidRedbankTest(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -155,7 +153,7 @@ const runTests = async (testConfig : TestConfig) => {
 
 	if (testConfig.tests.creditLineExceeded) {
 		results.creditLineExceeded = await runCreditLineExceededCoinTest(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -166,7 +164,7 @@ const runTests = async (testConfig : TestConfig) => {
 
 	if (testConfig.tests.coinDisabled) {
 		results.coinDisabled = await nonWhitelistedCoinTest(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -178,7 +176,7 @@ const runTests = async (testConfig : TestConfig) => {
 
 	if (testConfig.tests.coinBigger) {
 		results.coinBigger = await coinLargerThanVaultTest(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -190,7 +188,7 @@ const runTests = async (testConfig : TestConfig) => {
 
 	if (testConfig.tests.vaultBigger) {
 		results.vaultBigger = await vaultLargerThanCoinTest(
-            testConfig,
+			testConfig,
 			cwClient,
 			client,
 			executorLiquidator,
@@ -205,7 +203,7 @@ const runTests = async (testConfig : TestConfig) => {
 }
 
 const runUnlockingVaultTest = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -220,7 +218,7 @@ const runUnlockingVaultTest = async (
 
 		// // Set up our liquidatee
 		const victimAccountId = await createVictimVaultPosition(
-            testConfig,
+			testConfig,
 			masterAddress,
 			[{ denom: testConfig.gasDenom, amount: '110000' }],
 			client,
@@ -248,7 +246,7 @@ const runUnlockingVaultTest = async (
 }
 
 const runLockedVaultTest = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -263,7 +261,7 @@ const runLockedVaultTest = async (
 
 		// // Set up our liquidatee
 		const victimAccountId = await createVictimVaultPosition(
-            testConfig,
+			testConfig,
 			masterAddress,
 			[{ denom: testConfig.gasDenom, amount: '110000' }],
 			client,
@@ -291,7 +289,7 @@ const runLockedVaultTest = async (
 }
 
 const runCoinBorrowTest = async (
-    testConfig: TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -302,7 +300,7 @@ const runCoinBorrowTest = async (
 		console.log('Starting simple test')
 		// Set up our liquidatee
 		const victimAccountId = await createVictimCoinPosition(
-            testConfig,
+			testConfig,
 			client,
 			masterAddress,
 			[{ denom: 'uosmo', amount: '1100000' }],
@@ -332,7 +330,7 @@ const runCoinBorrowTest = async (
 }
 
 const lpCoinLiquidate = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -344,7 +342,12 @@ const lpCoinLiquidate = async (
 		console.log('Starting lpCoin test')
 		await exec.updateConfig({
 			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom, testConfig.osmoAtomPoolDenom],
+				allowed_coins: [
+					'uosmo',
+					testConfig.usdcDenom,
+					testConfig.atomDenom,
+					testConfig.osmoAtomPoolDenom,
+				],
 			},
 		})
 		// Set up our liquidatee
@@ -353,7 +356,13 @@ const lpCoinLiquidate = async (
 			address: victimAddress,
 			exec: vExec,
 			nft: vNft,
-		} = await createServices(testConfig.rpcEndpoint, testConfig.creditManagerAddress, testConfig.accountNFTAddress, mnemonic, testConfig.prefix)
+		} = await createServices(
+			testConfig.rpcEndpoint,
+			testConfig.creditManagerAddress,
+			testConfig.accountNFTAddress,
+			mnemonic,
+			testConfig.prefix,
+		)
 		const amount = '100000'
 		const depositCoin = {
 			amount: amount,
@@ -403,7 +412,13 @@ const lpCoinLiquidate = async (
 
 		// set price at 0.5
 		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1.75', config.oracleAddress)
-		await setPrice(cwClient, masterAddress, testConfig.osmoAtomPoolDenom, '0.000000025', config.oracleAddress)
+		await setPrice(
+			cwClient,
+			masterAddress,
+			testConfig.osmoAtomPoolDenom,
+			'0.000000025',
+			config.oracleAddress,
+		)
 		// set up liquidator
 
 		await executor.refreshData()
@@ -424,7 +439,7 @@ const lpCoinLiquidate = async (
 }
 
 const liquidateCoinWithMarketDisabled = async (
-    testConfig: TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -433,12 +448,18 @@ const liquidateCoinWithMarketDisabled = async (
 ): Promise<boolean> => {
 	try {
 		console.log('Starting disabled market test')
-		await updateMarketBorrow(client, masterAddress, testConfig.redbankAddress, testConfig.atomDenom, true)
+		await updateMarketBorrow(
+			client,
+			masterAddress,
+			testConfig.redbankAddress,
+			testConfig.atomDenom,
+			true,
+		)
 
 		// Victim2 is that same as the first, except we disable market before liquidation
 		// disable market
 		const victimAccount = await createVictimCoinPosition(
-            testConfig,
+			testConfig,
 			client,
 			masterAddress,
 			[{ denom: 'uosmo', amount: '1100000' }],
@@ -455,7 +476,13 @@ const liquidateCoinWithMarketDisabled = async (
 		// set price at 0.5
 		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1.4', config.oracleAddress)
 
-		await updateMarketBorrow(client, masterAddress, testConfig.redbankAddress, testConfig.atomDenom, false)
+		await updateMarketBorrow(
+			client,
+			masterAddress,
+			testConfig.redbankAddress,
+			testConfig.atomDenom,
+			false,
+		)
 
 		// refresh market data
 		await executor.refreshData()
@@ -463,7 +490,13 @@ const liquidateCoinWithMarketDisabled = async (
 		await executor.liquidate(victimAccount)
 
 		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
-		await updateMarketBorrow(client, masterAddress, testConfig.redbankAddress, testConfig.atomDenom, true)
+		await updateMarketBorrow(
+			client,
+			masterAddress,
+			testConfig.redbankAddress,
+			testConfig.atomDenom,
+			true,
+		)
 		console.log(await client.getAllBalances(config.liquidatorAddress))
 		console.log('Completed market disabled test')
 	} catch {
@@ -473,7 +506,7 @@ const liquidateCoinWithMarketDisabled = async (
 }
 
 const runIlliquidRedbankTest = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -486,7 +519,7 @@ const runIlliquidRedbankTest = async (
 
 		// disable market
 		const victimAccountId = await createVictimCoinPosition(
-            testConfig,
+			testConfig,
 			client,
 			masterAddress,
 			[{ denom: 'uosmo', amount: '1100000' }],
@@ -513,8 +546,8 @@ const runIlliquidRedbankTest = async (
 		}
 		// find market liquidity
 		const marketLiquidity =
-			executor.markets.find((marketInfo) => marketInfo.denom === testConfig.atomDenom)?.available_liquidity ||
-			0
+			executor.markets.find((marketInfo) => marketInfo.denom === testConfig.atomDenom)
+				?.available_liquidity || 0
 
 		// give creditline to master account, and borrow
 		const creditLineMsg = {
@@ -539,7 +572,11 @@ const runIlliquidRedbankTest = async (
 					testConfig.redbankAddress,
 					toUtf8(JSON.stringify(creditLineMsg)),
 				),
-				makeExecuteContractMessage(masterAddress, testConfig.oracleAddress, toUtf8(JSON.stringify(priceMsg))),
+				makeExecuteContractMessage(
+					masterAddress,
+					testConfig.oracleAddress,
+					toUtf8(JSON.stringify(priceMsg)),
+				),
 				// makeExecuteContractMessage(
 				// 	masterAddress,
 				// 	redbankAddress,
@@ -570,7 +607,7 @@ const runIlliquidRedbankTest = async (
 }
 
 const runCreditLineExceededCoinTest = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -581,7 +618,7 @@ const runCreditLineExceededCoinTest = async (
 		console.log('Starting creditLine exceeded test')
 
 		const victimAccount2 = await createVictimCoinPosition(
-            testConfig,
+			testConfig,
 			client,
 			masterAddress,
 			[{ denom: 'uosmo', amount: '1100000' }],
@@ -623,7 +660,11 @@ const runCreditLineExceededCoinTest = async (
 					testConfig.redbankAddress,
 					toUtf8(JSON.stringify(creditLineMsg)),
 				),
-				makeExecuteContractMessage(masterAddress, testConfig.oracleAddress, toUtf8(JSON.stringify(priceMsg))),
+				makeExecuteContractMessage(
+					masterAddress,
+					testConfig.oracleAddress,
+					toUtf8(JSON.stringify(priceMsg)),
+				),
 			],
 			'auto',
 		)
@@ -666,7 +707,7 @@ const runCreditLineExceededCoinTest = async (
 	return true
 }
 const nonWhitelistedCoinTest = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -685,7 +726,7 @@ const nonWhitelistedCoinTest = async (
 		// reenable market
 		// remove coin
 		const victimAccount3 = await createVictimCoinPosition(
-            testConfig,
+			testConfig,
 			client,
 			masterAddress,
 			[{ denom: 'uosmo', amount: '1100000' }],
@@ -705,7 +746,7 @@ const nonWhitelistedCoinTest = async (
 		// remove coin from whitelist
 		await exec.updateConfig({
 			updates: {
-				allowed_coins: ['uosmo',testConfig. usdcDenom, testConfig.atomDenom],
+				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
 			},
 		})
 
@@ -728,7 +769,7 @@ const nonWhitelistedCoinTest = async (
 }
 
 const coinLargerThanVaultTest = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -747,7 +788,7 @@ const coinLargerThanVaultTest = async (
 		// reenable market
 		// remove coin
 		const victimAccount3 = await createVictimCoinPosition(
-            testConfig,
+			testConfig,
 			client,
 			masterAddress,
 			[{ denom: 'uosmo', amount: '1100000' }],
@@ -788,7 +829,7 @@ const coinLargerThanVaultTest = async (
 	return true
 }
 const vaultLargerThanCoinTest = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
@@ -807,7 +848,7 @@ const vaultLargerThanCoinTest = async (
 		// reenable market
 		// remove coin
 		const victimAccount3 = await createVictimCoinPosition(
-            testConfig,
+			testConfig,
 			client,
 			masterAddress,
 			[{ denom: 'uosmo', amount: '1100000' }],
@@ -839,7 +880,7 @@ const vaultLargerThanCoinTest = async (
 		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
 		await exec.updateConfig({
 			updates: {
-				allowed_coins: ['uosmo',testConfig.usdcDenom, testConfig.atomDenom],
+				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
 			},
 		})
 	} catch {
@@ -924,7 +965,7 @@ const updateMarketBorrow = async (
 }
 
 const createVictimVaultPosition = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 
 	masterAddress: string,
 	coinsForVictim: Coin[],
@@ -938,7 +979,13 @@ const createVictimVaultPosition = async (
 		address: victimAddress,
 		exec,
 		nft: vNft,
-	} = await createServices(testConfig.rpcEndpoint, testConfig.creditManagerAddress, testConfig.accountNFTAddress, mnemonic, testConfig.prefix)
+	} = await createServices(
+		testConfig.rpcEndpoint,
+		testConfig.creditManagerAddress,
+		testConfig.accountNFTAddress,
+		mnemonic,
+		testConfig.prefix,
+	)
 
 	await masterClient.sendTokens(masterAddress, victimAddress, coinsForVictim, 'auto')
 
@@ -1005,7 +1052,7 @@ const createVictimVaultPosition = async (
 }
 
 const createVictimCoinPosition = async (
-    testConfig : TestConfig,
+	testConfig: TestConfig,
 	masterClient: SigningStargateClient,
 	masterAddress: string,
 	coinsForVictim: Coin[],
@@ -1018,7 +1065,13 @@ const createVictimCoinPosition = async (
 		address: victimAddress,
 		exec: vExec,
 		nft: vNft,
-	} = await createServices(testConfig.rpcEndpoint, testConfig.creditManagerAddress, testConfig.accountNFTAddress, mnemonic, testConfig.prefix)
+	} = await createServices(
+		testConfig.rpcEndpoint,
+		testConfig.creditManagerAddress,
+		testConfig.accountNFTAddress,
+		mnemonic,
+		testConfig.prefix,
+	)
 
 	await masterClient.sendTokens(masterAddress, victimAddress, coinsForVictim, 'auto')
 

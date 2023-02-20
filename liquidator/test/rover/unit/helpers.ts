@@ -2,7 +2,7 @@ import {
 	UncollateralizedLoanLimitResponse,
 	UserDebtResponse,
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
-import { MarketInfo } from '../../../src/rover/types/MarketInfo'
+import { MarketInfo } from '../../../src/rover/types/marketInfo'
 
 export const generateRandomMarket = (denom?: string): MarketInfo => {
 	return {
