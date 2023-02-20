@@ -64,13 +64,22 @@ func TestCanFilterUnhealthyPositions(t *testing.T) {
 		ContractQuery{
 			TotalCollateralInBaseAsset: "100",
 			TotalDebtInBaseAsset:       "100",
-			HealthStatus:               HealthStatus{Borrowing: "0.99"}}
+			HealthStatus: HealthStatus{
+				Borrowing: Borrowing{
+					LiquidationThresholdHf: "0.99",
+				},
+			},
+		}
 
 	dataB :=
 		ContractQuery{
 			TotalCollateralInBaseAsset: "100",
 			TotalDebtInBaseAsset:       "100",
-			HealthStatus:               HealthStatus{Borrowing: "1.01"},
+			HealthStatus: HealthStatus{
+				Borrowing: Borrowing{
+					LiquidationThresholdHf: "1.01",
+				},
+			},
 		}
 
 	// create fake positions

@@ -6,24 +6,24 @@ import (
 )
 
 var (
-	addressesPerJob   = 100
-	jobsPerWorker     = 10
-	hiveEndpoint      = "https://osmosis-testnet-hive.herokuapp.com/graphql" //todo mock me
-	redbankAddress    = "osmo1mx2redehm4dtmwkfq3399k8ly2skfyqzfzg9clelw4enuuhtfeeq3dk9kj"
-	numberOfAddresses = 200
+	addressesPerJob      = 100
+	jobsPerWorker        = 10
+	hiveEndpoint         = "https://osmosis-testnet-hive.herokuapp.com/graphql" //todo mock me
+	creditManagerAddress = "osmo1mx2redehm4dtmwkfq3399k8ly2skfyqzfzg9clelw4enuuhtfeeq3dk9kj"
+	numberOfAddresses    = 200
 )
 
-func initService() HealthChecker {
+func initService() HealthCheckerRover {
 
 	batchSize := 200
 
-	hive := Hive{hiveEndpoint}
-	service := HealthChecker{
-		hive:            hive,
-		redbankAddress:  redbankAddress,
-		jobsPerWorker:   jobsPerWorker,
-		addressesPerJob: addressesPerJob,
-		batchSize:       batchSize,
+	hive := RoverHive{hiveEndpoint}
+	service := HealthCheckerRover{
+		hive:                 hive,
+		creditManagerAddress: creditManagerAddress,
+		jobsPerWorker:        jobsPerWorker,
+		addressesPerJob:      addressesPerJob,
+		batchSize:            batchSize,
 	}
 
 	return service
@@ -61,16 +61,11 @@ func TestWeCanGenerateAndRunJobs(t *testing.T) {
 func TestCanFilterUnhealthyPositions(t *testing.T) {
 	dataA :=
 		ContractQuery{
-			TotalCollateralInBaseAsset: "100",
-			TotalDebtInBaseAsset:       "100",
-			HealthStatus:               HealthStatus{Borrowing: "0.99"}}
+			Health: Health{Liquidatable: true}}
 
 	dataB :=
 		ContractQuery{
-			TotalCollateralInBaseAsset: "100",
-			TotalDebtInBaseAsset:       "100",
-			HealthStatus:               HealthStatus{Borrowing: "1.01"},
-		}
+			Health: Health{Liquidatable: false}}
 
 	// create fake positions
 	results := []UserResult{

@@ -14,24 +14,6 @@ type BatchQuery struct {
 	Query     string                 `json:"query"`
 	Variables map[string]interface{} `json:"variables"`
 }
-type Health struct {
-	Liquidatable bool `json:"liquidatable"`
-}
-type RoverContractQuery struct {
-	Health Health `json:"Health"`
-}
-type RoverWasm struct {
-	RoverContractQuery RoverContractQuery `json:"contractQuery"`
-}
-type RoverData struct {
-	RoverWasm RoverWasm `json:"wasm"`
-}
-
-type RoverPosition struct {
-	UserAddress string
-	RoverData   map[string]Wasm `json:"data"`
-	Errors      []Error         `json:"errors"`
-}
 
 type Hive struct {
 	HiveEndpoint string
