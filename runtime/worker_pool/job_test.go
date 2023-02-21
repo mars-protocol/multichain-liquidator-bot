@@ -1,4 +1,4 @@
-package health_checker
+package worker_pool
 
 import (
 	"context"
