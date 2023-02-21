@@ -230,16 +230,15 @@ export class Executor extends BaseExecutor {
 
 		// todo estimate amount based on repay to prevent slippage.
 		// note : the actual msg does not use the amount passed here - it just swaps everything in the credit account
-		// note 2 : The asset here will be debt, not collateral - as we swap all the collateral to debt asset above
+		// note 2 : The asset here will be the coin we borrowed, not collateral - as we swap all the collateral to debt asset above
 		const swapToStableMsg =
-			bestDebt.denom !== this.config.neutralAssetDenom
+			borrow.denom !== this.config.neutralAssetDenom
 				? this.liquidationActionGenerator.generateSwapActions(
-						bestDebt.denom,
+						borrow.denom,
 						this.config.neutralAssetDenom,
 						'100',
 				  )
 				: []
-
 		const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
 
 		const actions = [
@@ -250,8 +249,6 @@ export class Executor extends BaseExecutor {
 			...swapToStableMsg,
 			refundAll,
 		]
-
-		actions.forEach((action) => console.log(action))
 
 		const msg = {
 			update_credit_account: { account_id: this.liquidatorAccountId, actions },
