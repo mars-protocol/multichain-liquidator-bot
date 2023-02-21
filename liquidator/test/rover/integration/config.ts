@@ -4,6 +4,7 @@ export interface TestConfig {
     usdcDenom : string
     gasDenom : string
     osmoAtomPoolDenom: string
+    osmoAtomPoolId : number,
     vaults : string[]
     accountNFTAddress : string
     creditManagerAddress : string
@@ -24,15 +25,14 @@ export interface TestConfig {
 	    lockedVault: boolean,
 	    unlockingVault: boolean,
 	    unlockedVault: boolean,
-	    coinBigger: boolean, // todo
-	    vaultBigger: boolean, // todo
     }
 }
 
-export const config : TestConfig = {
+export const testnetConfig : TestConfig = {
     seed :
 	'elevator august inherit simple buddy giggle zone despair marine rich swim danger blur people hundred faint ladder wet toe strong blade utility trial process',
     osmoAtomPoolDenom : 'gamm/pool/1',
+    osmoAtomPoolId : 1,
     atomDenom : 'ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2',
     usdcDenom : 'uosmo', // no usdc pools on testnet so I use osmo :)
     gasDenom : 'uosmo',
@@ -50,16 +50,47 @@ export const config : TestConfig = {
 
     // configure what tests you want to run
     tests : {
-        simpleCoin: false,
-	    marketDisabled: false,
-	    coinDisabled: false,
+        simpleCoin: true,
+	    marketDisabled: true,
+	    coinDisabled: true,
 	    lpTokenCollateral: false,
 	    creditLineExceeded: false,
 	    illiquidRedbank: false,
 	    lockedVault: false,
 	    unlockingVault: true,
 	    unlockedVault: false,
-	    coinBigger: false, // todo
-	    vaultBigger: false, // todo
+    }
+}
+
+export const localnetConfig : TestConfig = {
+    seed :
+    'notice oak worry limit wrap speak medal online prefer cluster roof addict wrist behave treat actual wasp year salad speed social layer crew genius',
+    osmoAtomPoolDenom : 'gamm/pool/1',
+    osmoAtomPoolId : 1,
+    atomDenom : 'uatom',
+    usdcDenom : 'usdc', 
+    gasDenom : 'uosmo',
+    vaults : ['osmo14c43j37uymeqtauuzzrmdzle2w2v5xxygwqvqkvspgce0n5wztxqyzye7a'],
+    accountNFTAddress :'osmo1cljmlh9ctfv00ug9m3ndrsyyyfqlxnx4welnw8upgu6ylhd6hk4qchm9rt',
+    creditManagerAddress : 'osmo1jyxsvevhu5dq6sqnrv446484jstmdcaahqldc29ukeknf6kk37uq6nvhlc',
+    redbankAddress : 'osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv',
+    oracleAddress : 'osmo1ghd753shjuwexxywmgs4xz7x2q732vcnkm6h2pyv9s6ah3hylvrqgj4mrx',
+    swapperAddress: 'osmo1a3pduqrv9unw9tpq49ytw0kmy37p7575czlawzyyg8xjd5kljy6sd8kkvg',
+    rpcEndpoint : 'http://127.0.0.1:26657',
+    prefix : 'osmo',
+    hiveEndpoint:'http://127.0.0.1:8085/graphql',
+    lcdEndpoint: 'http://127.0.0.1:1317',
+
+    // configure what tests you want to run
+    tests : {
+        simpleCoin: false,
+	    marketDisabled: true,
+	    coinDisabled: false,
+	    lpTokenCollateral: false,
+	    creditLineExceeded: false,
+	    illiquidRedbank: false,
+	    lockedVault: false,
+	    unlockingVault: false,
+	    unlockedVault: false,
     }
 }

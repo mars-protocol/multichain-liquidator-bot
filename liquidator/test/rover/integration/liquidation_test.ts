@@ -23,7 +23,9 @@ import {
 	VaultPositionType,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { toUtf8 } from '@cosmjs/encoding'
-import { config, TestConfig } from './config'
+import { TestConfig, localnetConfig } from './config'
+import BigNumber from 'bignumber.js'
+import { AMMRouter } from '../../../src/amm_router'
 
 const runTests = async (testConfig : TestConfig) => {
     // Test results
@@ -54,6 +56,10 @@ const runTests = async (testConfig : TestConfig) => {
 
 	console.log('Master account setup complete')
 
+	await seedRedbank(client, masterAddress, testConfig)
+
+	console.log("Seeded redbank")
+
 	const config: RoverExecutorConfig = {
 		redbankAddress: testConfig.redbankAddress,
 		oracleAddress: testConfig.oracleAddress,
@@ -79,7 +85,6 @@ const runTests = async (testConfig : TestConfig) => {
 	await executorLiquidator.refreshData()
 
 	
-
 	if (testConfig.tests.lockedVault) {
 		results.lockedVault = await runLockedVaultTest(
             testConfig,
@@ -88,7 +93,7 @@ const runTests = async (testConfig : TestConfig) => {
 			executorLiquidator,
 			masterAddress,
 			config,
-			exec,
+			exec
 		)
 	}
 
@@ -111,13 +116,8 @@ const runTests = async (testConfig : TestConfig) => {
 			client,
 			executorLiquidator,
 			masterAddress,
-			config,
-			exec,
+			config
 		)
-	}
-
-	if (testConfig.tests.unlockedVault) {
-		// TODO
 	}
 
 	if (testConfig.tests.simpleCoin) {
@@ -145,51 +145,23 @@ const runTests = async (testConfig : TestConfig) => {
 	if (testConfig.tests.illiquidRedbank) {
 		results.illiquidRedbank = await runIlliquidRedbankTest(
             testConfig,
-			cwClient,
 			client,
 			executorLiquidator,
 			masterAddress,
-			config,
 		)
 	}
 
 	if (testConfig.tests.creditLineExceeded) {
 		results.creditLineExceeded = await runCreditLineExceededCoinTest(
             testConfig,
-			cwClient,
 			client,
 			executorLiquidator,
-			masterAddress,
-			config,
+			masterAddress
 		)
 	}
 
 	if (testConfig.tests.coinDisabled) {
 		results.coinDisabled = await nonWhitelistedCoinTest(
-            testConfig,
-			cwClient,
-			client,
-			executorLiquidator,
-			masterAddress,
-			config,
-			exec,
-		)
-	}
-
-	if (testConfig.tests.coinBigger) {
-		results.coinBigger = await coinLargerThanVaultTest(
-            testConfig,
-			cwClient,
-			client,
-			executorLiquidator,
-			masterAddress,
-			config,
-			exec,
-		)
-	}
-
-	if (testConfig.tests.vaultBigger) {
-		results.vaultBigger = await vaultLargerThanCoinTest(
             testConfig,
 			cwClient,
 			client,
@@ -211,36 +183,34 @@ const runUnlockingVaultTest = async (
 	executor: Executor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
-	exec: MarsCreditManagerClient,
 ): Promise<boolean> => {
 	console.log('Starting unlocking vault test')
 	try {
-		console.log(exec.vaultsInfo)
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '13', testConfig.oracleAddress)
 
+		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
+
+		const depositAmount = '10000'
 		// // Set up our liquidatee
 		const victimAccountId = await createVictimVaultPosition(
             testConfig,
 			masterAddress,
 			[{ denom: testConfig.gasDenom, amount: '110000' }],
 			client,
-			{ denom: testConfig.gasDenom, amount: '1300' },
-			{ denom: testConfig.atomDenom, amount: '100' },
+			{ denom: testConfig.gasDenom, amount: depositAmount },
+			{ denom: testConfig.atomDenom, amount: new BigNumber(depositAmount).dividedBy(estimatedPrice).toFixed(0) },
 			'l_o_c_k_e_d',
 		)
 
 		console.log('created vault position')
-		// set price at 0.5
 
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '22', config.oracleAddress)
-
-		// set up liquidator
+		await setPrice(cwClient, masterAddress, testConfig.atomDenom, estimatedPrice.multipliedBy(2).toFixed(6), config.oracleAddress)
 		await executor.liquidate(victimAccountId)
 
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
 	} catch (e) {
 		console.error(e)
 		return false
+	} finally {
+		await resetAtomPrice(testConfig.atomDenom, testConfig.oracleAddress, masterAddress, testConfig.osmoAtomPoolId, client)
 	}
 
 	console.log('Finished vault test')
@@ -254,33 +224,34 @@ const runLockedVaultTest = async (
 	executor: Executor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
-	exec: MarsCreditManagerClient,
+	exec: MarsCreditManagerClient
 ): Promise<boolean> => {
 	try {
 		console.log('Testing locked vault')
-		console.log(exec.sender)
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '13', config.oracleAddress)
+		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
+		await exec.updateConfig({
+			updates: {
+				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom, testConfig.osmoAtomPoolDenom],
+			},
+		})
 
+		const depositAmount = '10000'
 		// // Set up our liquidatee
 		const victimAccountId = await createVictimVaultPosition(
             testConfig,
 			masterAddress,
 			[{ denom: testConfig.gasDenom, amount: '110000' }],
 			client,
-			{ denom: testConfig.gasDenom, amount: '1300' },
-			{ denom: testConfig.atomDenom, amount: '100' },
+			{ denom: testConfig.gasDenom, amount: depositAmount },
+			{ denom: testConfig.atomDenom, amount: new BigNumber(depositAmount).dividedBy(estimatedPrice).toFixed(0) },
 			'l_o_c_k_e_d',
 		)
 
 		console.log('created vault position')
-		// set price at 0.5
 
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '22', config.oracleAddress)
-
-		// set up liquidator
+		await setPrice(cwClient, masterAddress, testConfig.atomDenom, estimatedPrice.multipliedBy(2).toFixed(6), config.oracleAddress)
 		await executor.liquidate(victimAccountId)
-
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
+		await resetAtomPrice(testConfig.atomDenom, testConfig.oracleAddress, masterAddress, testConfig.osmoAtomPoolId, client)
 	} catch (e) {
 		console.log(e)
 		return false
@@ -299,34 +270,36 @@ const runCoinBorrowTest = async (
 	config: RoverExecutorConfig,
 ): Promise<boolean> => {
 	try {
-		console.log('Starting simple test')
+		console.log('Starting simple coin test')
+
+		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
+
 		// Set up our liquidatee
+		const amount = '100000'
 		const victimAccountId = await createVictimCoinPosition(
             testConfig,
 			client,
 			masterAddress,
-			[{ denom: 'uosmo', amount: '1100000' }],
+			[{ denom: 'uosmo', amount: '140000' }],
 			{
-				amount: '100000',
+				amount: amount,
 				denom: 'uosmo',
 			},
 			{
-				amount: '50000',
+				amount: (new BigNumber(amount).dividedBy(estimatedPrice)).dividedBy(2).toFixed(0),
 				denom: 'uatom',
 			},
 		)
 
-		// set price at 0.5
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1.4', config.oracleAddress)
-		// set up liquidator
-
+		await setPrice(cwClient, masterAddress, testConfig.atomDenom, estimatedPrice.multipliedBy(1.4).toFixed(6), config.oracleAddress)
 		await executor.liquidate(victimAccountId)
 
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
 		console.log('Finished simple test')
 	} catch (e) {
 		console.error(e)
 		return false
+	} finally {
+		await resetAtomPrice(testConfig.atomDenom, testConfig.oracleAddress, masterAddress, testConfig.osmoAtomPoolId, client)
 	}
 	return true
 }
@@ -347,13 +320,45 @@ const lpCoinLiquidate = async (
 				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom, testConfig.osmoAtomPoolDenom],
 			},
 		})
-		// Set up our liquidatee
+
+		// Set up our liquidatee. 
 		const { mnemonic } = await DirectSecp256k1HdWallet.generate(24)
 		const {
 			address: victimAddress,
 			exec: vExec,
 			nft: vNft,
 		} = await createServices(testConfig.rpcEndpoint, testConfig.creditManagerAddress, testConfig.accountNFTAddress, mnemonic, testConfig.prefix)
+		
+
+		const gammPriceMsg = {
+			set_price_source: {
+				denom: testConfig.osmoAtomPoolDenom,
+				price_source: { xyk_liquidity_token: { pool_id: 1 } },
+			}
+		}
+		
+		// We want to estimate the pool price correctly, so that we can do the following
+		// - provide the correct proportions to the pool
+		// - increase the price the correct amount to liquidate 
+		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
+		
+		
+		const atomPriceMsg = {
+			set_price_source: {
+				denom: testConfig.atomDenom,
+				price_source: { fixed: { price: estimatedPrice.toFixed(6) } },
+			}
+		}
+
+		// Ensure prices are correct
+		await client.signAndBroadcast(
+			masterAddress, 
+			[
+				makeExecuteContractMessage(masterAddress, testConfig.oracleAddress, toUtf8(JSON.stringify(gammPriceMsg))),
+				makeExecuteContractMessage(masterAddress, testConfig.oracleAddress, toUtf8(JSON.stringify(atomPriceMsg))),
+			], 
+			'auto')
+
 		const amount = '100000'
 		const depositCoin = {
 			amount: amount,
@@ -361,7 +366,7 @@ const lpCoinLiquidate = async (
 		}
 
 		const borrowCoin = {
-			amount: amount,
+			amount: new BigNumber(amount).times(estimatedPrice).toFixed(0),
 			denom: 'uatom',
 		}
 
@@ -401,24 +406,22 @@ const lpCoinLiquidate = async (
 			[{ amount: depositCoin.amount, denom: 'uosmo' }],
 		)
 
-		// set price at 0.5
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1.75', config.oracleAddress)
-		await setPrice(cwClient, masterAddress, testConfig.osmoAtomPoolDenom, '0.000000025', config.oracleAddress)
-		// set up liquidator
+		await setPrice(cwClient, masterAddress, testConfig.atomDenom, estimatedPrice.multipliedBy(2).toFixed(6), config.oracleAddress)
 
 		await executor.refreshData()
 		await executor.liquidate(victimAccountId)
 
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
+		console.log('Finished simple test')
+	} catch (e) {
+		console.error(e)
+		return false 
+	} finally {
+		await resetAtomPrice(testConfig.atomDenom, testConfig.oracleAddress, masterAddress, testConfig.osmoAtomPoolId, client)
 		await exec.updateConfig({
 			updates: {
 				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
 			},
 		})
-		console.log('Finished simple test')
-	} catch (e) {
-		console.error(e)
-		return false
 	}
 	return true
 }
@@ -433,69 +436,71 @@ const liquidateCoinWithMarketDisabled = async (
 ): Promise<boolean> => {
 	try {
 		console.log('Starting disabled market test')
-		await updateMarketBorrow(client, masterAddress, testConfig.redbankAddress, testConfig.atomDenom, true)
 
-		// Victim2 is that same as the first, except we disable market before liquidation
-		// disable market
-		const victimAccount = await createVictimCoinPosition(
+		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.usdcDenom)
+
+		// Set up our liquidatee
+		const amount = '100000'   
+		const victimAccountId = await createVictimCoinPosition(
             testConfig,
 			client,
 			masterAddress,
-			[{ denom: 'uosmo', amount: '1100000' }],
+			[{ denom: 'uosmo', amount: '140000' }],
 			{
-				amount: '1000000',
+				amount: amount,
 				denom: 'uosmo',
 			},
 			{
-				amount: '500000',
-				denom: testConfig.atomDenom,
+				amount: new BigNumber(amount).dividedBy(estimatedPrice).dividedBy(2).toFixed(0),
+				denom: testConfig.usdcDenom,
 			},
 		)
 
-		// set price at 0.5
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1.4', config.oracleAddress)
-
-		await updateMarketBorrow(client, masterAddress, testConfig.redbankAddress, testConfig.atomDenom, false)
+		// Disable borrow of debt asset before liquidation
+		await updateMarketBorrow(client, masterAddress, testConfig.redbankAddress, testConfig.usdcDenom, true)
 
 		// refresh market data
 		await executor.refreshData()
 
-		await executor.liquidate(victimAccount)
+		await setPrice(cwClient, masterAddress, testConfig.atomDenom, estimatedPrice.multipliedBy(1.4).toFixed(6), config.oracleAddress)
+		await executor.liquidate(victimAccountId)
 
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
-		await updateMarketBorrow(client, masterAddress, testConfig.redbankAddress, testConfig.atomDenom, true)
-		console.log(await client.getAllBalances(config.liquidatorAddress))
 		console.log('Completed market disabled test')
-	} catch {
+	} catch (e) {
+		console.log(e)
 		return false
+	} finally {
+		await resetAtomPrice(testConfig.atomDenom, testConfig.oracleAddress, masterAddress, testConfig.osmoAtomPoolId, client)
+
+		// Re enable borrow
+		await updateMarketBorrow(client, masterAddress, testConfig.redbankAddress, testConfig.atomDenom, true)
 	}
 	return true
 }
 
 const runIlliquidRedbankTest = async (
     testConfig : TestConfig,
-	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
 	masterAddress: string,
-	config: RoverExecutorConfig,
 ): Promise<boolean> => {
 	try {
 		console.log('Starting illiquid market test')
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
+		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
 
-		// disable market
+		// Set up our liquidatee
+		const amount = '100000'
 		const victimAccountId = await createVictimCoinPosition(
             testConfig,
 			client,
 			masterAddress,
-			[{ denom: 'uosmo', amount: '1100000' }],
+			[{ denom: 'uosmo', amount: '140000' }],
 			{
-				amount: '1000000',
+				amount: amount,
 				denom: 'uosmo',
 			},
 			{
-				amount: '500000',
+				amount: new BigNumber(amount).dividedBy(estimatedPrice).dividedBy(2).toFixed(0),
 				denom: testConfig.atomDenom,
 			},
 		)
@@ -507,7 +512,7 @@ const runIlliquidRedbankTest = async (
 			set_price_source: {
 				denom: testConfig.atomDenom,
 				price_source: {
-					fixed: { price: '1.6' },
+					fixed: { price: estimatedPrice.multipliedBy(1.5).toFixed(6) },
 				},
 			},
 		}
@@ -525,12 +530,11 @@ const runIlliquidRedbankTest = async (
 			},
 		}
 
-		// const msgs = []
-
 		// borrow all assets to make market utilisation 100%
 		const borrowAmount = (marketLiquidity - 100).toFixed(0)
 		const borrowMessage = { borrow: { denom: testConfig.atomDenom, amount: borrowAmount } }
-		console.log(JSON.stringify(borrowMessage))
+
+		console.log('updating tests')
 		await client.signAndBroadcast(
 			masterAddress,
 			[
@@ -540,57 +544,54 @@ const runIlliquidRedbankTest = async (
 					toUtf8(JSON.stringify(creditLineMsg)),
 				),
 				makeExecuteContractMessage(masterAddress, testConfig.oracleAddress, toUtf8(JSON.stringify(priceMsg))),
-				// makeExecuteContractMessage(
-				// 	masterAddress,
-				// 	redbankAddress,
-				// 	toUtf8(JSON.stringify(borrowMessage)),
-				// ),
+				makeExecuteContractMessage(
+					masterAddress,
+					testConfig.redbankAddress,
+					toUtf8(JSON.stringify(borrowMessage)),
+				),
 			],
 			'auto',
 		)
 
 		await executor.refreshData()
-		executor.markets = executor.markets.map((market) => {
-			if (market.denom === testConfig.atomDenom) market.available_liquidity = 0
-			return market
-		})
 
 		await executor.liquidate(victimAccountId)
 
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
-
-		console.log(await client.getAllBalances(config.liquidatorAddress))
 		// return assets
 		console.log('Completed illiquid market test')
 	} catch (e) {
-		throw e
+		console.log(e)
 		return false
+	} finally {
+		await resetAtomPrice(testConfig.atomDenom, testConfig.oracleAddress, masterAddress, testConfig.osmoAtomPoolId, client)
 	}
 	return true
 }
 
 const runCreditLineExceededCoinTest = async (
     testConfig : TestConfig,
-	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
 	executor: Executor,
-	masterAddress: string,
-	config: RoverExecutorConfig,
+	masterAddress: string
 ): Promise<boolean> => {
 	try {
 		console.log('Starting creditLine exceeded test')
 
-		const victimAccount2 = await createVictimCoinPosition(
+		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
+
+		// Set up our liquidatee
+		const amount = '100000'
+		const victimAccountId = await createVictimCoinPosition(
             testConfig,
 			client,
 			masterAddress,
-			[{ denom: 'uosmo', amount: '1100000' }],
+			[{ denom: 'uosmo', amount: '140000' }],
 			{
-				amount: '1000000',
+				amount: amount,
 				denom: 'uosmo',
 			},
 			{
-				amount: '500000',
+				amount: new BigNumber(amount).dividedBy(estimatedPrice).dividedBy(2).toFixed(0),
 				denom: testConfig.atomDenom,
 			},
 		)
@@ -600,18 +601,18 @@ const runCreditLineExceededCoinTest = async (
 			set_price_source: {
 				denom: testConfig.atomDenom,
 				price_source: {
-					fixed: { price: '1.6' },
+					fixed: { price: estimatedPrice.multipliedBy(1.6).toFixed(6) },
 				},
 			},
 		}
 
-		// give creditline to master account, and borrow
+		// effectively remove credit line for debt asset (atom) 
 		const creditLineMsg = {
 			update_uncollateralized_loan_limit: {
 				user: testConfig.creditManagerAddress,
 				denom: testConfig.atomDenom,
 				// cannot set new limit to 0 if we have existing debt,
-				new_limit: '10000000000',
+				new_limit: '1',
 			},
 		}
 
@@ -628,13 +629,22 @@ const runCreditLineExceededCoinTest = async (
 			'auto',
 		)
 
-		// refresh market data
+		// refresh market data before liquidation
 		await executor.refreshData()
+		console.log('liquidating')
+		await executor.liquidate(victimAccountId)
 
-		await executor.liquidate(victimAccount2)
-
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
-
+		console.log('Completed credit line exceeded test')
+	} catch (e) {
+		console.error(e)
+		return false
+	} finally {
+		const resetAtomPriceMsg = {
+			set_price_source: {
+				denom: testConfig.atomDenom,
+				price_source: { arithmetic_twap: { pool_id: testConfig.osmoAtomPoolId, window_size: 1800 } },
+			}
+		}
 		// Reset credit line to be usable for next tests
 		await client.signAndBroadcast(
 			masterAddress,
@@ -652,15 +662,10 @@ const runCreditLineExceededCoinTest = async (
 						}),
 					),
 				),
+				makeExecuteContractMessage(masterAddress, testConfig.oracleAddress, toUtf8(JSON.stringify(resetAtomPriceMsg))),
 			],
 			'auto',
 		)
-		console.log(await client.getAllBalances(config.liquidatorAddress))
-
-		console.log('Completed credit line exceeded test')
-	} catch (e) {
-		console.error(e)
-		return false
 	}
 
 	return true
@@ -676,15 +681,9 @@ const nonWhitelistedCoinTest = async (
 ): Promise<boolean> => {
 	try {
 		console.log('Starting non whitelisted coin test')
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
-		// Victim3 is that same as the first, except we remove debt coin from allowed coins before liquidation
-		// reenable market
-		// remove coin
-		const victimAccount3 = await createVictimCoinPosition(
+		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
+		
+		const victimAccount = await createVictimCoinPosition(
             testConfig,
 			client,
 			masterAddress,
@@ -699,153 +698,31 @@ const nonWhitelistedCoinTest = async (
 			},
 		)
 
-		// set price at 0.5
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1.4', config.oracleAddress)
+		await setPrice(cwClient, masterAddress, testConfig.atomDenom, estimatedPrice.multipliedBy(1.4).toFixed(6), config.oracleAddress)
 
 		// remove coin from whitelist
 		await exec.updateConfig({
 			updates: {
-				allowed_coins: ['uosmo',testConfig. usdcDenom, testConfig.atomDenom],
+				allowed_coins: ['uosmo',testConfig.usdcDenom],
 			},
 		})
 
 		// refresh market data
 		await executor.refreshData()
 
-		await executor.liquidate(victimAccount3)
+		await executor.liquidate(victimAccount)
 
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
 	} catch (e) {
 		console.error(e)
 		return false
+	} finally {
+		await resetAtomPrice(testConfig.atomDenom, testConfig.oracleAddress, masterAddress, testConfig.osmoAtomPoolId, client)
+		await exec.updateConfig({
+			updates: {
+				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
+			},
+		})
 	}
-	return true
-}
-
-const coinLargerThanVaultTest = async (
-    testConfig : TestConfig,
-	cwClient: SigningCosmWasmClient,
-	client: SigningStargateClient,
-	executor: Executor,
-	masterAddress: string,
-	config: RoverExecutorConfig,
-	exec: MarsCreditManagerClient,
-): Promise<boolean> => {
-	try {
-		console.log('Starting non whitelisted coin test')
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
-		// Victim3 is that same as the first, except we remove debt coin from allowed coins before liquidation
-		// reenable market
-		// remove coin
-		const victimAccount3 = await createVictimCoinPosition(
-            testConfig,
-			client,
-			masterAddress,
-			[{ denom: 'uosmo', amount: '1100000' }],
-			{
-				amount: '1000000',
-				denom: 'uosmo',
-			},
-			{
-				amount: '500000',
-				denom: testConfig.atomDenom,
-			},
-		)
-
-		// set price at 0.5
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1.4', config.oracleAddress)
-
-		// remove coin from whitelist
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
-
-		// refresh market data
-		await executor.refreshData()
-
-		await executor.liquidate(victimAccount3)
-
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
-	} catch {
-		return false
-	}
-	return true
-}
-const vaultLargerThanCoinTest = async (
-    testConfig : TestConfig,
-	cwClient: SigningCosmWasmClient,
-	client: SigningStargateClient,
-	executor: Executor,
-	masterAddress: string,
-	config: RoverExecutorConfig,
-	exec: MarsCreditManagerClient,
-): Promise<boolean> => {
-	try {
-		console.log('Starting non whitelisted coin test')
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
-		// Victim3 is that same as the first, except we remove debt coin from allowed coins before liquidation
-		// reenable market
-		// remove coin
-		const victimAccount3 = await createVictimCoinPosition(
-            testConfig,
-			client,
-			masterAddress,
-			[{ denom: 'uosmo', amount: '1100000' }],
-			{
-				amount: '1000000',
-				denom: 'uosmo',
-			},
-			{
-				amount: '500000',
-				denom: testConfig.atomDenom,
-			},
-		)
-
-		// set price at 0.5
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1.4', config.oracleAddress)
-
-		// remove coin from whitelist
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
-
-		// refresh market data
-		await executor.refreshData()
-
-		await executor.liquidate(victimAccount3)
-
-		await setPrice(cwClient, masterAddress, testConfig.atomDenom, '1', config.oracleAddress)
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo',testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
-	} catch {
-		return false
-	}
-
 	return true
 }
 
@@ -920,6 +797,73 @@ const updateMarketBorrow = async (
 			),
 		],
 		'auto',
+	)
+}
+
+const resetAtomPrice = async(atomDenom : string, oracleAddress: string, masterAddress : string, poolId : number, client: SigningStargateClient) => {
+	const resetAtomPriceMsg = {
+		set_price_source: {
+			denom: atomDenom,
+			price_source: { arithmetic_twap: { pool_id: poolId, window_size: 1800 } },
+		}
+	}
+	
+	await client.signAndBroadcast(
+		masterAddress,
+		[
+			makeExecuteContractMessage(
+				masterAddress,
+				oracleAddress,
+				toUtf8(JSON.stringify(resetAtomPriceMsg)))
+		],
+		'auto'
+	)
+}
+
+const getEstimatedPoolPrice = (ammRouter : AMMRouter, assetDenom : string) : BigNumber => {
+		
+		const amountOut = new BigNumber(1000000)
+		const osmoAtomRoute = ammRouter.getBestRouteGivenOutput(assetDenom, 'uosmo', amountOut)
+		const estimatedPrice = amountOut.dividedBy(ammRouter.getRequiredInput(amountOut, osmoAtomRoute))
+		return estimatedPrice
+}
+const seedRedbank = async(client: SigningStargateClient, masterAddress: string, testConfig: TestConfig) => {
+	// seed redbank
+	await client.signAndBroadcast(
+		masterAddress,
+		[
+			makeExecuteContractMessage(
+				masterAddress, 
+				testConfig.redbankAddress,
+				toUtf8(JSON.stringify({ deposit : {} })),
+				[
+					{
+						denom: 'uosmo',
+						amount: '20000000'
+					}
+				] ),
+			makeExecuteContractMessage(
+				masterAddress, 
+				testConfig.redbankAddress,
+				toUtf8(JSON.stringify({ deposit : {} })),
+				[
+					{
+						denom: testConfig.atomDenom,
+						amount: '10000000'
+					}
+				] ),
+				makeExecuteContractMessage(
+					masterAddress, 
+					testConfig.redbankAddress,
+					toUtf8(JSON.stringify({ deposit : {} })),
+					[
+						{
+							denom: testConfig.usdcDenom,
+							amount: '10000000'
+						}
+					] )
+		],
+		'auto'
 	)
 }
 
@@ -1046,7 +990,7 @@ const createVictimCoinPosition = async (
 }
 
 const main = async () => {
-	await runTests(config)
+	await runTests(localnetConfig)
 }
 
 main().then(() => process.exit())

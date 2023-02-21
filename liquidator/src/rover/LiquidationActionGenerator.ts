@@ -350,7 +350,6 @@ export class LiquidationActionGenerator {
 
 			// find underlying tokens and swap to borrowed asset
 			const underlyingDenoms = findUnderlying(collateralDenom, this.router.getPools())
-			underlyingDenoms?.forEach((underlyingDenom) => console.log(underlyingDenom))
 			underlyingDenoms?.forEach((denom) => {
 				if (denom !== borrowed.denom) {
 					actions = actions.concat(this.generateSwapActions(denom, borrowed.denom, borrowed.amount))
@@ -362,7 +361,6 @@ export class LiquidationActionGenerator {
 			)
 		}
 
-		actions.forEach((action) => console.log(action))
 		return actions
 	}
 
