@@ -1,7 +1,4 @@
-import { Asset } from './types/asset.js'
-import { Position } from './types/position.js'
-import { LiquidationTx } from './types/liquidation.js'
-import { AssetResponse, Collateral, DataResponse, Debt } from './hive.js'
+import { AssetResponse, Collateral, Debt } from './hive.js'
 import BigNumber from 'bignumber.js'
 
 // Sort asset array from highest amount to lowest

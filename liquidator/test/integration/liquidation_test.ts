@@ -13,7 +13,6 @@ import { HdPath } from '@cosmjs/crypto'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { GasPrice, SigningStargateClient } from '@cosmjs/stargate'
 import { RedisClientType } from 'redis'
-import { LiquidationHelper } from '../../src/liquidationHelpers.js'
 import { RedisInterface } from '../../src/redis.js'
 import {
   borrow,
@@ -106,13 +105,13 @@ const runTest = async () => {
 
   // set prices, both at 1
   console.log(`setting prices`)
-  await setPrice(cwClient, deployerAddress, osmoDenom, '1', addresses)
-  await setPrice(cwClient, deployerAddress, atomDenom, '1', addresses)
+  await setPrice(cwClient, deployerAddress, osmoDenom, '1', addresses.oracle)
+  await setPrice(cwClient, deployerAddress, atomDenom, '1', addresses.oracle)
 
   console.log(`seeding redbank with intial deposit`)
 
   // create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
-  await deposit(cwClient, deployerAddress, atomDenom, '100_000_000', addresses)
+  await deposit(cwClient, deployerAddress, atomDenom, '100_000_000', addresses.oracle)
   // await deposit(client, deployerAddress, osmoDenom, "100_000_000", addresses)
 
   console.log('Setting up positions')
@@ -121,7 +120,7 @@ const runTest = async () => {
   while (index < length) {
     try {
       const address = useableAddresses[index]
-      await deposit(cwClient, address, osmoDenom, '10000000', addresses)
+      await deposit(cwClient, address, osmoDenom, '10000000', addresses.oracle)
       await borrow(cwClient, address, atomDenom, '3000000', addresses)
       console.log(`created position for address ${address}`)
     } catch {}
@@ -135,12 +134,13 @@ const runTest = async () => {
   await pushPositionsToRedis(useableAddresses, redisClient)
 
   // manipulate price
-  await setPrice(cwClient, deployerAddress, atomDenom, '3', addresses)
+  await setPrice(cwClient, deployerAddress, atomDenom, '3', addresses.oracle)
 
   const initialBalance = {
     uosmo: await cwClient.getBalance(deployerAddress, osmoDenom),
     atom: await cwClient.getBalance(deployerAddress, atomDenom),
   }
+  
   console.log(`================= executing liquidations =================`)
   // execute liquidations
   await dispatchLiquidations(sgClient, cwClient, config)

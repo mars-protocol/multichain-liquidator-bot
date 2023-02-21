@@ -1,10 +1,9 @@
-import { Coin } from '@cosmjs/amino'
 import {
+  Coin,
   VaultPosition,
   VaultUnlockingPosition,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { Executor } from '../../../src/rover/executor'
-import { LiquidationActionGenerator } from '../../../src/rover/LiquidationActionGenerator'
 
 describe('Rover Executor Tests', () => {
   test('Can find largest collateral when it is an unlocking position', () => {

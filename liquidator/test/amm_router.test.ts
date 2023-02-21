@@ -1,5 +1,4 @@
 import { AMMRouter } from '../src/amm_router'
-import { Coin } from '@cosmjs/amino'
 import { Pool, PoolAsset } from '../src/types/Pool'
 import Long from 'long'
 import BigNumber from 'bignumber.js'
@@ -186,8 +185,7 @@ describe('Osmosis Router Tests', () => {
     // routeb = "osmo:atom:stable"
     const osmoDenom = 'osmo'
     const atomDenom = 'atom'
-    const shitDenom = 'shit'
-    const hex = 'hex'
+    const shitDenom = 'hex'
     const stableDenom = 'stable'
     const pools = [
       generateRandomPool([
