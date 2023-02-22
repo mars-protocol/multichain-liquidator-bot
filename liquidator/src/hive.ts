@@ -66,7 +66,7 @@ export interface RoverData {
 	whitelistedAssets: string[]
 	creditLines: UserDebtResponse[]
 	creditLineCaps: UncollateralizedLoanLimitResponse[]
-  routes: SwapperRoute[],
+	routes: SwapperRoute[]
 	vaultInfo: Map<string, VaultInfo>
 }
 
@@ -80,11 +80,9 @@ interface CoreDataResponse {
 		whitelistedAssets: string[]
 		creditLines: UserDebtResponse[]
 		creditLineCaps: UncollateralizedLoanLimitResponse[]
-    routes: SwapperRoute[]
+		routes: SwapperRoute[]
 	}
 }
-
-
 
 interface VaultInfoWasm {
 	totalSupply: string
@@ -193,7 +191,7 @@ const produceCoreRoverDataQuery = (
 	redbankAddress: string,
 	oracleAddress: string,
 	creditManagerAddress: string,
-  swapperAddress: string
+	swapperAddress: string,
 ) => {
 	return `{
     bank {
@@ -237,7 +235,7 @@ export const fetchRoverData = async (
 	redbankAddress: string,
 	oracleAddress: string,
 	creditManagerAddress: string,
-  swapperAddress : string,
+	swapperAddress: string,
 	vaultAddresses: string[],
 ): Promise<RoverData> => {
 	const coreQuery = produceCoreRoverDataQuery(
@@ -245,7 +243,7 @@ export const fetchRoverData = async (
 		redbankAddress,
 		oracleAddress,
 		creditManagerAddress,
-    swapperAddress
+		swapperAddress,
 	)
 
 	const queries = vaultAddresses.map((vault) => {
@@ -275,14 +273,14 @@ export const fetchRoverData = async (
 		const vaultInfo: VaultInfo = produceVaultInfo(vaultResponse.data as VaultDataResponse)
 		vaultMap.set(vaultInfo.vaultAddress, vaultInfo)
 	})
-  
+
 	return {
 		markets: coreData.wasm.markets,
 		masterBalance: coreData.bank.balance,
 		prices: coreData.wasm.prices,
 		creditLines: coreData.wasm.creditLines.filter((debt) => debt.uncollateralized),
 		creditLineCaps: coreData.wasm.creditLineCaps,
-    routes: coreData.wasm.routes,
+		routes: coreData.wasm.routes,
 		vaultInfo: vaultMap,
 		whitelistedAssets: coreData.wasm.whitelistedAssets,
 	}

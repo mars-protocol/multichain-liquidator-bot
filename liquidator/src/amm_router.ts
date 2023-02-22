@@ -91,7 +91,7 @@ export class AMMRouter implements AMMRouterInterface {
 		return this.getRouteWithHighestOutput(amountIn, routeOptions)
 	}
 
-	getRouteWithHighestOutput(amountIn : BigNumber, routes: RouteHop[][]) : RouteHop[] {
+	getRouteWithHighestOutput(amountIn: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
 			.sort((routeA, routeB) => {
 				const routeAReturns = this.getOutput(amountIn, routeA)
@@ -103,21 +103,18 @@ export class AMMRouter implements AMMRouterInterface {
 		return bestRoute || []
 	}
 
-	getRouteWithLowestInput(
-		amountOut : BigNumber,
-		routes: RouteHop[][]
-	) : RouteHop[] {
+	getRouteWithLowestInput(amountOut: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
-		.sort((routeA, routeB) => {
-			const routeAReturns = this.getRequiredInput(amountOut, routeA)
-			const routeBReturns = this.getRequiredInput(amountOut, routeB)
+			.sort((routeA, routeB) => {
+				const routeAReturns = this.getRequiredInput(amountOut, routeA)
+				const routeBReturns = this.getRequiredInput(amountOut, routeB)
 
-			// route a is a better route if it returns
-			return routeAReturns.minus(routeBReturns).toNumber()
-		})
-		.pop()
+				// route a is a better route if it returns
+				return routeAReturns.minus(routeBReturns).toNumber()
+			})
+			.pop()
 
-	return bestRoute || []
+		return bestRoute || []
 	}
 
 	getBestRouteGivenOutput(
