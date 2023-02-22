@@ -5,8 +5,8 @@
 	"main": "index.ts",
 	"license": "MIT",
 	"scripts": {
-		"test:integration": "yarn build && node build/test/integration/liquidation_test",
-		"test:rover-integration": "yarn build && node build/test/rover/integration/liquidation_test",
+		"test:integration": "yarn build && node build/test/integration/liquidationTest",
+		"test:rover-integration": "yarn build && node build/test/rover/integration/liquidationTest",
 		"build": "tsc",
 		"start": "node --loader ts-node/esm src/main.ts",
 		"test": "yarn node --experimental-vm-modules $(yarn bin jest)",

@@ -1,4 +1,4 @@
-import { AMMRouter } from '../src/amm_router'
+import { AMMRouter } from '../src/AmmRouter'
 import { Pool, PoolAsset } from '../src/types/Pool'
 import Long from 'long'
 import BigNumber from 'bignumber.js'

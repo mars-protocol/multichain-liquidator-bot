@@ -1,7 +1,7 @@
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from './helpers.js'
 import { getConfig } from './redbank/config/osmosis.js'
-import { Executor } from './redbank/executor.js'
+import { Executor } from './redbank/Executor'
 import { getSecretManager } from './secretManager.js'
 import { Network } from './types/network.js'
 

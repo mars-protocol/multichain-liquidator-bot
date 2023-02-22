@@ -45,7 +45,7 @@ export const testnetConfig: TestConfig = {
 	redbankAddress: 'osmo1t0dl6r27phqetfu0geaxrng0u9zn8qgrdwztapt5xr32adtwptaq6vwg36',
 	oracleAddress: 'osmo1dqz2u3c8rs5e7w5fnchsr2mpzzsxew69wtdy0aq4jsd76w7upmsstqe0s8',
 	swapperAddress: 'osmo1fqnwlxk3a4rhp04srxu2tnujcq9w052t8dkmvzgv6n8rz2flcm4sdtlzjg',
-	rpcEndpoint: 'https://rpc-test.osmosis.zone',
+	rpcEndpoint: 'https://osmosis-delphi-testnet-1.simply-vc.com.mt/XF32UOOU55CX/osmosis-rpc/',
 	prefix: 'osmo',
 	hiveEndpoint:
 		'https://osmosis-delphi-testnet-1.simply-vc.com.mt/XF32UOOU55CX/osmosis-hive/graphql',
@@ -53,9 +53,9 @@ export const testnetConfig: TestConfig = {
 
 	// configure what tests you want to run
 	tests: {
-		simpleCoin: true,
-		marketDisabled: true,
-		coinDisabled: true,
+		simpleCoin: false,
+		marketDisabled: false,
+		coinDisabled: false,
 		lpTokenCollateral: false,
 		creditLineExceeded: false,
 		illiquidRedbank: false,
