@@ -121,12 +121,12 @@ export const produceSigningCosmWasmClient = async (
 	})
 }
 
-export const findUnderlying = (lpToken: string, pools: Pool[]) : string[] | undefined  => {
-  const poolId = lpToken.split("/").pop()
-  const pool = pools.find((pool)=> pool.id.toString() === poolId)
-  if (!pool) return undefined
+export const findUnderlying = (lpToken: string, pools: Pool[]): string[] | undefined => {
+	const poolId = lpToken.split('/').pop()
+	const pool = pools.find((pool) => pool.id.toString() === poolId)
+	if (!pool) return undefined
 
-  return pool.poolAssets.map((pool)=> pool.token.denom)
+	return pool.poolAssets.map((pool) => pool.token.denom)
 }
 
 export const setPrice = async (

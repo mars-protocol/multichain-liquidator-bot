@@ -12,8 +12,8 @@ import BigNumber from 'bignumber.js'
  * @return The number of y tokens we will recieve
  */
 export const calculateOutputXYKPool = (x1: BigNumber, y1: BigNumber, xChange: BigNumber) => {
-  // ∆y = (∆x / (x1 + ∆x)) * y1
-  return xChange.dividedBy(x1.plus(xChange)).multipliedBy(y1)
+	// ∆y = (∆x / (x1 + ∆x)) * y1
+	return xChange.dividedBy(x1.plus(xChange)).multipliedBy(y1)
 }
 
 /**
@@ -28,9 +28,9 @@ export const calculateOutputXYKPool = (x1: BigNumber, y1: BigNumber, xChange: Bi
  * @return The number of y tokens we will recieve
  */
 export const calculateRequiredInputXYKPool = (x1: BigNumber, y1: BigNumber, yChange: BigNumber) => {
-  // ∆x = (∆y / (y1 - ∆y)) * x1
+	// ∆x = (∆y / (y1 - ∆y)) * x1
 
-  return yChange.dividedBy(y1.minus(yChange)).multipliedBy(x1)
+	return yChange.dividedBy(y1.minus(yChange)).multipliedBy(x1)
 }
 
 /**
@@ -45,13 +45,13 @@ export const calculateRequiredInputXYKPool = (x1: BigNumber, y1: BigNumber, yCha
  * @return The price impact of the swap, measured in basis points
  */
 export const calculateSlippageBp = (x1: BigNumber, y1: BigNumber, xChange: BigNumber) => {
-  const initialPrice = x1.dividedBy(y1)
-  const estimatedSettlementPrice = calculateOutputXYKPool(x1, y1, xChange)
-  const priceDifference = initialPrice.minus(estimatedSettlementPrice)
+	const initialPrice = x1.dividedBy(y1)
+	const estimatedSettlementPrice = calculateOutputXYKPool(x1, y1, xChange)
+	const priceDifference = initialPrice.minus(estimatedSettlementPrice)
 
-  // scale to percentage
-  const percentageDifference = priceDifference.dividedBy(initialPrice).multipliedBy(100)
+	// scale to percentage
+	const percentageDifference = priceDifference.dividedBy(initialPrice).multipliedBy(100)
 
-  // scale to bp (e.g 1% is 100bp)
-  return percentageDifference.multipliedBy(100)
+	// scale to bp (e.g 1% is 100bp)
+	return percentageDifference.multipliedBy(100)
 }

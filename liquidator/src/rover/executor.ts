@@ -98,7 +98,7 @@ export class Executor extends BaseExecutor {
 		this.vaultDetails = roverData.vaultInfo
 		this.creditLines = roverData.creditLines
 		this.creditLineCaps = roverData.creditLineCaps
-		
+
 		this.liquidationActionGenerator.setSwapperRoutes(roverData.routes)
 
 		const pools = await this.loadPools()

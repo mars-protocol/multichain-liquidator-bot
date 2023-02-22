@@ -1,4 +1,4 @@
 export enum Network {
-    MAINNET,
-    TESTNET
+	MAINNET,
+	TESTNET,
 }
