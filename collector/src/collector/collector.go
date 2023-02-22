@@ -244,24 +244,15 @@ func (service *Collector) fetchContractItems(
 		// Denom is all that's left
 		denom := hexKey
 
-		var value DebtCollateralMapValue
-		err = json.Unmarshal(model.Value, &value)
-		if err != nil {
-			service.logger.WithFields(logrus.Fields{
-				"err": err,
-				"key": hexKey.String(),
-				"map": mapName,
-			}).Warning("Unable to decode contract state value")
-			continue
+		identifier := string(address)
+		if workItem.WorkItemType == types.Rover {
+			// its the second item for the rover contract, the first is the owner address
+			identifier = string(denom)
 		}
-
-		// Track this account
-		if _, ok := accounts[string(address)]; !ok {
+		if _, ok := accounts[identifier]; !ok {
 			// Not added yet, init
-			accounts[string(address)] = types.HealthCheckWorkItem{
-				Address:    string(address),
-				Debts:      []types.Asset{},
-				Collateral: []types.Asset{},
+			accounts[identifier] = types.HealthCheckWorkItem{
+				Identifier: identifier,
 				Endpoints: types.Endpoints{
 					RPC:  workItem.RPCEndpoint,
 					LCD:  workItem.LCDEndpoint,
@@ -269,33 +260,16 @@ func (service *Collector) fetchContractItems(
 				},
 			}
 		}
-		current := accounts[string(address)]
-
-		// Append values for debts
-		if string(mapName) == "debts" {
-			current.Debts = append(accounts[string(address)].Debts, types.Asset{
-				Token:  string(denom),
-				Amount: value.AmountScaled,
-			})
-		}
-		// Append values for collateral
-		if string(mapName) == "collaterals" {
-			current.Collateral = append(accounts[string(address)].Collateral, types.Asset{
-				Token:  string(denom),
-				Amount: value.AmountScaled,
-			})
-		}
-		accounts[string(address)] = current
 	}
 
 	// Construct the resulting output by encoding to JSON
 	// and returning to the caller
-	for address, workItem := range accounts {
+	for identifier, workItem := range accounts {
 		resultJSON, err := json.Marshal(workItem)
 		if err != nil {
 			service.logger.WithFields(logrus.Fields{
-				"err":     err,
-				"address": address,
+				"err":        err,
+				"identifier": identifier,
 			}).Warning("Unable to encode contract state result")
 		}
 		results = append(results, resultJSON)

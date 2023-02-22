@@ -37,6 +37,9 @@ type Manager struct {
 	collectorContract       string
 	collectorItemsPerPacket int
 
+	contractItemPrefix string
+	workItemType       types.WorkItemType
+
 	metricsEnabled bool
 
 	logger *logrus.Entry
@@ -65,6 +68,8 @@ func New(
 	scalers map[string]managerinterfaces.Scaler,
 	collectorContract string,
 	collectorItemsPerPacket int,
+	contractItemPrefix string,
+	workItemType types.WorkItemType,
 	metricsEnabled bool,
 	logger *logrus.Entry,
 ) (*Manager, error) {
@@ -93,6 +98,10 @@ func New(
 		return nil, errors.New("you must provide the contract to be monitored")
 	}
 
+	if workItemType != types.Redbank && workItemType != types.Rover {
+		return nil, errors.New("incorrect work item type provided: ")
+	}
+
 	return &Manager{
 		chainID:                 chainID,
 		rpcEndpoint:             rpcEndpoint,
@@ -107,6 +116,8 @@ func New(
 		scalers:                 scalers,
 		collectorContract:       collectorContract,
 		collectorItemsPerPacket: collectorItemsPerPacket,
+		contractItemPrefix:      contractItemPrefix,
+		workItemType:            workItemType,
 		logger:                  logger,
 		lastBlockTime:           time.Now(),
 		metricsEnabled:          metricsEnabled,
@@ -269,7 +280,8 @@ func (service *Manager) Run() error {
 				HiveEndpoint:       service.hiveEndpoint,
 				LCDEndpoint:        service.lcdEndpoint,
 				ContractAddress:    service.collectorContract,
-				ContractItemPrefix: "debts",
+				ContractItemPrefix: service.contractItemPrefix,
+				WorkItemType:       service.workItemType,
 				ContractPageOffset: offset,
 				ContractPageLimit:  uint64(limit),
 			}

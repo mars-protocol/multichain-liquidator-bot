@@ -6,7 +6,7 @@
 
 IMAGE_NAME := "multichain-manager:latest"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
-REDBANK_ADDRESS := "osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv"
+REDBANK_ADDRESS := "osmo1cljmlh9ctfv00ug9m3ndrsyyyfqlxnx4welnw8upgu6ylhd6hk4qchm9rt"
 AWS_ACCESS_KEY := "123456"
 AWS_ACCESS_KEY_SECRET := "abcd"
 HIVE_URL := "http://127.0.0.1:8080/graphql"
@@ -14,7 +14,7 @@ LCD_ENDPOINT := "http://127.0.0.1:1317"
 RPC_ENDPOINT := "http://127.0.0.1:26657"
 RPC_WEBSOCKET_ENDPOINT := "ws://127.0.0.1:26657/websocket"
 AWS_CLUSTER_ARN := "1245"
-CHAIN_ID := "liq_test"
+CHAIN_ID := "osmosis-1"
 # This makes the APP_NAME be the name of the current directory
 # Ex. in path /home/dev/app/my-app the APP_NAME will be set to my-app
 APP_NAME := $(notdir $(CURDIR))
@@ -46,6 +46,7 @@ run: build .start_redis ## Build and run the service binary
 	REDIS_DATABASE=0 \
 	REDIS_METRICS_DATABASE=0 \
 	REDIS_ENDPOINT="127.0.0.1:6379" \
+	WORK_ITEM_TYPE="Rover" \
 	COLLECTOR_QUEUE_NAME="collector" \
 	COLLECTOR_ITEMS_PER_PACKET=4000 \
 	HEALTH_CHECK_QUEUE_NAME="health_check" \
