@@ -1,4 +1,4 @@
-import { AMMRouter } from '../../../src/amm_router'
+import { AMMRouter } from '../../../src/AmmRouter'
 import { LiquidationActionGenerator } from '../../../src/rover/LiquidationActionGenerator'
 import { MarketInfo } from '../../../src/rover/types/MarketInfo'
 import {
@@ -13,7 +13,7 @@ import {
 import { Collateral, Debt, PositionType } from '../../../src/rover/types/RoverPosition'
 import { Pool } from '../../../src/types/Pool'
 import Long from 'long'
-import { NO_ROUTE_FOR_SWAP } from '../../../src/rover/constants/Errors'
+import { NO_ROUTE_FOR_SWAP } from '../../../src/rover/constants/errors'
 
 describe('Liquidation Actions generator Unit Tests', () => {
 	const router: AMMRouter = new AMMRouter()

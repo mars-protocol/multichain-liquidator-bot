@@ -3,7 +3,7 @@ import {
 	VaultPosition,
 	VaultUnlockingPosition,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
-import { Executor } from '../../../src/rover/executor'
+import { Executor } from '../../../src/rover/Executor'
 
 describe('Rover Executor Tests', () => {
 	test('Can find largest collateral when it is an unlocking position', () => {

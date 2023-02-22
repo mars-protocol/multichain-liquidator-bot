@@ -3,7 +3,7 @@ import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from '../
 import { getSecretManager } from '../secretManager.js'
 import { Network } from '../types/network.js'
 import { getConfig } from './config/osmosis.js'
-import { Executor } from './executor.js'
+import { Executor } from './Executor.js'
 
 export const main = async () => {
 	// If you wish to use a secret manager, construct it here

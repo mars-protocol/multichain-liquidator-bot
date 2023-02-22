@@ -14,7 +14,7 @@ import { MarsAccountNftQueryClient } from 'marsjs-types/creditmanager/generated/
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { SigningStargateClient } from '@cosmjs/stargate'
-import { Executor, RoverExecutorConfig } from '../../../src/rover/executor'
+import { Executor, RoverExecutorConfig } from '../../../src/rover/Executor'
 import { makeCosmoshubPath } from '@cosmjs/amino'
 import {
 	Action,
@@ -23,9 +23,9 @@ import {
 	VaultPositionType,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { toUtf8 } from '@cosmjs/encoding'
-import { TestConfig, localnetConfig } from './config'
+import { TestConfig, testnetConfig } from './config'
 import BigNumber from 'bignumber.js'
-import { AMMRouter } from '../../../src/amm_router'
+import { AMMRouter } from '../../../src/AmmRouter'
 
 const runTests = async (testConfig: TestConfig) => {
 	// Test results
@@ -56,7 +56,11 @@ const runTests = async (testConfig: TestConfig) => {
 
 	console.log('Master account setup complete')
 
-	await seedRedbank(client, masterAddress, testConfig)
+	if (false) {
+		await seedRedbank(client, masterAddress, testConfig)
+	}
+
+	console.log({masterAddress})
 
 	console.log('Seeded redbank')
 
@@ -199,7 +203,7 @@ const runUnlockingVaultTest = async (
 				denom: testConfig.atomDenom,
 				amount: new BigNumber(depositAmount).dividedBy(estimatedPrice).toFixed(0),
 			},
-			'l_o_c_k_e_d',
+			'u_n_l_o_c_k_i_n_g',
 		)
 
 		console.log('created vault position')
@@ -956,8 +960,9 @@ const resetPrice = async (
 }
 
 const getEstimatedPoolPrice = (ammRouter: AMMRouter, assetDenom: string): BigNumber => {
-	const amountOut = new BigNumber(1000000)
+	const amountOut = new BigNumber(1000000000)
 	const osmoAtomRoute = ammRouter.getBestRouteGivenOutput(assetDenom, 'uosmo', amountOut)
+	console.log({osmoAtomRoute})
 	const estimatedPrice = amountOut.dividedBy(ammRouter.getRequiredInput(amountOut, osmoAtomRoute))
 	return estimatedPrice
 }
@@ -977,32 +982,10 @@ const seedRedbank = async (
 				[
 					{
 						denom: 'uosmo',
-						amount: '20000000',
+						amount: '2000000',
 					},
 				],
-			),
-			makeExecuteContractMessage(
-				masterAddress,
-				testConfig.redbankAddress,
-				toUtf8(JSON.stringify({ deposit: {} })),
-				[
-					{
-						denom: testConfig.atomDenom,
-						amount: '10000000',
-					},
-				],
-			),
-			makeExecuteContractMessage(
-				masterAddress,
-				testConfig.redbankAddress,
-				toUtf8(JSON.stringify({ deposit: {} })),
-				[
-					{
-						denom: testConfig.usdcDenom,
-						amount: '10000000',
-					},
-				],
-			),
+			)
 		],
 		'auto',
 	)
@@ -1048,7 +1031,7 @@ const createVictimVaultPosition = async (
 		vaultState === 'u_n_l_o_c_k_i_n_g'
 			? {
 					request_vault_unlock: {
-						amount: '999988',
+						amount: '100000000000',
 						vault: {
 							address: testConfig.vaults[0],
 						},
@@ -1091,7 +1074,6 @@ const createVictimVaultPosition = async (
 		depositCoin,
 	])
 
-	console.log({ victimAccountId })
 	return victimAccountId
 }
 
@@ -1143,7 +1125,7 @@ const createVictimCoinPosition = async (
 }
 
 const main = async () => {
-	await runTests(localnetConfig)
+	await runTests(testnetConfig)
 }
 
 main().then(() => process.exit())

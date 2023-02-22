@@ -1,6 +1,6 @@
 import { Collateral, Debt } from '../src/hive'
-import { getLargestCollateral, getLargestDebt } from '../src/liquidation_generator'
-import { generateRandomAsset } from './test_helpers'
+import { getLargestCollateral, getLargestDebt } from '../src/liquidationGenerator'
+import { generateRandomAsset } from './testHelpers'
 
 describe('Liquidation Tx Generator Tests..', () => {
 	test('Can get largest colallateral correctly', () => {

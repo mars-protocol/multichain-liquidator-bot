@@ -1,5 +1,5 @@
 import { RedisInterface } from '../src/redis'
-import { generateRandomPosition } from './test_helpers'
+import { generateRandomPosition } from './testHelpers'
 
 describe('Redis Tests', () => {
 	test(`We can connect to redis`, async () => {

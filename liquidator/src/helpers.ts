@@ -100,6 +100,8 @@ export const produceSigningStargateClient = async (
 		gasPrice: GasPrice.fromString(gasPrice),
 		registry,
 		aminoTypes,
+		broadcastPollIntervalMs : 1000,
+		broadcastTimeoutMs: 300000
 	}
 
 	return await SigningStargateClient.connectWithSigner(rpcEndpoint, liquidator, clientOption)
@@ -118,6 +120,8 @@ export const produceSigningCosmWasmClient = async (
 ): Promise<SigningCosmWasmClient> => {
 	return await SigningCosmWasmClient.connectWithSigner(rpcEndpoint, liquidator, {
 		gasPrice: GasPrice.fromString(gasPrice),
+		broadcastPollIntervalMs : 1000,
+		broadcastTimeoutMs: 300000
 	})
 }
 

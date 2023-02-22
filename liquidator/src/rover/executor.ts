@@ -18,7 +18,7 @@ import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { MarketInfo } from './types/MarketInfo'
-import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/Errors'
+import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/errors'
 import {
 	UncollateralizedLoanLimitResponse,
 	UserDebtResponse,

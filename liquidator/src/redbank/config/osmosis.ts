@@ -1,5 +1,5 @@
 import { Network } from '../../types/network'
-import { RedbankExecutorConfig } from '../executor'
+import { RedbankExecutorConfig } from '../Executor'
 
 export const getConfig = (
 	liquidatorMasterAddress: string,

@@ -15,7 +15,7 @@ import BigNumber from 'bignumber.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { getLargestCollateral, getLargestDebt } from '../liquidation_generator'
+import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 

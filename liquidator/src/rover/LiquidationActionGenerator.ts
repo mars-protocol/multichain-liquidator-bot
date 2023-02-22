@@ -1,4 +1,4 @@
-import { AMMRouter } from '../amm_router'
+import { AMMRouter } from '../AmmRouter'
 import { MarketInfo } from './types/MarketInfo'
 import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import {
@@ -14,8 +14,8 @@ import {
 	NO_VALID_MARKET,
 	POOL_NOT_FOUND,
 	UNSUPPORTED_VAULT,
-} from './constants/Errors.js'
-import { GENERIC_BUFFER } from './constants/Variables'
+} from './constants/errors.js'
+import { GENERIC_BUFFER } from './constants/variables'
 import { VaultInfo } from '../hive'
 import {
 	UncollateralizedLoanLimitResponse,
