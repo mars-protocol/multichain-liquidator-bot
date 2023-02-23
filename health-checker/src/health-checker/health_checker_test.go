@@ -33,9 +33,7 @@ func initService() HealthChecker {
 func TestWeCanGenerateAndRunJobs(t *testing.T) {
 	batchSize := 200
 	mockPosition := types.HealthCheckWorkItem{
-		Address:    "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9",
-		Debts:      []types.Asset{},
-		Collateral: []types.Asset{},
+		Identifier: "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9",
 	}
 
 	positions := []types.HealthCheckWorkItem{}
@@ -85,11 +83,11 @@ func TestCanFilterUnhealthyPositions(t *testing.T) {
 	// create fake positions
 	results := []UserResult{
 		{
-			Address:       "aaaaaa",
+			Identifier:    "aaaaaa",
 			ContractQuery: dataA,
 		},
 		{
-			Address:       "bbbbbb",
+			Identifier:    "bbbbbb",
 			ContractQuery: dataB,
 		},
 	}

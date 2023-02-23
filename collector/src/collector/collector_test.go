@@ -37,7 +37,7 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestRPCFetch(t *testing.T) {
+func TestRPCFetchRedbank(t *testing.T) {
 	logger := logrus.WithFields(logrus.Fields{})
 	queue, err := mock.NewRedisQueue()
 	if err != nil {
@@ -64,6 +64,58 @@ func TestRPCFetch(t *testing.T) {
 		ContractAddress:    "testContractAddress",
 		RPCEndpoint:        rpcServer.URL,
 		ContractItemPrefix: "debts,collaterals",
+		WorkItemType:       types.Redbank,
+		ContractPageOffset: 0,
+		ContractPageLimit:  10,
+	}
+
+	items, _, err := instance.fetchContractItems(workitem)
+
+	if err != nil {
+		t.Errorf("unable to fetch contract items: %s", err)
+	}
+
+	// We expect 10 items to be returned by the fetch of contract state
+	expectedItemCount := 1
+	actualItemCount := len(items)
+	if actualItemCount != expectedItemCount {
+		t.Errorf(
+			"returned item counts doesn't match expected. Expected %d, got %d",
+			expectedItemCount,
+			actualItemCount,
+		)
+		return
+	}
+}
+
+func TestRPCFetchRover(t *testing.T) {
+	logger := logrus.WithFields(logrus.Fields{})
+	queue, err := mock.NewRedisQueue()
+	if err != nil {
+		t.Errorf("failed to create mock Redis queue: %s", err)
+	}
+
+	cache, err := mock.NewRedisCache()
+	if err != nil {
+		t.Errorf("failed to create mock Redis queue: %s", err)
+	}
+
+	instance, err := New(queue, cache, "collector", "health_check", logger)
+	if err != nil {
+		t.Errorf("unexpected failure to create Collector: %s", err)
+	}
+
+	rpcServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// RPC sample response containing 10 balance records is returned for any request
+		testResponse := `{"jsonrpc": "2.0","id": 0,"result": {"response": {"code": 0,"log": "","info": "","index": "0","key": null,"value": "CnUKOO+/vQV0b2tlbnNfX293bmVy77+9K29zbW8xY3l5enB4cGx4ZHprZWVhN2t3c3lkYWRnODczNTdxbmFoYWtha3MyNxI5eyJhbW91bnRfc2NhbGVkIjoiMjk5OTk5OTc2MjE4IiwidW5jb2xsYXRlcmFsaXplZCI6ZmFsc2V9CgQKCu+/vQdtYXJrZXRzdWlvbhIEeyJkZW5vbSI6InVpb24iLCJtYXhfbG9hbl90b192YWx1ZSI6IjAuNjUiLCJsaXF1aWRhdGlvbl90aHJlc2hvbGQiOiIwLjciLCJsaXF1aWRhdGlvbl9ib251cyI6IjAuMSIsInJlc2VydmVfZmFjdG9yIjoiMC4yIiwiaW50ZXJlc3RfcmF0ZV9tb2RlbCI6eyJvcHRpbWFsX3V0aWxpemF0aW9uX3JhdGUiOiIwLjEiLCJiYXNlIjoiMC4zIiwic2xvcGVfMSI6IjAuMjUiLCJzbG9wZV8yIjoiMC4zIn0sImJvcnJvd19pbmRleCI6IjEuMDAwMDAwMDc5Mjc0NDgxNDY2IiwibGlxdWlkaXR5X2luZGV4IjoiMSIsImJvcnJvd19yYXRlIjoiMC42MTY2NjY2NjY2NjY2NjY2NjYiLCJsaXF1aWRpdHlfcmF0ZSI6IjAuMTQ3OTk5OTk5OTk5OTk5OTk5IiwiaW5kZXhlc19sYXN0X3VwZGF0ZWQiOjE2NjQzMDgyMTgsImNvbGxhdGVyYWxfdG90YWxfc2NhbGVkIjoiMTAwMDAwMDAwMDAwMCIsImRlYnRfdG90YWxfc2NhbGVkIjoiMjk5OTk5OTc2MjE4IiwiZGVwb3NpdF9lbmFibGVkIjp0cnVlLCJib3Jyb3dfZW5hYmxlZCI6dHJ1ZSwiZGVwb3NpdF9jYXAiOiIxMDAwMDAwMDAwMCJ9CgMKDu+/vQdtYXJrZXRzdW9zbW8SA3siZGVub20iOiJ1b3NtbyIsIm1heF9sb2FuX3RvX3ZhbHVlIjoiMC41NSIsImxpcXVpZGF0aW9uX3RocmVzaG9sZCI6IjAuNjUiLCJsaXF1aWRhdGlvbl9ib251cyI6IjAuMSIsInJlc2VydmVfZmFjdG9yIjoiMC4yIiwiaW50ZXJlc3RfcmF0ZV9tb2RlbCI6eyJvcHRpbWFsX3V0aWxpemF0aW9uX3JhdGUiOiIwLjciLCJiYXNlIjoiMC4zIiwic2xvcGVfMSI6IjAuMjUiLCJzbG9wZV8yIjoiMC4zIn0sImJvcnJvd19pbmRleCI6IjEiLCJsaXF1aWRpdHlfaW5kZXgiOiIxIiwiYm9ycm93X3JhdGUiOiIwLjEiLCJsaXF1aWRpdHlfcmF0ZSI6IjAiLCJpbmRleGVzX2xhc3RfdXBkYXRlZCI6MTY2NDMwODE5OCwiY29sbGF0ZXJhbF90b3RhbF9zY2FsZWQiOiIwIiwiZGVidF90b3RhbF9zY2FsZWQiOiIwIiwiZGVwb3NpdF9lbmFibGVkIjp0cnVlLCJib3Jyb3dfZW5hYmxlZCI6dHJ1ZSwiZGVwb3NpdF9jYXAiOiIxMDAwMDAwMDAwMCJ9CnIKPu+/vQtjb2xsYXRlcmFsc++/vStvc21vMWN5eXpweHBseGR6a2VlYTdrd3N5ZGFkZzg3MzU3cW5haGFrYWtzdWlvbhIweyJhbW91bnRfc2NhbGVkIjoiMTAwMDAwMDAwMDAwMCIsImVuYWJsZWQiOnRydWV9CgEKBmNvbmZpZxIBeyJvd25lciI6Im9zbW8xY3l5enB4cGx4ZHprZWVhN2t3c3lkYWRnODczNTdxbmFoYWtha3MiLCJhZGRyZXNzX3Byb3ZpZGVyIjoib3NtbzF3bjYyNXM0amNtdmswc3pwbDg1cmo1YXprZmM2c3V5dmY3NXE2dnJkZHNjamRwaHR2ZThzbTV5Mzd3IiwiY2xvc2VfZmFjdG9yIjoiMC41In0KSQoKY29udHJhY3RfaW5mbxI4eyJjb250cmFjdCI6ImNyYXRlcy5pbzptYXJzLXJlZC1iYW5rIiwidmVyc2lvbiI6IjAuMS4wIn0S77+9","proofOps": null,"height": "1180475","codespace": ""}}}`
+		w.Write([]byte(testResponse))
+	}))
+
+	workitem := types.WorkItem{
+		ContractAddress:    "testContractAddress",
+		RPCEndpoint:        rpcServer.URL,
+		ContractItemPrefix: "tokens__owner",
+		WorkItemType:       types.Rover,
 		ContractPageOffset: 0,
 		ContractPageLimit:  10,
 	}
@@ -114,6 +166,7 @@ func TestRPCFetchIncorrectPrefix(t *testing.T) {
 		ContractAddress:    "testContractAddress",
 		RPCEndpoint:        rpcServer.URL,
 		ContractItemPrefix: "incorrectprefix",
+		WorkItemType:       types.Redbank,
 		ContractPageOffset: 0,
 		ContractPageLimit:  10,
 	}

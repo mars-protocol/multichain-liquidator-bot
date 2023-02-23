@@ -15,9 +15,7 @@ func Test_weCanQueryMultipleUsers(t *testing.T) {
 	batchSize := 200
 
 	mockPosition := types.HealthCheckWorkItem{
-		Address:    "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9",
-		Debts:      []types.Asset{},
-		Collateral: []types.Asset{},
+		Identifier: "osmo18nm43hck80s2et26g2csvltecvhk49526dugd9",
 	}
 
 	positions := []types.HealthCheckWorkItem{}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/cache"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/queue"
+	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
 )
 
 const (
@@ -42,6 +44,8 @@ type Config struct {
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
 	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
 	RedisMetricsDatabase int    `envconfig:"REDIS_METRICS_DATABASE" required:"true"`
+
+	WorkItemType types.WorkItemType `envconfig:"WORK_ITEM_TYPE" required:"true"`
 
 	CollectorQueueName      string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
 	CollectorItemsPerPacket int    `envconfig:"COLLECTOR_ITEMS_PER_PACKET" required:"true"`
@@ -90,6 +94,11 @@ func main() {
 		"service":  strings.ToLower(config.ServiceName),
 		"chain_id": strings.ToLower(config.ChainID),
 	})
+
+	contractItemPrefix := "debts"
+	if config.WorkItemType == types.Rover {
+		contractItemPrefix = "tokens__owner"
+	}
 
 	// Setup signal handler
 	signalChannel := make(chan os.Signal, 1)
@@ -144,12 +153,16 @@ func main() {
 		logger.Fatal(err)
 	}
 
+	executorServiceId := fmt.Sprintf("%s-executor", config.WorkItemType)
+	collectorServiceId := fmt.Sprintf("%s-collector", config.WorkItemType)
+	healthCheckServiceId := fmt.Sprintf("%s-health-check", config.WorkItemType)
+
 	switch strings.ToLower(config.DeployerType) {
 	case DeployerTypeDocker:
 
 		// Set up the collector's deployer
 		collectorDeployer, err = deployer.NewDocker(
-			"collector",
+			collectorServiceId,
 			config.CollectorImage,
 			collectorConfig,
 			logger,
@@ -160,7 +173,7 @@ func main() {
 
 		// Set up the health checker's deployer
 		healthCheckerDeployer, err = deployer.NewDocker(
-			"health-checker",
+			healthCheckServiceId,
 			config.HealthCheckerImage,
 			healthCheckerConfig,
 			logger,
@@ -171,7 +184,7 @@ func main() {
 
 		// Set up the executor's deployer
 		executorDeployer, err = deployer.NewDocker(
-			"executor",
+			executorServiceId,
 			config.ExecutorImage,
 			executorConfig,
 			logger,
@@ -184,7 +197,7 @@ func main() {
 
 		// Set up the collector's deployer
 		collectorDeployer, err = deployer.NewAWSECS(
-			"collector",
+			collectorServiceId,
 			config.CollectorImage,
 			collectorConfig,
 			logger,
@@ -195,7 +208,7 @@ func main() {
 
 		// Set up the health checker's deployer
 		healthCheckerDeployer, err = deployer.NewAWSECS(
-			"health-checker",
+			healthCheckServiceId,
 			config.HealthCheckerImage,
 			healthCheckerConfig,
 			logger,
@@ -206,7 +219,7 @@ func main() {
 
 		// Set up the executor's deployer
 		executorDeployer, err = deployer.NewAWSECS(
-			"executor",
+			executorServiceId,
 			config.ExecutorImage,
 			executorConfig,
 			logger,
@@ -217,13 +230,12 @@ func main() {
 
 	default:
 		logger.Fatal("Invalid deployer type specified: ", config.DeployerType)
-
 	}
 
 	switch strings.ToLower(config.ScalingType) {
 	case ScalingTypeWatermark:
 		// Set up the collector's scaler with the given deployer
-		scalers["collector"], err = scaler.NewQueueWatermark(
+		scalers[collectorServiceId], err = scaler.NewQueueWatermark(
 			queueProvider,
 			config.CollectorQueueName,
 			collectorDeployer,
@@ -237,7 +249,7 @@ func main() {
 		}
 
 		// Set up the health checker's scaler with the given deployer
-		scalers["health-check"], err = scaler.NewQueueWatermark(
+		scalers[healthCheckServiceId], err = scaler.NewQueueWatermark(
 			queueProvider,
 			config.HealthCheckQueueName,
 			healthCheckerDeployer,
@@ -251,7 +263,7 @@ func main() {
 		}
 
 		// Set up the executor's scaler with the given deployer
-		scalers["executor"], err = scaler.NewQueueWatermark(
+		scalers[executorServiceId], err = scaler.NewQueueWatermark(
 			queueProvider,
 			config.ExecutorQueueName,
 			executorDeployer,
@@ -285,6 +297,8 @@ func main() {
 		scalers,
 		config.CollectorContract,
 		config.CollectorItemsPerPacket,
+		contractItemPrefix,
+		config.WorkItemType,
 		config.MetricsEnabled,
 		logger,
 	)
