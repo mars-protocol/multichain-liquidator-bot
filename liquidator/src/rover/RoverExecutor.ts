@@ -34,7 +34,7 @@ export interface RoverExecutorConfig extends BaseExecutorConfig {
 	minGasTokens: number
 }
 
-export class Executor extends BaseExecutor {
+export class RoverExecutor extends BaseExecutor {
 	private VAULT_RELOAD_WINDOW = 1800000
 	public config: RoverExecutorConfig
 	private liquidationActionGenerator: LiquidationActionGenerator
@@ -66,21 +66,22 @@ export class Executor extends BaseExecutor {
 		while (true) await this.run()
 	}
 
-	fetchVaults = async() => {
+	fetchVaults = async () => {
 		let foundAll = false
 		const limit = 5
-		let vaults : VaultInfoResponse[] = []
-		let startAfter : VaultBaseForAddr | undefined = undefined
+		let vaults: VaultInfoResponse[] = []
+		let startAfter: VaultBaseForAddr | undefined = undefined
 		while (!foundAll) {
-			const vaultQuery : QueryMsg = {
-				vaults_info : {
+			const vaultQuery: QueryMsg = {
+				vaults_info: {
 					limit,
-					start_after: startAfter
-				}
+					start_after: startAfter,
+				},
 			}
 
-			const results : VaultInfoResponse [] = await this.queryClient.queryContractSmart(
-				this.config.creditManagerAddress, vaultQuery,
+			const results: VaultInfoResponse[] = await this.queryClient.queryContractSmart(
+				this.config.creditManagerAddress,
+				vaultQuery,
 			)
 
 			vaults = vaults.concat(results)

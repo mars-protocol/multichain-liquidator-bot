@@ -1,5 +1,5 @@
 import { Network } from '../../types/network'
-import { RoverExecutorConfig } from '../Executor'
+import { RoverExecutorConfig } from '../RoverExecutor'
 
 export const getConfig = (
 	liquidatorMasterAddress: string,

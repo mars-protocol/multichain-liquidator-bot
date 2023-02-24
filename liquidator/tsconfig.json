@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"target": "ES2021",
 		"lib": ["ES2021"],
-		"types": ["jest", "node"],
+		"types": ["node"],
 		"module": "NodeNext",
 		"declaration": true,
 		"noImplicitAny": true,
@@ -28,5 +28,5 @@
 		"skipLibCheck": true
 	},
 	"include": ["**/*.ts", "**/*.tsx", "types.d.ts"],
-	"exclude": ["node_modules", "./build/**/*"]
+	"exclude": ["node_modules", "./build/**/*", "jest.config.ts"]
 }

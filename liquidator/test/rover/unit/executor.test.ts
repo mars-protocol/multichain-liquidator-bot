@@ -3,7 +3,7 @@ import {
 	VaultPosition,
 	VaultUnlockingPosition,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
-import { Executor } from '../../../src/rover/Executor'
+import { RoverExecutor } from '../../../src/rover/RoverExecutor'
 
 describe('Rover Executor Tests', () => {
 	test('Can find largest collateral when it is an unlocking position', () => {
@@ -51,7 +51,7 @@ describe('Rover Executor Tests', () => {
 		}
 
 		//@ts-ignore - parameters not used for testing
-		const executor = new Executor({}, {}, {})
+		const executor = new RoverExecutor({}, {}, {})
 		const collateralState = executor.findBestCollateral([collateral1], [collateral2, collateral3])
 
 		expect(collateralState.amount).toBe(600)
@@ -101,7 +101,7 @@ describe('Rover Executor Tests', () => {
 			}
 
 			// @ts-ignore - params are not used - TODO move `findBestCollateral()` to helper class
-			const executor = new Executor({}, {}, {})
+			const executor = new RoverExecutor({}, {}, {})
 			const collateralState = executor.findBestCollateral([collateral1], [collateral2, collateral3])
 
 			expect(collateralState.amount).toBe(800)
@@ -154,7 +154,7 @@ describe('Rover Executor Tests', () => {
 		}
 
 		//@ts-ignore - parameters not used for testing - todo move to helper / logic class
-		const executor = new Executor({}, {}, {})
+		const executor = new RoverExecutor({}, {}, {})
 		const collateralState = executor.findBestCollateral([collateral1], [collateral2, collateral3])
 
 		expect(collateralState.amount).toBe(1500)
@@ -175,7 +175,7 @@ describe('Rover Executor Tests', () => {
 		}
 
 		//@ts-ignore - parameters not used for testing
-		const executor = new Executor({}, {}, {})
+		const executor = new RoverExecutor({}, {}, {})
 		const bestDebt = executor.findBestDebt([debt1, debt2])
 
 		expect(bestDebt.amount).toBe(1500)
