@@ -1,4 +1,4 @@
-import { AssetResponse } from '../src/hive'
+import { AssetResponse } from '../src/query/types'
 import { Position } from '../src/types/position'
 
 export const generateRandomAsset = (): AssetResponse => {

@@ -16,13 +16,13 @@ import {
 	UNSUPPORTED_VAULT,
 } from './constants/errors.js'
 import { GENERIC_BUFFER } from './constants/variables'
-import { VaultInfo } from '../hive'
 import {
 	UncollateralizedLoanLimitResponse,
 	UserDebtResponse,
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import { findUnderlying } from '../helpers'
 import { SwapperRoute } from '../types/swapper'
+import { VaultInfo } from '../query/types'
 
 export class LiquidationActionGenerator {
 	private router: AMMRouter
