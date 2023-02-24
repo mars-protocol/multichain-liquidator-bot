@@ -5,6 +5,8 @@ import { fetchRoverData, fetchRoverPosition, VaultInfo } from '../hive'
 import { LiquidationActionGenerator } from './LiquidationActionGenerator'
 import {
 	Coin,
+	QueryMsg,
+	VaultBaseForAddr,
 	VaultInfoResponse,
 	VaultPosition,
 	VaultPositionType,
@@ -64,14 +66,40 @@ export class Executor extends BaseExecutor {
 		while (true) await this.run()
 	}
 
+	fetchVaults = async() => {
+		let foundAll = false
+		const limit = 5
+		let vaults : VaultInfoResponse[] = []
+		let startAfter : VaultBaseForAddr | undefined = undefined
+		while (!foundAll) {
+			const vaultQuery : QueryMsg = {
+				vaults_info : {
+					limit,
+					start_after: startAfter
+				}
+			}
+
+			const results : VaultInfoResponse [] = await this.queryClient.queryContractSmart(
+				this.config.creditManagerAddress, vaultQuery,
+			)
+
+			vaults = vaults.concat(results)
+
+			if (results.length < limit) {
+				foundAll = true
+			}
+
+			startAfter = results.pop()?.vault
+		}
+
+		return vaults
+	}
+
 	refreshData = async () => {
 		// Periodically refresh the vaults we have
 		const currentTimeMs = Date.now()
 		if (this.lastFetchedVaultTime + this.VAULT_RELOAD_WINDOW < currentTimeMs) {
-			const vaultsData: VaultInfoResponse[] = await this.queryClient.queryContractSmart(
-				this.config.creditManagerAddress,
-				{ vaults_info: {} },
-			)
+			const vaultsData: VaultInfoResponse[] = await this.fetchVaults()
 			this.vaults = vaultsData.map((vaultData) => vaultData.vault.address)
 			this.lastFetchedVaultTime = currentTimeMs
 		}
