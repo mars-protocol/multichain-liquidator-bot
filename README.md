@@ -3,7 +3,7 @@
 The multichain liquidator bot is a scalable liquidation bot that ensures accounts
 are liquidated in a timely fashion.
 
-It is built to support both the [RedBank](https://github.com/mars-protocol/red-bank) and [Rover](https://github.com/mars-protocol/rover).
+It is built to support both the [RedBank](https://github.com/mars-protocol/red-bank) and [Rover](https://github.com/mars-protocol/v2-fields-of-mars).
 
 NOTE: For questions, issues or support, feel free to join the `liquidators` channel in the mars discord
 
@@ -29,7 +29,7 @@ The Liquidator service is responsible for handling liquidations of unhealthy pos
 4. Manager
 
 The Manager service is responsible for ensuring all the data is processed within
-a timeframe. By default, the timeframe is a single block. It is also responsible for booting up new services (i.e health checker, executor) to meet demand. More info in [manager/README](manager)
+a timeframe. By default, the timeframe is a single block. It is also responsible for booting up new services (i.e health checker, executor) to meet demand. More info in [manager](manager/README)
 
 ## Usage
 
