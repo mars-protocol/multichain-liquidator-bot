@@ -23,6 +23,7 @@ export interface BaseExecutorConfig {
 	neutralAssetDenom: string
 	logResults: boolean
 	redisEndpoint: string
+	poolsRefreshWindow: number
 }
 
 /**
@@ -30,17 +31,26 @@ export interface BaseExecutorConfig {
  * @param config holds the neccessary configuration for the executor to operate
  */
 export class BaseExecutor {
+	// Configuration should always be override by extending class
+	public config: BaseExecutorConfig
+
+	// Helpers
 	public ammRouter: AMMRouter
-	public redis: RedisInterface
+
+	// Data
 	public prices: Map<string, number> = new Map()
 	public balances: Map<string, number> = new Map()
 	public markets: MarketInfo[] = []
 
-	public config: BaseExecutorConfig
-
+	// clients
 	public client: SigningStargateClient
 	public queryClient: CosmWasmClient
+	public redis: RedisInterface
 
+	// variables
+	private poolsNextRefresh = 0
+
+	// logging
 	private csvLogger = new CSVWriter('./results.csv', [
 		{ id: 'blockHeight', title: 'BlockHeight' },
 		{ id: 'userAddress', title: 'User' },
@@ -49,6 +59,7 @@ export class BaseExecutor {
 		{ id: 'collateral', title: 'collateral' },
 		{ id: 'liquidatorBalance', title: 'liquidatorBalance' },
 	])
+	
 	constructor(
 		config: BaseExecutorConfig,
 		client: SigningStargateClient,
@@ -113,8 +124,17 @@ export class BaseExecutor {
 		bank.balance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
 		wasm.prices.forEach((price: PriceResponse) => this.prices.set(price.denom, Number(price.price)))
 
-		const pools = await this.loadPools()
-		this.ammRouter.setPools(pools)
+		await this.refreshPoolData()
+	}
+
+	refreshPoolData = async () => {
+		const currentTime = Date.now()
+		if (this.poolsNextRefresh < currentTime) {
+
+			const pools = await this.loadPools()
+			this.ammRouter.setPools(pools)
+			this.poolsNextRefresh = Date.now() + this.config.poolsRefreshWindow
+		}
 	}
 
 	loadPools = async (): Promise<Pool[]> => {
