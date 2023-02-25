@@ -33,7 +33,7 @@ export interface RedbankExecutorConfig extends BaseExecutorConfig {
  * @param sm An optional parameter. If you want to use a secret manager to hold the seed
  *           phrase, implement the secret manager interface and pass as a dependency.
  */
-export class Executor extends BaseExecutor {
+export class RedbankExecutor extends BaseExecutor {
 	public config: RedbankExecutorConfig
 
 	constructor(

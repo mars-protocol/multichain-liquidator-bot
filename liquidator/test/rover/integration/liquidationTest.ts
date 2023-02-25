@@ -14,7 +14,7 @@ import { MarsAccountNftQueryClient } from 'marsjs-types/creditmanager/generated/
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { SigningStargateClient } from '@cosmjs/stargate'
-import { Executor, RoverExecutorConfig } from '../../../src/rover/Executor'
+import { RoverExecutor, RoverExecutorConfig } from '../../../src/rover/RoverExecutor'
 import { makeCosmoshubPath } from '@cosmjs/amino'
 import {
 	Action,
@@ -60,7 +60,7 @@ const runTests = async (testConfig: TestConfig) => {
 		await seedRedbank(client, masterAddress, testConfig)
 	}
 
-	console.log({masterAddress})
+	console.log({ masterAddress })
 
 	console.log('Seeded redbank')
 
@@ -82,7 +82,7 @@ const runTests = async (testConfig: TestConfig) => {
 	}
 
 	// Set up our liquidator
-	const executorLiquidator = new Executor(config, client, cwClient)
+	const executorLiquidator = new RoverExecutor(config, client, cwClient)
 	await executorLiquidator.initiate()
 	const tokenId = await executorLiquidator.setUpAccount()
 	executorLiquidator.liquidatorAccountId = tokenId
@@ -183,7 +183,7 @@ const runUnlockingVaultTest = async (
 	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
-	executor: Executor,
+	executor: RoverExecutor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
 ): Promise<boolean> => {
@@ -237,7 +237,7 @@ const runLockedVaultTest = async (
 	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
-	executor: Executor,
+	executor: RoverExecutor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
 	exec: MarsCreditManagerClient,
@@ -301,7 +301,7 @@ const runCoinBorrowTest = async (
 	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
-	executor: Executor,
+	executor: RoverExecutor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
 ): Promise<boolean> => {
@@ -356,7 +356,7 @@ const lpCoinLiquidate = async (
 	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
-	executor: Executor,
+	executor: RoverExecutor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
 	exec: MarsCreditManagerClient,
@@ -508,7 +508,7 @@ const liquidateCoinWithMarketDisabled = async (
 	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
-	executor: Executor,
+	executor: RoverExecutor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
 ): Promise<boolean> => {
@@ -582,7 +582,7 @@ const liquidateCoinWithMarketDisabled = async (
 const runIlliquidRedbankTest = async (
 	testConfig: TestConfig,
 	client: SigningStargateClient,
-	executor: Executor,
+	executor: RoverExecutor,
 	masterAddress: string,
 ): Promise<boolean> => {
 	try {
@@ -682,7 +682,7 @@ const runIlliquidRedbankTest = async (
 const runCreditLineExceededCoinTest = async (
 	testConfig: TestConfig,
 	client: SigningStargateClient,
-	executor: Executor,
+	executor: RoverExecutor,
 	masterAddress: string,
 ): Promise<boolean> => {
 	try {
@@ -795,7 +795,7 @@ const nonWhitelistedCoinTest = async (
 	testConfig: TestConfig,
 	cwClient: SigningCosmWasmClient,
 	client: SigningStargateClient,
-	executor: Executor,
+	executor: RoverExecutor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
 	exec: MarsCreditManagerClient,
@@ -962,7 +962,7 @@ const resetPrice = async (
 const getEstimatedPoolPrice = (ammRouter: AMMRouter, assetDenom: string): BigNumber => {
 	const amountOut = new BigNumber(1000000000)
 	const osmoAtomRoute = ammRouter.getBestRouteGivenOutput(assetDenom, 'uosmo', amountOut)
-	console.log({osmoAtomRoute})
+	console.log({ osmoAtomRoute })
 	const estimatedPrice = amountOut.dividedBy(ammRouter.getRequiredInput(amountOut, osmoAtomRoute))
 	return estimatedPrice
 }
@@ -985,7 +985,7 @@ const seedRedbank = async (
 						amount: '2000000',
 					},
 				],
-			)
+			),
 		],
 		'auto',
 	)

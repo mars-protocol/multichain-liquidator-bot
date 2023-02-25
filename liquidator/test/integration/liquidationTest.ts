@@ -30,7 +30,7 @@ import {
 import { Position } from '../../src/types/position'
 import path from 'path'
 import 'dotenv/config.js'
-import { Executor, RedbankExecutorConfig } from '../../src/redbank/Executor'
+import { RedbankExecutor, RedbankExecutorConfig } from '../../src/redbank/RedbankExecutor'
 
 const deployDetails = path.join(process.env.OUTPOST_ARTIFACTS_PATH!, `${process.env.CHAIN_ID}.json`)
 
@@ -190,7 +190,7 @@ const dispatchLiquidations = async (
 	cwClient: CosmWasmClient,
 	config: RedbankExecutorConfig,
 ) => {
-	const executor = new Executor(config, client, cwClient)
+	const executor = new RedbankExecutor(config, client, cwClient)
 
 	await executor.initiate()
 	await executor.run()
