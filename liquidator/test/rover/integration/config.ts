@@ -15,6 +15,7 @@ export interface TestConfig {
 	swapperAddress: string
 	rpcEndpoint: string
 	prefix: string
+	seedRedbankRequired: boolean
 	hiveEndpoint: string
 	lcdEndpoint: string
 	tests: {
@@ -50,6 +51,7 @@ export const testnetConfig: TestConfig = {
 	hiveEndpoint:
 		'https://osmosis-delphi-testnet-1.simply-vc.com.mt/XF32UOOU55CX/osmosis-hive/graphql',
 	lcdEndpoint: 'https://lcd-test.osmosis.zone',
+	seedRedbankRequired: false,
 
 	// configure what tests you want to run
 	tests: {
@@ -84,6 +86,7 @@ export const localnetConfig: TestConfig = {
 	prefix: 'osmo',
 	hiveEndpoint: 'http://127.0.0.1:8085/graphql',
 	lcdEndpoint: 'http://127.0.0.1:1317',
+	seedRedbankRequired: false,
 
 	// configure what tests you want to run
 	tests: {
