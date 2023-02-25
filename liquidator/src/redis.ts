@@ -15,11 +15,20 @@ export class RedisInterface implements IRedisInterface {
 
 	/**
 	 *
-	 * @param key the key to the liquidation redis list. Not passing a key and
-	 * setting via the .env file is preferred for production.
+	 * @param key the key to the liquidation redis list. Note that for production
+	 * the key should be set by the environment variable that is given to it by
+	 * the manager service, as this key needs to be shared with the collector
 	 */
 	constructor(key?: string) {
-		this.key = !key ? process.env.LIQUIDATION_QUEUE_NAME! : key
+		// Priority:
+		// 	if environment var set, use that (this will be the case in prod).
+		// 	if no env, try use key passed in.
+		// 	if no key passed in, use default testing key.
+		this.key = process.env.LIQUIDATION_QUEUE_NAME
+			? process.env.LIQUIDATION_QUEUE_NAME
+			: key
+			? key
+			: 'testing-queue'
 	}
 
 	async popUnhealthyRoverAccountId(): Promise<string> {
