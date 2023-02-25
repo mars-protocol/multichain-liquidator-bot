@@ -130,12 +130,11 @@ export class RoverExecutor extends BaseExecutor {
 
 		this.liquidationActionGenerator.setSwapperRoutes(roverData.routes)
 
-		const pools = await this.loadPools()
-		this.ammRouter.setPools(pools)
+		await this.refreshPoolData()
 	}
 
 	setUpAccount = async (): Promise<string> => {
-		// check our gas balance - if we have no balance then we need to send some tokens to it.
+		console.log(this.config)
 		const balanceCoin = await this.queryClient.getBalance(
 			this.config.liquidatorAddress,
 			this.config.gasDenom,
@@ -196,14 +195,23 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	run = async () => {
-		// pop latest unhealthy position from the list
-		const targetAccountId = await this.redis.popUnhealthyRoverAccountId()
+		try {
+			// Do we need to await here? maybe refresh.then() and assign data would be faster
+			await this.refreshData()
 
-		if (targetAccountId.length == 0) {
-			//sleep to avoid spamming redis db when empty
-			await sleep(200)
-			console.log(' - No items for liquidation yet')
-			return
+			// pop latest unhealthy position from the list
+			const targetAccountId = await this.redis.popUnhealthyRoverAccountId()
+	
+			if (targetAccountId.length == 0) {
+				//sleep to avoid spamming redis db when empty
+				await sleep(500)
+				console.log(' - No items for liquidation yet')
+				return
+			}
+	
+			await this.liquidate(targetAccountId)
+		} catch (e) {
+			console.error(e)
 		}
 	}
 
