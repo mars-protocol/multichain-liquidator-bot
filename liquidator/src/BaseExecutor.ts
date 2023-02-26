@@ -59,7 +59,7 @@ export class BaseExecutor {
 		{ id: 'collateral', title: 'collateral' },
 		{ id: 'liquidatorBalance', title: 'liquidatorBalance' },
 	])
-	
+
 	constructor(
 		config: BaseExecutorConfig,
 		client: SigningStargateClient,
@@ -73,7 +73,7 @@ export class BaseExecutor {
 	}
 
 	async initiate(): Promise<void> {
-		await this.redis.connect()
+		await this.redis.connect(this.config.redisEndpoint)
 		await this.refreshData()
 	}
 
