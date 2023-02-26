@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -29,10 +28,25 @@ const (
 	DeployerTypeECS = "aws-ecs"
 	// ScalingTypeWatermark scales based on watermark levels
 	ScalingTypeWatermark = "watermark"
+	// Contract prefixs are used to identify values we want from contract state
+	RedbankContractPrefix = "debts"
+	RoverContractPrefix   = "tokens__owner"
+	// redis database info
+	RedbankDatabaseIndex = 0
+	RoverDatabaseIndex   = 1
+	// contract addresses
+	RedbankAddress    = "osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv"
+	AccountNftAddress = "osmo1cljmlh9ctfv00ug9m3ndrsyyyfqlxnx4welnw8upgu6ylhd6hk4qchm9rt"
+	// Health checker config params
+	AddressesPerJob = "100"
+	JobsPerWorker   = "10"
+	BatchSize       = "1000"
+	//Collector service config
+	CollectorItemsPerPacket = 4000
 )
 
 // Config defines the environment variables for the service
-type Config struct {
+type EnvironmentConfig struct {
 	runtime.BaseConfig
 
 	ChainID              string `envconfig:"CHAIN_ID" required:"true"`
@@ -40,88 +54,128 @@ type Config struct {
 	RPCEndpoint          string `envconfig:"RPC_ENDPOINT" required:"true"`
 	RPCWebsocketEndpoint string `envconfig:"RPC_WEBSOCKET_ENDPOINT" required:"true"`
 	LCDEndpoint          string `envconfig:"LCD_ENDPOINT" required:"true"`
-
 	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
-	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
-	RedisMetricsDatabase int    `envconfig:"REDIS_METRICS_DATABASE" required:"true"`
+
+	CollectorImage     string `envconfig:"COLLECTOR_IMAGE" required:"true"`
+	HealthCheckerImage string `envconfig:"HEALTH_CHECKER_IMAGE" required:"true"`
+
+	ExecutorImage string `envconfig:"EXECUTOR_IMAGE" required:"true"`
 
 	WorkItemType types.WorkItemType `envconfig:"WORK_ITEM_TYPE" required:"true"`
 
-	CollectorQueueName      string `envconfig:"COLLECTOR_QUEUE_NAME" required:"true"`
-	CollectorItemsPerPacket int    `envconfig:"COLLECTOR_ITEMS_PER_PACKET" required:"true"`
-	HealthCheckQueueName    string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
-	ExecutorQueueName       string `envconfig:"EXECUTOR_QUEUE_NAME" required:"true"`
-
-	DeployerType       string `envconfig:"DEPLOYER_TYPE" required:"true"`
-	CollectorImage     string `envconfig:"COLLECTOR_IMAGE" required:"true"`
-	HealthCheckerImage string `envconfig:"HEALTH_CHECKER_IMAGE" required:"true"`
-	ExecutorImage      string `envconfig:"EXECUTOR_IMAGE" required:"true"`
-
-	ScalingType string `envconfig:"SCALING_TYPE" required:"true"`
-
-	CollectorContract string `envconfig:"COLLECTOR_CONTRACT" required:"true"`
-
-	CollectorConfig     string `envconfig:"COLLECTOR_CONFIG" required:"true"`
-	HealthCheckerConfig string `envconfig:"HEALTH_CHECKER_CONFIG" required:"true"`
-	ExecutorConfig      string `envconfig:"EXECUTOR_CONFIG" required:"true"`
-
-	MetricsEnabled bool `envconfig:"METRICS_ENABLED" required:"true"`
+	DeployerType string `envconfig:"DEPLOYER_TYPE" required:"true"`
 }
 
-func main() {
-	var config Config
-	err := envconfig.Process("", &config)
-	if err != nil {
-		log.Fatalf("Unable to process config: %s", err)
+type DeploymentConfig struct {
+	CollectorQueueName      string
+	CollectorItemsPerPacket int
+	HealthCheckQueueName    string
+	ExecutorQueueName       string
+
+	RedisDatabase        int
+	RedisMetricsDatabase int
+
+	CollectorContract string
+	ContractPrefix    string
+
+	CollectorConfig     map[string]string
+	HealthCheckerConfig map[string]string
+	ExecutorConfig      map[string]string
+
+	MetricsEnabled bool
+
+	ScalingType string
+}
+
+type Config struct {
+	runtime.BaseConfig
+
+	EnvironmentConfig
+	DeploymentConfig
+}
+
+func getRedisDatabase(workItemType types.WorkItemType) int {
+	if workItemType == types.Redbank {
+		return RedbankDatabaseIndex
 	}
 
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&log.JSONFormatter{
-		TimestampFormat: "Jan 02 15:04:05",
-	})
-	if strings.ToLower(config.LogFormat) == "text" {
-		log.SetFormatter(&log.TextFormatter{
-			FullTimestamp:   true,
-			TimestampFormat: "Jan 02 15:04:05",
-		})
-	}
-	logLevel, err := log.ParseLevel(config.LogLevel)
-	if err != nil {
-		log.Fatalf("Unable to parse log level: %s", err)
-	}
-	log.SetLevel(logLevel)
-	logger := log.WithFields(log.Fields{
-		"service":  strings.ToLower(config.ServiceName),
-		"chain_id": strings.ToLower(config.ChainID),
-	})
+	return RoverDatabaseIndex
+}
 
-	contractItemPrefix := "debts"
-	if config.WorkItemType == types.Rover {
-		contractItemPrefix = "tokens__owner"
+func getExecutorServiceConfig(environmentConfig EnvironmentConfig, executorServiceId string, serviceType types.WorkItemType) map[string]string {
+	executorEnv := make(map[string]string)
+	executorEnv["RPC_ENDPOINT"] = environmentConfig.RPCEndpoint
+
+	executorEnv["LIQUIDATION_QUEUE_NAME"] = executorServiceId
+	executorEnv["LCD_ENDPOINT"] = environmentConfig.LCDEndpoint
+	executorEnv["HIVE_ENDPOINT"] = environmentConfig.HiveEndpoint
+	executorEnv["REDIS_ENDPOINT"] = environmentConfig.RedisEndpoint
+	executorEnv["REDIS_METRICS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	executorEnv["REDIS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+
+	return executorEnv
+}
+
+func getCollectorServiceConfig(environmentConfig EnvironmentConfig, collectorServiceId string, healthCheckServiceId string, serviceType types.WorkItemType) map[string]string {
+
+	collectorEnv := make(map[string]string)
+	collectorEnv["LOG_LEVEL"] = environmentConfig.BaseConfig.LogLevel
+	collectorEnv["LOG_FORMAT"] = environmentConfig.BaseConfig.LogFormat
+	collectorEnv["SERVICE_NAME"] = environmentConfig.BaseConfig.ServiceName
+	collectorEnv["CHAIN_ID"] = environmentConfig.ChainID
+	collectorEnv["REDIS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	collectorEnv["REDIS_ENDPOINT"] = environmentConfig.RedisEndpoint
+	collectorEnv["REDIS_METRICS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	collectorEnv["COLLECTOR_QUEUE_NAME"] = collectorServiceId
+	collectorEnv["HEALTH_CHECK_QUEUE_NAME"] = healthCheckServiceId
+
+	return collectorEnv
+}
+
+func getHealthCheckerServiceConfig(environmentConfig EnvironmentConfig, healthCheckServiceId string, executorServiceId string, serviceType types.WorkItemType) map[string]string {
+
+	collectorContract := RedbankAddress
+
+	if serviceType == types.Rover {
+		collectorContract = AccountNftAddress
 	}
 
-	// Setup signal handler
-	signalChannel := make(chan os.Signal, 1)
-	signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
+	healthCheckerEnv := make(map[string]string)
+	healthCheckerEnv["LOG_LEVEL"] = environmentConfig.BaseConfig.LogLevel
+	healthCheckerEnv["LOG_FORMAT"] = environmentConfig.BaseConfig.LogFormat
+	healthCheckerEnv["SERVICE_NAME"] = environmentConfig.BaseConfig.ServiceName + healthCheckServiceId
+	healthCheckerEnv["CHAIN_ID"] = environmentConfig.ChainID
+	healthCheckerEnv["REDIS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	healthCheckerEnv["REDIS_ENDPOINT"] = environmentConfig.RedisEndpoint
+	healthCheckerEnv["REDIS_METRICS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	healthCheckerEnv["HEALTH_CHECK_QUEUE_NAME"] = healthCheckServiceId
+	healthCheckerEnv["LIQUIDATOR_QUEUE_NAME"] = executorServiceId
+	healthCheckerEnv["HIVE_ENDPOINT"] = environmentConfig.HiveEndpoint
+	healthCheckerEnv["REDBANK_ADDRESS"] = collectorContract
+	healthCheckerEnv["ADDRESS_PER_JOB"] = AddressesPerJob
+	healthCheckerEnv["JOBS_PER_WORKER"] = JobsPerWorker
+	healthCheckerEnv["BATCH_SIZE"] = BatchSize
 
-	// Construct the service
+	return healthCheckerEnv
+}
+
+func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentConfig, logger *log.Entry, workItemType types.WorkItemType) *manager.Manager {
 	logger.Info("Setting up manager")
-
-	// Set up Redis as queue provider
 	var queueProvider interfaces.Queuer
-	queueProvider, err = queue.NewRedis(
-		config.RedisEndpoint,
-		config.RedisDatabase,
+	queueProvider, err := queue.NewRedis(
+		environmentConfig.RedisEndpoint,
+		serviceConfig.RedisDatabase,
 		5, // BLPOP timeout seconds
 	)
+
 	if err != nil {
 		logger.Fatal(err)
 	}
 
 	var metricsCacheProvider interfaces.Cacher
 	metricsCacheProvider, err = cache.NewRedis(
-		config.RedisEndpoint,
-		config.RedisMetricsDatabase,
+		environmentConfig.RedisEndpoint,
+		serviceConfig.RedisMetricsDatabase,
 	)
 	if err != nil {
 		logger.Fatal(err)
@@ -140,53 +194,36 @@ func main() {
 	// Set up the deployer, AWS or Docker
 	// The deployers need the container images for collector, health-checker
 	// and liquidator
-	collectorConfig, err := parseConfig(config.CollectorConfig)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	healthCheckerConfig, err := parseConfig(config.HealthCheckerConfig)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	executorConfig, err := parseConfig(config.ExecutorConfig)
-	if err != nil {
-		logger.Fatal(err)
-	}
 
-	executorServiceId := fmt.Sprintf("%s-executor", config.WorkItemType)
-	collectorServiceId := fmt.Sprintf("%s-collector", config.WorkItemType)
-	healthCheckServiceId := fmt.Sprintf("%s-health-check", config.WorkItemType)
-
-	switch strings.ToLower(config.DeployerType) {
+	executorServiceId := fmt.Sprintf("%s-executor", workItemType)
+	collectorServiceId := fmt.Sprintf("%s-collector", workItemType)
+	healthCheckServiceId := fmt.Sprintf("%s-health-check", workItemType)
+	switch strings.ToLower(environmentConfig.DeployerType) {
 	case DeployerTypeDocker:
 
 		// Set up the collector's deployer
 		collectorDeployer, err = deployer.NewDocker(
 			collectorServiceId,
-			config.CollectorImage,
-			collectorConfig,
+			environmentConfig.CollectorImage,
+			serviceConfig.CollectorConfig,
 			logger,
 		)
 		if err != nil {
 			logger.Fatal(err)
 		}
 
-		// Set up the health checker's deployer
 		healthCheckerDeployer, err = deployer.NewDocker(
 			healthCheckServiceId,
-			config.HealthCheckerImage,
-			healthCheckerConfig,
+			environmentConfig.HealthCheckerImage,
+			serviceConfig.HealthCheckerConfig,
 			logger,
 		)
-		if err != nil {
-			logger.Fatal(err)
-		}
 
 		// Set up the executor's deployer
 		executorDeployer, err = deployer.NewDocker(
 			executorServiceId,
-			config.ExecutorImage,
-			executorConfig,
+			environmentConfig.ExecutorImage,
+			serviceConfig.ExecutorConfig,
 			logger,
 		)
 		if err != nil {
@@ -198,21 +235,21 @@ func main() {
 		// Set up the collector's deployer
 		collectorDeployer, err = deployer.NewAWSECS(
 			collectorServiceId,
-			config.CollectorImage,
-			collectorConfig,
+			environmentConfig.CollectorImage,
+			serviceConfig.CollectorConfig,
 			logger,
 		)
 		if err != nil {
 			logger.Fatal(err)
 		}
 
-		// Set up the health checker's deployer
 		healthCheckerDeployer, err = deployer.NewAWSECS(
 			healthCheckServiceId,
-			config.HealthCheckerImage,
-			healthCheckerConfig,
+			environmentConfig.HealthCheckerImage,
+			serviceConfig.HealthCheckerConfig,
 			logger,
 		)
+
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -220,8 +257,8 @@ func main() {
 		// Set up the executor's deployer
 		executorDeployer, err = deployer.NewAWSECS(
 			executorServiceId,
-			config.ExecutorImage,
-			executorConfig,
+			environmentConfig.ExecutorImage,
+			serviceConfig.ExecutorConfig,
 			logger,
 		)
 		if err != nil {
@@ -229,15 +266,15 @@ func main() {
 		}
 
 	default:
-		logger.Fatal("Invalid deployer type specified: ", config.DeployerType)
+		logger.Fatal("Invalid deployer type specified: ", environmentConfig.DeployerType)
 	}
 
-	switch strings.ToLower(config.ScalingType) {
+	switch strings.ToLower(serviceConfig.ScalingType) {
 	case ScalingTypeWatermark:
 		// Set up the collector's scaler with the given deployer
 		scalers[collectorServiceId], err = scaler.NewQueueWatermark(
 			queueProvider,
-			config.CollectorQueueName,
+			serviceConfig.CollectorQueueName,
 			collectorDeployer,
 			0, // Scale down when we have no items in the queue
 			1, // Scale up when we have 1 or more items in the queue
@@ -247,11 +284,17 @@ func main() {
 		if err != nil {
 			logger.Fatal(err)
 		}
+		fmt.Println(queueProvider)
+		fmt.Println(serviceConfig.CollectorQueueName)
+		fmt.Println(collectorDeployer)
+		fmt.Println(queueProvider)
+		fmt.Println(serviceConfig.HealthCheckQueueName)
+		fmt.Println(healthCheckerDeployer)
 
 		// Set up the health checker's scaler with the given deployer
 		scalers[healthCheckServiceId], err = scaler.NewQueueWatermark(
 			queueProvider,
-			config.HealthCheckQueueName,
+			serviceConfig.HealthCheckQueueName,
 			healthCheckerDeployer,
 			0, // Scale down when we have no items in the queue
 			1, // Scale up when we have 1 or more items in the queue
@@ -265,7 +308,7 @@ func main() {
 		// Set up the executor's scaler with the given deployer
 		scalers[executorServiceId], err = scaler.NewQueueWatermark(
 			queueProvider,
-			config.ExecutorQueueName,
+			serviceConfig.ExecutorQueueName,
 			executorDeployer,
 			0,     // Scale down when we have no items in the queue
 			10000, // We do not want to scale up the executor
@@ -276,7 +319,7 @@ func main() {
 			logger.Fatal(err)
 		}
 	default:
-		logger.Fatal("Invalid scaling type specified: ", config.ScalingType)
+		logger.Fatal("Invalid scaling type specified: ", serviceConfig.ScalingType)
 	}
 
 	// Set up the manager with the scalers
@@ -284,27 +327,108 @@ func main() {
 	// blocks. It also needs to check whether the current amount of
 	// collectors are able to query all the possible positions
 	service, err := manager.New(
-		config.ChainID,
-		config.RPCEndpoint,
-		config.RPCWebsocketEndpoint,
-		config.LCDEndpoint,
-		config.HiveEndpoint,
+		environmentConfig.ChainID,
+		environmentConfig.RPCEndpoint,
+		environmentConfig.RPCWebsocketEndpoint,
+		environmentConfig.LCDEndpoint,
+		environmentConfig.HiveEndpoint,
 		queueProvider,
 		metricsCacheProvider,
-		config.CollectorQueueName,
-		config.HealthCheckQueueName,
-		config.ExecutorQueueName,
+		serviceConfig.CollectorQueueName,
+		serviceConfig.HealthCheckQueueName,
+		serviceConfig.ExecutorQueueName,
 		scalers,
-		config.CollectorContract,
-		config.CollectorItemsPerPacket,
-		contractItemPrefix,
-		config.WorkItemType,
-		config.MetricsEnabled,
+		serviceConfig.CollectorContract,
+		serviceConfig.CollectorItemsPerPacket,
+		serviceConfig.ContractPrefix,
+		workItemType,
+		serviceConfig.MetricsEnabled,
 		logger,
 	)
+
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
+
+	return service
+}
+
+func getDeploymentConfig(environmentConfig EnvironmentConfig, serviceType types.WorkItemType) DeploymentConfig {
+
+	executorServiceId := fmt.Sprintf("%s-executor", serviceType)
+	collectorServiceId := fmt.Sprintf("%s-collector", serviceType)
+	healthCheckServiceId := fmt.Sprintf("%s-health-check", environmentConfig.WorkItemType)
+
+	redisDatabaseIndex := RedbankDatabaseIndex
+	if environmentConfig.WorkItemType == types.Rover {
+		redisDatabaseIndex = RoverDatabaseIndex
+	}
+
+	collectorContract := RedbankAddress
+	contractPrefix := RedbankContractPrefix
+	if serviceType == types.Rover {
+		collectorContract = AccountNftAddress
+		contractPrefix = RoverContractPrefix
+	}
+
+	return DeploymentConfig{
+		CollectorQueueName:      collectorServiceId,
+		CollectorItemsPerPacket: CollectorItemsPerPacket,
+		HealthCheckQueueName:    healthCheckServiceId,
+		ExecutorQueueName:       executorServiceId,
+		RedisDatabase:           0,
+		RedisMetricsDatabase:    redisDatabaseIndex,
+		CollectorContract:       collectorContract,
+		ContractPrefix:          contractPrefix,
+		CollectorConfig:         getCollectorServiceConfig(environmentConfig, collectorServiceId, healthCheckServiceId, serviceType),
+		HealthCheckerConfig:     getHealthCheckerServiceConfig(environmentConfig, healthCheckServiceId, executorServiceId, serviceType),
+		ExecutorConfig:          getExecutorServiceConfig(environmentConfig, executorServiceId, serviceType),
+		MetricsEnabled:          true,
+		ScalingType:             ScalingTypeWatermark,
+	}
+}
+
+func main() {
+
+	var environmentConfig EnvironmentConfig
+	err := envconfig.Process("", &environmentConfig)
+
+	if err != nil {
+		log.Fatalf("Unable to process config: %s", err)
+	}
+
+	log.SetOutput(os.Stdout)
+	log.SetFormatter(&log.JSONFormatter{
+		TimestampFormat: "Jan 02 15:04:05",
+	})
+	if strings.ToLower(environmentConfig.LogFormat) == "text" {
+		log.SetFormatter(&log.TextFormatter{
+			FullTimestamp:   true,
+			TimestampFormat: "Jan 02 15:04:05",
+		})
+	}
+	logLevel, err := log.ParseLevel(environmentConfig.LogLevel)
+	if err != nil {
+		log.Fatalf("Unable to parse log level: %s", err)
+	}
+	log.SetLevel(logLevel)
+	logger := log.WithFields(log.Fields{
+		"service":  strings.ToLower(fmt.Sprintf("%s", environmentConfig.WorkItemType)),
+		"chain_id": strings.ToLower(environmentConfig.ChainID),
+	})
+
+	// Setup signal handler
+	signalChannel := make(chan os.Signal, 1)
+	signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
+
+	// Construct the service
+
+	serviceType := environmentConfig.WorkItemType
+
+	config := getDeploymentConfig(environmentConfig, serviceType)
+
+	// Set up Redis as queue provider
+	service := setUpManager(config, environmentConfig, logger, serviceType)
 
 	// Handle stop signals
 	go func() {
@@ -312,10 +436,11 @@ func main() {
 		logger.WithFields(log.Fields{
 			"signal": sig,
 		}).Info("Received OS signal")
+
 		service.Stop()
 	}()
 
-	logger.Info("Start service")
+	logger.Info("Starting services")
 
 	// Run forever
 	err = service.Run()
@@ -325,15 +450,4 @@ func main() {
 
 	logger.Info("Shutdown")
 
-}
-
-// parseConfig parses the JSON environment variable into a map to be used
-// by other services
-func parseConfig(input string) (map[string]string, error) {
-	output := make(map[string]string)
-	err := json.Unmarshal([]byte(input), &output)
-	if err != nil {
-		return nil, err
-	}
-	return output, nil
 }
