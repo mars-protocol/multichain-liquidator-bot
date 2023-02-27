@@ -35,8 +35,8 @@ const (
 	RedbankDatabaseIndex = 0
 	RoverDatabaseIndex   = 1
 	// contract addresses
-	RedbankAddress    = "osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv"
-	AccountNftAddress = "osmo1cljmlh9ctfv00ug9m3ndrsyyyfqlxnx4welnw8upgu6ylhd6hk4qchm9rt"
+	RedbankAddress    = "osmo1tyg72uru87ws0rldfq723a0fr6qle33etww6uk2545xtf2te7d8s8fmud7"
+	AccountNftAddress = "osmo16wwckvccarltl4mlnjhw3lcj3v59yglhldgw36ldkknmjavqyaasgcessw"
 	// Health checker config params
 	AddressesPerJob = "100"
 	JobsPerWorker   = "10"
@@ -58,8 +58,7 @@ type EnvironmentConfig struct {
 
 	CollectorImage     string `envconfig:"COLLECTOR_IMAGE" required:"true"`
 	HealthCheckerImage string `envconfig:"HEALTH_CHECKER_IMAGE" required:"true"`
-
-	ExecutorImage string `envconfig:"EXECUTOR_IMAGE" required:"true"`
+	ExecutorImage      string `envconfig:"EXECUTOR_IMAGE" required:"true"`
 
 	WorkItemType types.WorkItemType `envconfig:"WORK_ITEM_TYPE" required:"true"`
 
