@@ -34,10 +34,7 @@ const (
 	RoverContractPrefix   = "tokens__owner"
 	// redis database info
 	RedbankDatabaseIndex = 0
-	RoverDatabaseIndex   = 1
-	// contract addresses
-	RedbankAddress    = "osmo1tyg72uru87ws0rldfq723a0fr6qle33etww6uk2545xtf2te7d8s8fmud7"
-	AccountNftAddress = "osmo16wwckvccarltl4mlnjhw3lcj3v59yglhldgw36ldkknmjavqyaasgcessw"
+	RoverDatabaseIndex   = 0
 	// Health checker config params
 	AddressesPerJob = "100"
 	JobsPerWorker   = "10"
@@ -64,6 +61,9 @@ type EnvironmentConfig struct {
 	WorkItemType types.WorkItemType `envconfig:"WORK_ITEM_TYPE" required:"true"`
 
 	DeployerType string `envconfig:"DEPLOYER_TYPE" required:"true"`
+
+	RedbankAddress    string `envconfig:"REDBANK_ADDRESS" required:"true"`
+	AccountNftAddress string `envconfig:"ACCOUNT_NFT_ADDRESS" required:"true"`
 }
 
 type DeploymentConfig struct {
@@ -134,10 +134,10 @@ func getCollectorServiceConfig(environmentConfig EnvironmentConfig, collectorSer
 
 func getHealthCheckerServiceConfig(environmentConfig EnvironmentConfig, healthCheckServiceId string, executorServiceId string, serviceType types.WorkItemType) map[string]string {
 
-	collectorContract := RedbankAddress
+	collectorContract := environmentConfig.RedbankAddress
 
 	if serviceType == types.Rover {
-		collectorContract = AccountNftAddress
+		collectorContract = environmentConfig.AccountNftAddress
 	}
 
 	healthCheckerEnv := make(map[string]string)
@@ -358,10 +358,10 @@ func getDeploymentConfig(environmentConfig EnvironmentConfig, serviceType types.
 		redisDatabaseIndex = RoverDatabaseIndex
 	}
 
-	collectorContract := RedbankAddress
+	collectorContract := environmentConfig.RedbankAddress
 	contractPrefix := RedbankContractPrefix
 	if serviceType == types.Rover {
-		collectorContract = AccountNftAddress
+		collectorContract = environmentConfig.AccountNftAddress
 		contractPrefix = RoverContractPrefix
 	}
 

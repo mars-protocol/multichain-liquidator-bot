@@ -107,6 +107,7 @@ func (s *HealthCheckerRover) getExecuteFunction(creditManagerAddress string) fun
 func (s *HealthCheckerRover) generateJobs(positionList []types.RoverHealthCheckWorkItem, addressesPerJob int) []worker_pool.Job {
 
 	numberOfAddresses := len(positionList)
+
 	jobs := []worker_pool.Job{}
 	// Slice our address into jobs, each job fetching N number of addresses
 	for i := 0; i < len(positionList); i += addressesPerJob {
@@ -138,7 +139,7 @@ func (s *HealthCheckerRover) generateJobs(positionList []types.RoverHealthCheckW
 func (s *HealthCheckerRover) produceUnhealthyPositions(results []UserResult) [][]byte {
 	var unhealthyPositions [][]byte
 	for _, userResult := range results {
-		liquidatable := userResult.ContractQuery.Health.Liquidatable
+		liquidatable := userResult.ContractQuery.Liquidatable
 		if liquidatable {
 
 			positionDecoded, decodeError := json.Marshal(userResult)
