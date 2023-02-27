@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -109,8 +110,8 @@ func getExecutorServiceConfig(environmentConfig EnvironmentConfig, executorServi
 	executorEnv["LCD_ENDPOINT"] = environmentConfig.LCDEndpoint
 	executorEnv["HIVE_ENDPOINT"] = environmentConfig.HiveEndpoint
 	executorEnv["REDIS_ENDPOINT"] = environmentConfig.RedisEndpoint
-	executorEnv["REDIS_METRICS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
-	executorEnv["REDIS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	executorEnv["REDIS_METRICS_DATABASE"] = strconv.Itoa(getRedisDatabase(serviceType))
+	executorEnv["REDIS_DATABASE"] = strconv.Itoa(getRedisDatabase(serviceType))
 
 	return executorEnv
 }
@@ -122,9 +123,9 @@ func getCollectorServiceConfig(environmentConfig EnvironmentConfig, collectorSer
 	collectorEnv["LOG_FORMAT"] = environmentConfig.BaseConfig.LogFormat
 	collectorEnv["SERVICE_NAME"] = environmentConfig.BaseConfig.ServiceName
 	collectorEnv["CHAIN_ID"] = environmentConfig.ChainID
-	collectorEnv["REDIS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	collectorEnv["REDIS_DATABASE"] = strconv.Itoa(getRedisDatabase(serviceType))
 	collectorEnv["REDIS_ENDPOINT"] = environmentConfig.RedisEndpoint
-	collectorEnv["REDIS_METRICS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	collectorEnv["REDIS_METRICS_DATABASE"] = strconv.Itoa(getRedisDatabase(serviceType))
 	collectorEnv["COLLECTOR_QUEUE_NAME"] = collectorServiceId
 	collectorEnv["HEALTH_CHECK_QUEUE_NAME"] = healthCheckServiceId
 
@@ -144,9 +145,9 @@ func getHealthCheckerServiceConfig(environmentConfig EnvironmentConfig, healthCh
 	healthCheckerEnv["LOG_FORMAT"] = environmentConfig.BaseConfig.LogFormat
 	healthCheckerEnv["SERVICE_NAME"] = environmentConfig.BaseConfig.ServiceName + healthCheckServiceId
 	healthCheckerEnv["CHAIN_ID"] = environmentConfig.ChainID
-	healthCheckerEnv["REDIS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	healthCheckerEnv["REDIS_DATABASE"] = strconv.Itoa(getRedisDatabase(serviceType))
 	healthCheckerEnv["REDIS_ENDPOINT"] = environmentConfig.RedisEndpoint
-	healthCheckerEnv["REDIS_METRICS_DATABASE"] = fmt.Sprintf("%s", getRedisDatabase(serviceType))
+	healthCheckerEnv["REDIS_METRICS_DATABASE"] = strconv.Itoa(getRedisDatabase(serviceType))
 	healthCheckerEnv["HEALTH_CHECK_QUEUE_NAME"] = healthCheckServiceId
 	healthCheckerEnv["LIQUIDATOR_QUEUE_NAME"] = executorServiceId
 	healthCheckerEnv["HIVE_ENDPOINT"] = environmentConfig.HiveEndpoint
@@ -283,12 +284,6 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 		if err != nil {
 			logger.Fatal(err)
 		}
-		fmt.Println(queueProvider)
-		fmt.Println(serviceConfig.CollectorQueueName)
-		fmt.Println(collectorDeployer)
-		fmt.Println(queueProvider)
-		fmt.Println(serviceConfig.HealthCheckQueueName)
-		fmt.Println(healthCheckerDeployer)
 
 		// Set up the health checker's scaler with the given deployer
 		scalers[healthCheckServiceId], err = scaler.NewQueueWatermark(
@@ -375,7 +370,7 @@ func getDeploymentConfig(environmentConfig EnvironmentConfig, serviceType types.
 		CollectorItemsPerPacket: CollectorItemsPerPacket,
 		HealthCheckQueueName:    healthCheckServiceId,
 		ExecutorQueueName:       executorServiceId,
-		RedisDatabase:           0,
+		RedisDatabase:           redisDatabaseIndex,
 		RedisMetricsDatabase:    redisDatabaseIndex,
 		CollectorContract:       collectorContract,
 		ContractPrefix:          contractPrefix,
