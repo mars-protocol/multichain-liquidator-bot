@@ -56,13 +56,12 @@ const runTests = async (testConfig: TestConfig) => {
 
 	console.log('Master account setup complete')
 
-	if (false) {
-		await seedRedbank(client, masterAddress, testConfig)
-	}
-
 	console.log({ masterAddress })
 
-	console.log('Seeded redbank')
+	if (testConfig.seedRedbankRequired) {
+		await seedRedbank(client, masterAddress, testConfig)
+		console.log('Seeded redbank')
+	}
 
 	const config: RoverExecutorConfig = {
 		redbankAddress: testConfig.redbankAddress,
@@ -79,6 +78,7 @@ const runTests = async (testConfig: TestConfig) => {
 		logResults: true,
 		neutralAssetDenom: testConfig.usdcDenom,
 		redisEndpoint: 'http://127.0.0.1:6379', // not required for integration tests
+		poolsRefreshWindow: 60000,
 	}
 
 	// Set up our liquidator

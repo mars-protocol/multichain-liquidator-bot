@@ -19,11 +19,8 @@ type RoverHive struct {
 	HiveEndpoint string
 }
 
-type Health struct {
-	Liquidatable bool `json:"liquidatable"`
-}
 type ContractQuery struct {
-	Health Health `json:"Health"`
+	Liquidatable bool `json:"liquidatable"`
 }
 type Wasm struct {
 	ContractQuery ContractQuery `json:"contractQuery"`
@@ -64,18 +61,20 @@ func (hive *RoverHive) FetchBatch(
 	var queries []BatchQuery
 	for _, position := range positions {
 		// store addresses in this local map so that we can easily add debts and collateral later
-		positonMap[position.AccountId] = position
+		positonMap[position.Identifier] = position
+
 		batchQuery := BatchQuery{
 			Query: fmt.Sprintf(`query($contractAddress: String! $accountId: String!) {
                         account_%s:wasm {
 							contractQuery(contractAddress: $contractAddress, query: { health : { account_id: $accountId } })
 						}
-                    }`, position.AccountId),
+                    }`, position.Identifier),
 			Variables: map[string]interface{}{
 				"contractAddress": contractAddress,
-				"accountId":       position.AccountId,
+				"accountId":       position.Identifier,
 			},
 		}
+
 		queries = append(queries, batchQuery)
 	}
 

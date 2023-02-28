@@ -92,7 +92,6 @@ func (s *HealthChecker) getExecuteFunction(redbankAddress string) func(ctx conte
 		}
 
 		batchResults, err := s.hive.FetchBatch(redbankAddress, positions)
-
 		if err != nil {
 			return nil, err
 		}
@@ -138,12 +137,27 @@ func (s *HealthChecker) generateJobs(positionList []types.HealthCheckWorkItem, a
 // TODO handle different liquidation types (e.g redbank, rover). Currently we only store address
 func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte {
 	var unhealthyPositions [][]byte
+
 	for _, userResult := range results {
-		ltv, err := strconv.ParseFloat(userResult.ContractQuery.HealthStatus.Borrowing.LiquidationThresholdHf, 32)
+		collateralisedDebt, err := strconv.ParseInt(userResult.ContractQuery.TotalCollateralizedDebt, 8, 32)
+
+		// Uncollateralised positions still have debt, but will not return a health status.
+		// We filter them out here.
+		if collateralisedDebt == 0 {
+			continue
+		}
+
+		// Produce health status from json string
+		healthStatus := HealthStatus{}
+		value := userResult.ContractQuery.HealthStatus.(map[string]interface{})
+		data, err := json.Marshal(value)
+		json.Unmarshal(data, &healthStatus)
+
+		ltv, err := strconv.ParseFloat(healthStatus.Borrowing.LiquidationThresholdHf, 32)
+
 		if err != nil {
 			s.logger.Errorf("An Error Occurred decoding health status. %v", err)
 		} else if ltv < 1 {
-
 			positionDecoded, decodeError := json.Marshal(userResult)
 			if decodeError == nil {
 				unhealthyPositions = append(unhealthyPositions, positionDecoded)
@@ -274,15 +288,15 @@ func (s *HealthChecker) RunWorkerPool(jobs []worker_pool.Job) ([]UserResult, boo
 		select {
 		case r, ok := <-wp.Results():
 
-			if !ok {
-				fmt.Println(fmt.Errorf("An unknown error occurred fetching data."))
-				continue
-			}
-
 			if r.Err != nil {
 				s.logger.WithFields(logrus.Fields{
 					"error": r.Err,
 				}).Error("Unable to fetch data")
+				continue
+			}
+
+			if !ok {
+				fmt.Println(fmt.Errorf("An unknown error occurred fetching data."))
 				continue
 			}
 

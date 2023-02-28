@@ -5,10 +5,10 @@
 	"main": "index.ts",
 	"license": "MIT",
 	"scripts": {
-		"test:integration": "yarn build && node build/test/integration/liquidationTest",
+		"test:integration": "yarn build && node build/test/redbank/integration/liquidationTest",
 		"test:rover-integration": "yarn build && node build/test/rover/integration/liquidationTest",
 		"build": "tsc",
-		"start": "node --loader ts-node/esm src/main.ts",
+		"start": "yarn build && node build/src/main",
 		"test": "jest",
 		"lint": "yarn format-check && eslint . && yarn build",
 		"format": "prettier --write .",

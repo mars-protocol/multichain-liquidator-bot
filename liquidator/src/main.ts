@@ -41,7 +41,7 @@ export const main = async () => {
 
 	switch (executorType) {
 		case REDBANK:
-			await launchRedbank(client, queryClient, Network.TESTNET, liquidatorMasterAddress)
+			await launchRedbank(client, queryClient, Network.MAINNET, liquidatorMasterAddress)
 			return
 		case ROVER:
 			await launchRover(client, queryClient, Network.TESTNET, liquidatorMasterAddress, liquidator)

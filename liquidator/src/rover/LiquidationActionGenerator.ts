@@ -15,7 +15,7 @@ import {
 	POOL_NOT_FOUND,
 	UNSUPPORTED_VAULT,
 } from './constants/errors.js'
-import { GENERIC_BUFFER } from './constants/variables'
+import { GENERIC_BUFFER } from '../constants'
 import {
 	UncollateralizedLoanLimitResponse,
 	UserDebtResponse,
