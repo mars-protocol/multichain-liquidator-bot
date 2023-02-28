@@ -5,16 +5,16 @@ import { Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import { coins, EncodeObject } from '@cosmjs/proto-signing'
 
-import { makeExecuteContractMessage, makeWithdrawMessage, sleep } from '../helpers.js'
+import { makeExecuteContractMessage, makeWithdrawMessage, sleep } from '../helpers'
 import { osmosis, cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
-import { fetchRedbankBatch } from '../query/hive'
+import { Collateral, DataResponse, fetchRedbankBatch } from '../hive'
 
 import BigNumber from 'bignumber.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
-import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
+import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
 
@@ -31,8 +31,10 @@ export interface RedbankExecutorConfig extends BaseExecutorConfig {
 /**
  * Executor class is the entry point for the executor service
  *
- * @param sm An optional parameter. If you want to use a secret manager to hold the seed
- *           phrase, implement the secret manager interface and pass as a dependency.
+ * @param config The config defines the required contracts, endpoints and
+ * 				 other parameters required
+ * @param client A signing stargate client for dispatching transactions
+ * @param queryClient A read only cosmwasm client for querying contracts
  */
 export class RedbankExecutor extends BaseExecutor {
 	public config: RedbankExecutorConfig
@@ -254,6 +256,39 @@ export class RedbankExecutor extends BaseExecutor {
 		return expectedDebtAssetsPostSwap
 	}
 
+	executeViaRedbankMsg = (tx: LiquidationTx): MsgExecuteContractEncodeObject => {
+		const msg = JSON.stringify({
+			liquidate: { user: tx.user_address, collateral_denom: tx.collateral_denom },
+		})
+
+		return makeExecuteContractMessage(
+			this.config.liquidatorMasterAddress,
+			this.config.redbankAddress,
+			toUtf8(msg),
+			[
+				{
+					amount: tx.amount,
+					denom: tx.debt_denom,
+				},
+			],
+		)
+	}
+
+	executeViaFilterer = (
+		txs: LiquidationTx[],
+		debtCoins: Coin[],
+	): MsgExecuteContractEncodeObject => {
+
+		const msg = toUtf8(JSON.stringify({ liquidate_many: { liquidations: txs } }))
+
+		return makeExecuteContractMessage(
+			this.config.liquidatorMasterAddress,
+			this.config.liquidationFiltererAddress,
+			msg,
+			debtCoins,
+		)
+	}
+
 	async run(): Promise<void> {
 		const liquidatorAddress = this.config.liquidatorMasterAddress
 
@@ -261,9 +296,6 @@ export class RedbankExecutor extends BaseExecutor {
 			throw new Error("Instantiate your clients before calling 'run()'")
 
 		await this.refreshData()
-
-		// refresh our balances
-		await this.setBalances(liquidatorAddress)
 
 		console.log('Checking for liquidations')
 		const positions: Position[] = await this.redis.popUnhealthyRedbankPositions(25)
@@ -298,19 +330,17 @@ export class RedbankExecutor extends BaseExecutor {
 			new BigNumber(this.balances.get(this.config.neutralAssetDenom)!),
 		)
 
-		const liquidateMsg = JSON.stringify({ liquidate_many: { liquidations: txs } })
-		const msg = toUtf8(liquidateMsg)
+		// Preferably, we liquidate via redbank directly. This is so that if the liquidation fails,
+		// the entire transaction fails and we do not swap.
+		// When using the liquidation filterer contract, transactions with no successfull liquidations
+		// will still succeed, meaning that we will still swap to the debt and have to swap back again.
+		// If liquidating via redbank, unsucessfull liquidations will error, preventing the swap
 
-		firstMsgBatch.push(
-			executeContract(
-				makeExecuteContractMessage(
-					this.config.liquidatorMasterAddress,
-					this.config.liquidationFiltererAddress,
-					msg,
-					debtCoins,
-				).value as MsgExecuteContract,
-			),
-		)
+		const execute: MsgExecuteContractEncodeObject =
+			// index [0] is safe as we know the length is 1 from the conditional
+			txs.length == 1 ? this.executeViaRedbankMsg(txs[0]) : this.executeViaFilterer(txs, debtCoins)
+			
+		firstMsgBatch.push(execute)
 
 		if (!firstMsgBatch || firstMsgBatch.length === 0 || txs.length === 0) return
 

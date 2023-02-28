@@ -100,8 +100,8 @@ export const produceSigningStargateClient = async (
 		gasPrice: GasPrice.fromString(gasPrice),
 		registry,
 		aminoTypes,
-		broadcastPollIntervalMs : 1000,
-		broadcastTimeoutMs: 300000
+		broadcastPollIntervalMs: 1000,
+		broadcastTimeoutMs: 300000,
 	}
 
 	return await SigningStargateClient.connectWithSigner(rpcEndpoint, liquidator, clientOption)
@@ -120,8 +120,8 @@ export const produceSigningCosmWasmClient = async (
 ): Promise<SigningCosmWasmClient> => {
 	return await SigningCosmWasmClient.connectWithSigner(rpcEndpoint, liquidator, {
 		gasPrice: GasPrice.fromString(gasPrice),
-		broadcastPollIntervalMs : 1000,
-		broadcastTimeoutMs: 300000
+		broadcastPollIntervalMs: 1000,
+		broadcastTimeoutMs: 300000,
 	})
 }
 
@@ -208,7 +208,7 @@ export const borrow = async (
 	sender: string,
 	assetDenom: string,
 	amount: string,
-	addresses: ProtocolAddresses,
+	redbankAddress: string,
 ) => {
 	const msg = {
 		borrow: {
@@ -217,7 +217,7 @@ export const borrow = async (
 		},
 	}
 
-	return await client.execute(sender, addresses.redBank, msg, 'auto')
+	return await client.execute(sender, redbankAddress, msg, 'auto')
 }
 
 export const makeExecuteContractMessage = (
@@ -389,10 +389,10 @@ export const repay = async (
 export const queryHealth = async (
 	client: CosmWasmClient,
 	address: string,
-	addresses: ProtocolAddresses,
+	redbankAddress: string,
 ) => {
 	const msg = { user_position: { user: address } }
-	return await client.queryContractSmart(addresses.redBank, msg)
+	return await client.queryContractSmart(redbankAddress, msg)
 }
 
 export interface ProtocolAddresses {
