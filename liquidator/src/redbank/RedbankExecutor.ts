@@ -9,7 +9,7 @@ import { makeExecuteContractMessage, makeWithdrawMessage, sleep } from '../helpe
 import { osmosis, cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
-import { Collateral, DataResponse, fetchRedbankBatch } from '../hive'
+import { fetchRedbankBatch } from '../query/hive'
 
 import BigNumber from 'bignumber.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
