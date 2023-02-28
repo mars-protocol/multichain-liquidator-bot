@@ -28,9 +28,8 @@ type HealthStatus struct {
 	Borrowing Borrowing `json:"borrowing"`
 }
 type ContractQuery struct {
-	TotalCollateralInBaseAsset string       `json:"total_collateral_in_base_asset"`
-	TotalDebtInBaseAsset       string       `json:"total_debt_in_base_asset"`
-	HealthStatus               HealthStatus `json:"health_status"`
+	TotalCollateralizedDebt string      `json:"total_collateralized_debt"`
+	HealthStatus            interface{} `json:"health_status"`
 }
 type Wasm struct {
 	ContractQuery ContractQuery `json:"contractQuery"`
@@ -64,6 +63,7 @@ func (hive *Hive) FetchBatch(
 ) ([]UserResult, error) {
 	var userResults []UserResult
 	var batchEvents BatchEventsResponse
+
 	positonMap := make(map[string]types.HealthCheckWorkItem)
 
 	var queries []BatchQuery
@@ -82,6 +82,7 @@ func (hive *Hive) FetchBatch(
 				"userAddress":     position.Identifier,
 			},
 		}
+
 		queries = append(queries, batchQuery)
 	}
 
@@ -104,12 +105,12 @@ func (hive *Hive) FetchBatch(
 
 	err = json.NewDecoder(response.Body).Decode(&batchEvents)
 	if err != nil {
+
 		return userResults, err
 	}
 
 	for _, event := range batchEvents {
 		// event.Data is now the address[contractQuery] map
-
 		for identifier, data := range event.Data {
 			userResults = append(userResults, UserResult{
 				Identifier:    identifier,
