@@ -44,7 +44,7 @@ export const main = async () => {
 			await launchRedbank(client, queryClient, Network.MAINNET, liquidatorMasterAddress)
 			return
 		case ROVER:
-			await launchRover(client, queryClient, Network.TESTNET, liquidatorMasterAddress, liquidator)
+			await launchRover(client, queryClient, Network.MAINNET, liquidatorMasterAddress, liquidator)
 		default:
 			throw new Error(
 				`Invalid executor type. Executor type must be either ${REDBANK} or ${ROVER}, recieved ${executorType}`,
@@ -63,7 +63,7 @@ const launchRover = async (
 	const liquidatorAddress = (await liquidatorWallet.getAccounts())[1].address
 
 	await new RoverExecutor(
-		// Change network to fit your requirements
+
 		getRoverConfig(liquidatorMasterAddress, liquidatorAddress, network),
 		client,
 		wasmClient,
