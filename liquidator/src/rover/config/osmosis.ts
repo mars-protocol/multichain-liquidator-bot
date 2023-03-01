@@ -6,8 +6,27 @@ export const getConfig = (
 	liquidatorAddress: string,
 	network: Network,
 ): RoverExecutorConfig => {
-	if (network === Network.MAINNET) throw new Error('Mainnet network not yet supported')
+	if (network === Network.MAINNET) {
+		return {
+			gasDenom: 'uosmo',
+			hiveEndpoint: process.env.HIVE_ENDPOINT!,
+			lcdEndpoint: process.env.LCD_ENDPOINT!,
+			neutralAssetDenom: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858', // no usdc pools on testnet so we use osmo
+			swapperAddress: 'osmo1wee0z8c7tcawyl647eapqs4a88q8jpa7ddy6nn2nrs7t47p2zhxswetwla',
+			oracleAddress: 'osmo1mhznfr60vjdp2gejhyv2gax9nvyyzhd3z0qcwseyetkfustjauzqycsy2g',
+			redbankAddress: 'osmo1c3ljch9dfw5kf52nfwpxd2zmj2ese7agnx0p9tenkrryasrle5sqf3ftpg',
+			accountNftAddress: 'osmo1450hrg6dv2l58c0rvdwx8ec2a0r6dd50hn4frk370tpvqjhy8khqw7sw09',
+			creditManagerAddress: 'osmo1f2m24wktq0sw3c0lexlg7fv4kngwyttvzws3a3r3al9ld2s2pvds87jqvf',
+			liquidatorMasterAddress: liquidatorMasterAddress,
+			liquidatorAddress: liquidatorAddress,
+			minGasTokens: 10000000,
+			logResults: false,
+			redisEndpoint: process.env.REDIS_ENDPOINT || '', // recommend using local
+			poolsRefreshWindow: 60000,
+		}
+	}
 
+	// Not mainnet
 	return {
 		gasDenom: 'uosmo',
 		hiveEndpoint: process.env.HIVE_ENDPOINT!,
@@ -22,7 +41,7 @@ export const getConfig = (
 		liquidatorAddress: liquidatorAddress,
 		minGasTokens: 10000000,
 		logResults: false,
-		redisEndpoint: process.env.REDIS_ENDPOINT || 'http://127:0.0.1:6379', // recommend using local
+		redisEndpoint: process.env.REDIS_ENDPOINT || '', // recommend using local
 		poolsRefreshWindow: 60000,
 	}
 }

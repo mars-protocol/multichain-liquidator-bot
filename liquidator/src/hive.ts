@@ -343,7 +343,12 @@ export const fetchRoverPosition = async (
 	creditManagerAddress: string,
 	hiveEndpoint: string,
 ): Promise<Positions> => {
+
+	const accountObject = JSON.parse(accountId)
+	accountId = accountObject["Address"].split("_")[1]
+
 	const query = { query: produceRoverAccountPositionQuery(accountId, creditManagerAddress) }
+
 	// post to hive endpoint
 	const response = await fetch(hiveEndpoint, {
 		method: 'post',
