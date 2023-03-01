@@ -58,6 +58,8 @@ const runTests = async (testConfig: TestConfig) => {
 
 	console.log({ masterAddress })
 
+	await setPrice(cwClient, masterAddress, testConfig.atomDenom, '25', testConfig.oracleAddress)
+
 	if (testConfig.seedRedbankRequired) {
 		await seedRedbank(client, masterAddress, testConfig)
 		console.log('Seeded redbank')
