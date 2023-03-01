@@ -9,13 +9,14 @@ import { makeExecuteContractMessage, makeWithdrawMessage, sleep } from '../helpe
 import { osmosis, cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
-import { Collateral, DataResponse, fetchRedbankBatch } from '../hive'
+import { fetchRedbankBatch } from '../query/hive'
 
 import BigNumber from 'bignumber.js'
 import { Long } from 'osmojs/types/codegen/helpers.js'
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
+import { Collateral, DataResponse } from '../query/types.js'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 

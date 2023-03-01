@@ -1,7 +1,7 @@
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { makeExecuteContractMessage, sleep } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
-import { fetchRoverData, fetchRoverPosition, VaultInfo } from '../hive'
+import { fetchRoverData, fetchRoverPosition } from '../query/hive'
 import { LiquidationActionGenerator } from './LiquidationActionGenerator'
 import {
 	Coin,
@@ -12,6 +12,8 @@ import {
 	VaultPositionType,
 	VaultUnlockingPosition,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+
+import { VaultInfo } from '../query/types'
 
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 

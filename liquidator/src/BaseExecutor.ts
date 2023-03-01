@@ -10,7 +10,7 @@ import { MarketInfo } from './rover/types/MarketInfo.js'
 import { CSVWriter, Row } from './CsvWriter.js'
 import { camelCaseKeys } from './helpers.js'
 import BigNumber from 'bignumber.js'
-import { fetchData } from './hive.js'
+import { fetchRedbankData } from './query/hive.js'
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types.js'
 
 export interface BaseExecutorConfig {
@@ -113,7 +113,7 @@ export class BaseExecutor {
 
 	refreshData = async () => {
 		// dispatch hive request and parse it
-		const { wasm, bank } = await fetchData(
+		const { wasm, bank } = await fetchRedbankData(
 			this.config.hiveEndpoint,
 			this.config.liquidatorMasterAddress,
 			this.config.redbankAddress,

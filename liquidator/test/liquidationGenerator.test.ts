@@ -1,5 +1,5 @@
-import { Collateral, Debt } from '../src/hive'
 import { getLargestCollateral, getLargestDebt } from '../src/liquidationGenerator'
+import { Collateral, Debt } from '../src/query/types'
 import { generateRandomAsset } from './testHelpers'
 
 describe('Liquidation Tx Generator Tests..', () => {

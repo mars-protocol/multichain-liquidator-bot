@@ -1,5 +1,6 @@
-import { AssetResponse, Collateral, Debt } from './hive.js'
+
 import BigNumber from 'bignumber.js'
+import { AssetResponse, Collateral, Debt } from './query/types'
 
 // Sort asset array from highest amount to lowest
 const sortAssetArrayByAmount = (
