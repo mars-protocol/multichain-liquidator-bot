@@ -72,9 +72,8 @@ export class BaseExecutor {
 		this.queryClient = queryClient
 	}
 
-	async initiate(): Promise<void> {
+	async initiateRedis(): Promise<void> {
 		await this.redis.connect(this.config.redisEndpoint)
-		await this.refreshData()
 	}
 
 	applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {
