@@ -15,6 +15,7 @@ import { produceBalanceQuery, produceRedbankGeneralQuery, produceUserPositionQue
 import {
 	CoreDataResponse,
 	DataResponse,
+	LiquidatorBalanceResponse,
 	RoverData,
 	VaultDataResponse,
 	VaultInfo,
@@ -174,5 +175,14 @@ export const fetchBalances = async (hiveEndpoint: string, addresses: string[]) :
 		headers: { 'Content-Type': 'application/json' },
 	})
 
-	return (await response.json()).data
+	const resultJson = await response.json() as {data : LiquidatorBalanceResponse} []
+	const balancesMap : Map<string, Coin[]>= new Map()
+	
+	resultJson.forEach((result) => {
+		const liquidatorAddress : string = Object.keys(result.data).pop()!
+		const coins : Coin[] = result.data[liquidatorAddress].balance
+		balancesMap.set(liquidatorAddress, coins)
+	})
+
+	return balancesMap
 }

@@ -1,7 +1,7 @@
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
-import { makeExecuteContractMessage, sleep } from '../helpers'
+import { makeExecuteContractMessage, makeSendMessage, sleep } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
-import { fetchRoverData, fetchRoverPosition } from '../query/hive'
+import { fetchBalances, fetchRoverData, fetchRoverPosition } from '../query/hive'
 import { LiquidationActionGenerator } from './LiquidationActionGenerator'
 import {
 	Coin,
@@ -12,14 +12,11 @@ import {
 	VaultPositionType,
 	VaultUnlockingPosition,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
-
 import { VaultInfo } from '../query/types'
-
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
-
 import BigNumber from 'bignumber.js'
 import { Collateral, Debt, PositionType } from './types/RoverPosition'
-import { SigningStargateClient } from '@cosmjs/stargate'
+import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { MarketInfo } from './types/MarketInfo'
 import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/errors'
@@ -27,15 +24,20 @@ import {
 	UncollateralizedLoanLimitResponse,
 	UserDebtResponse,
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
+import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
+
+interface CreateCreditAccountResponse {
+	tokenId : number
+	liquidatorAddress : string
+}
 
 export interface RoverExecutorConfig extends BaseExecutorConfig {
 	creditManagerAddress: string
 	swapperAddress: string
-	liquidatorAddress: string
 	accountNftAddress: string
 	minGasTokens: number
+	maxLiquidators: number
 }
-
 export class RoverExecutor extends BaseExecutor {
 	private VAULT_RELOAD_WINDOW = 1800000
 	public config: RoverExecutorConfig
@@ -43,29 +45,86 @@ export class RoverExecutor extends BaseExecutor {
 	private creditLines: UserDebtResponse[] = []
 	private creditLineCaps: UncollateralizedLoanLimitResponse[] = []
 
+	private liquidatorAccounts: Map<string, number> = new Map()
+
 	public liquidatorAccountId = ''
 	private whitelistedCoins: string[] = []
 	private vaults: string[] = []
 	private vaultDetails: Map<string, VaultInfo> = new Map()
 	private lastFetchedVaultTime = 0
 
+	private wallet: DirectSecp256k1HdWallet
+
 	constructor(
 		config: RoverExecutorConfig,
 		client: SigningStargateClient,
 		queryClient: CosmWasmClient,
+		wallet: DirectSecp256k1HdWallet,
 	) {
 		super(config, client, queryClient)
 		this.config = config
 		this.liquidationActionGenerator = new LiquidationActionGenerator(this.ammRouter)
+		this.wallet = wallet
 	}
 
+	// Entry to rover executor
 	start = async () => {
-		// this will fetch prices etc
-		this.initiate()
+		await this.initiateRedis()
 
-		this.liquidatorAccountId = await this.setUpAccount()
+		// set up accounts
+		const accounts = await this.wallet.getAccounts()
 
-		while (true) await this.run()
+		// get liquidator addresses
+		const liquidatorAddresses: string[] = accounts
+			.slice(1, this.config.maxLiquidators + 1)
+			.map((account) => account.address)
+
+		// initiate our wallets (in case they are not)
+		await this.topUpWallets(liquidatorAddresses)
+		
+		// Fetch or create our credit accounts for each address
+		liquidatorAddresses.forEach((address: string) => {
+			// todo - what if this fails? - how do we handle this?
+			this.createCreditAccount(address).then(({liquidatorAddress, tokenId}) => this.liquidatorAccounts.set(liquidatorAddress, tokenId))
+		})
+
+		// We set up 3 separate tasks to run in parallel
+		//
+		// Refresh the data such as pool data, vaults,
+		setInterval(this.refreshData, 5*1000)
+		// Ensure our liquidator wallets have more than enough funds to operate
+		setInterval(this.updateLiquidatorBalances, 5*1000)
+		// check for and dispatch liquidations
+		setInterval(this.run, 200)
+	}
+
+	
+	updateLiquidatorBalances = async () => {
+		const liquidatorAddresses = Array.from(this.liquidatorAccounts.keys())
+		await this.topUpWallets(liquidatorAddresses)
+	}
+
+	topUpWallets = async(addresses: string[]) => {
+		const balances = await fetchBalances(this.config.hiveEndpoint, addresses)
+		this.liquidatorBalances = balances
+		const sendMsgs : MsgSendEncodeObject[] = []
+		
+		const amountToSend = this.config.minGasTokens * 2
+
+		for (const balanceKey of Array.from(balances.keys())) {
+
+			const osmoBalance = Number(balances.get(balanceKey)?.find((coin : Coin) => coin.denom === this.config.gasDenom)?.amount || 0)
+
+			if (osmoBalance === undefined || osmoBalance < this.config.minGasTokens) {
+				// send message to send gas tokens to our liquidator
+				sendMsgs.push(makeSendMessage(this.config.liquidatorMasterAddress,balanceKey, [{denom: this.config.gasDenom, amount : amountToSend.toFixed(0)}]))
+			}
+		}
+
+		if (sendMsgs.length > 0) {
+			await this.client.signAndBroadcast(this.config.liquidatorMasterAddress, sendMsgs, 'auto')
+			console.log(`topped up ${sendMsgs.length} wallets`)
+		}
 	}
 
 	fetchVaults = async () => {
@@ -135,44 +194,20 @@ export class RoverExecutor extends BaseExecutor {
 		await this.refreshPoolData()
 	}
 
-	setUpAccount = async (): Promise<string> => {
-		console.log(this.config)
-		const balanceCoin = await this.queryClient.getBalance(
-			this.config.liquidatorAddress,
-			this.config.gasDenom,
-		)
-
-		const balance = Number(balanceCoin.amount)
-
-		// if less than min tokens, we need to top up
-		if (balance < this.config.minGasTokens) {
-			// send from our master to our liquidator
-			const tokensToSend = this.config.minGasTokens - balance
-
-			const result = await this.client.sendTokens(
-				this.config.liquidatorMasterAddress,
-				this.config.liquidatorAddress,
-				[{ denom: this.config.gasDenom, amount: tokensToSend.toFixed(0) }],
-				'auto',
-			)
-
-			if (result.code !== 0) {
-				console.warn(
-					`Failed to top up gas for liquidator ${this.config.liquidatorAddress}. Current balance: ${balance}${this.config.gasDenom}`,
-				)
-			}
-		}
+	createCreditAccount = async (
+		liquidatorAddress: string,
+	): Promise<CreateCreditAccountResponse> => {
 
 		let { tokens } = await this.queryClient.queryContractSmart(this.config.accountNftAddress, {
-			tokens: { owner: this.config.liquidatorAddress },
+			tokens: { owner: liquidatorAddress },
 		})
 
 		if (tokens.length === 0) {
 			const result = await this.client.signAndBroadcast(
-				this.config.liquidatorAddress,
+				liquidatorAddress,
 				[
 					makeExecuteContractMessage(
-						this.config.liquidatorAddress,
+						liquidatorAddress,
 						this.config.creditManagerAddress,
 						toUtf8(`{ "create_credit_account": {} }`),
 					),
@@ -182,42 +217,48 @@ export class RoverExecutor extends BaseExecutor {
 
 			if (result.code !== 0) {
 				throw new Error(
-					`Failed to create credit account for ${this.config.liquidatorAddress}. TxHash: ${result.transactionHash}`,
+					`Failed to create credit account for ${liquidatorAddress}. TxHash: ${result.transactionHash}`,
 				)
 			}
-			// todo parse result to get sub account id
-			const { tokens } = await this.queryClient.queryContractSmart(this.config.accountNftAddress, {
-				tokens: { owner: this.config.liquidatorAddress },
-			})
 
-			return tokens[0]
+			// todo parse result to get sub account id
+			const { tokens: updatedTokens } = await this.queryClient.queryContractSmart(
+				this.config.accountNftAddress,
+				{
+					tokens: { owner: liquidatorAddress },
+				},
+			)
+
+			tokens = updatedTokens
 		}
 
-		return tokens[0]
+		return { liquidatorAddress, tokenId: tokens[0] }
 	}
 
 	run = async () => {
-		try {
-			// Do we need to await here? maybe refresh.then() and assign data would be faster
-			await this.refreshData()
 
-			// pop latest unhealthy position from the list
-			const targetAccountId = await this.redis.popUnhealthyRoverAccountId()
-	
-			if (targetAccountId.length == 0) {
-				//sleep to avoid spamming redis db when empty
-				await sleep(500)
-				console.log(' - No items for liquidation yet')
-				return
-			}
-	
-			await this.liquidate(targetAccountId)
-		} catch (e) {
-			console.error(e)
+		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
+		const targetAccounts : string[] = await this.redis.popUnhealthyPositions<string>(this.config.maxLiquidators)
+
+		// Sleep to avoid spamming redis db when empty.
+		if (targetAccounts.length == 0) {
+			await sleep(200)
+			console.log(' - No items for liquidation yet')
+			return
 		}
+
+		// Dispatch our liquidations 
+		const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
+		const liquidationPromises : Promise<void>[] = []
+		for (const targetAccount of targetAccounts) {
+			const liquidatorAddress : string = liquidatorAddressesIterator.next().value
+			liquidationPromises.push(this.liquidate(targetAccount, liquidatorAddress))
+		}
+
+		await Promise.allSettled(liquidationPromises)
 	}
 
-	liquidate = async (accountId: string) => {
+	liquidate = async (accountId: string, liquidatorAddress : string) => {
 		const roverPosition = await fetchRoverPosition(
 			accountId,
 			this.config.creditManagerAddress,
@@ -294,10 +335,10 @@ export class RoverExecutor extends BaseExecutor {
 		}
 
 		const result = await this.client.signAndBroadcast(
-			this.config.liquidatorAddress,
+			liquidatorAddress,
 			[
 				makeExecuteContractMessage(
-					this.config.liquidatorAddress,
+					liquidatorAddress,
 					this.config.creditManagerAddress,
 					toUtf8(JSON.stringify(msg)),
 				),
@@ -309,7 +350,6 @@ export class RoverExecutor extends BaseExecutor {
 			console.log(`Liquidation failed. TxHash: ${result.transactionHash}`)
 		} else {
 			console.log(`Liquidation successfull. TxHash: ${result.transactionHash}`)
-			// todo parse and log events?
 		}
 	}
 

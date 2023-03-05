@@ -49,7 +49,7 @@ export class RedbankExecutor extends BaseExecutor {
 	}
 
 	async start() {
-		await this.initiate()
+		await this.initiateRedis()
 
 		// run
 		while (true) {
@@ -298,7 +298,7 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.refreshData()
 
 		console.log('Checking for liquidations')
-		const positions: Position[] = await this.redis.popUnhealthyRedbankPositions(25)
+		const positions: Position[] = await this.redis.popUnhealthyPositions<Position>(25)
 
 		if (positions.length == 0) {
 			//sleep to avoid spamming redis db when empty

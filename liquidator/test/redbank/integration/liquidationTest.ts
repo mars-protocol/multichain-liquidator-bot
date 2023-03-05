@@ -212,7 +212,7 @@ const dispatchLiquidations = async (
 ) => {
 	const executor = new RedbankExecutor(config, client, cwClient)
 
-	await executor.initiate()
+	await executor.initiateRedis()
 	await executor.run()
 }
 const main = async () => {

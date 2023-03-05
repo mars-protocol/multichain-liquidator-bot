@@ -32,19 +32,22 @@ export const main = async () => {
 		prefix: process.env.PREFIX!,
 		hdPaths: paths,
 	})
-
 	const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
 
 	// produce clients
 	const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!)
 	const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
 
+	// Produce network
+	const networkEnv = process.env.NETWORK || "LOCALNET"
+	const network  = networkEnv === "MAINNET" ? Network.MAINNET : networkEnv === "TESTNET" ? Network.TESTNET : Network.LOCALNET
 	switch (executorType) {
 		case REDBANK:
-			await launchRedbank(client, queryClient, Network.MAINNET, liquidatorMasterAddress)
+			await launchRedbank(client, queryClient, network, liquidatorMasterAddress)
 			return
 		case ROVER:
-			await launchRover(client, queryClient, Network.MAINNET, liquidatorMasterAddress, liquidator)
+			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator)
+			return
 		default:
 			throw new Error(
 				`Invalid executor type. Executor type must be either ${REDBANK} or ${ROVER}, recieved ${executorType}`,
@@ -59,14 +62,11 @@ const launchRover = async (
 	liquidatorMasterAddress: string,
 	liquidatorWallet: DirectSecp256k1HdWallet,
 ) => {
-	// todo support more than one liquidator - this will be done
-	const liquidatorAddress = (await liquidatorWallet.getAccounts())[1].address
-
 	await new RoverExecutor(
-		// Change network to fit your requirements
-		getRoverConfig(liquidatorMasterAddress, liquidatorAddress, network),
+		getRoverConfig(liquidatorMasterAddress, network),
 		client,
 		wasmClient,
+		liquidatorWallet
 	).start()
 }
 

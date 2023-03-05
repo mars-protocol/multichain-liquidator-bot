@@ -1,10 +1,9 @@
 import { RedisClientType } from '@redis/client'
 import { createClient } from 'redis'
-import { Position } from './types/position'
 
 export interface IRedisInterface {
 	connect(): Promise<RedisClientType>
-	popUnhealthyRedbankPositions(count: number): Promise<Position[]>
+	popUnhealthyPositions<T>(count: number): Promise<T[]>
 	incrementBy(key: string, value: number): Promise<number>
 }
 
@@ -31,17 +30,7 @@ export class RedisInterface implements IRedisInterface {
 			: 'testing-queue'
 	}
 
-	async popUnhealthyRoverAccountId(): Promise<string> {
-		if (!this.client) {
-			throw new Error()
-		}
 
-		const record = await this.client.lPopCount(this.key, 1)
-
-		if (!record) return ''
-
-		return record[0]
-	}
 
 	/**
 	 * Fetch all addresses out of UNHEALTHY_QUEUE redis list
@@ -49,7 +38,7 @@ export class RedisInterface implements IRedisInterface {
 	 * Note that the max this can return at 1 time is 1000, any more will be left in
 	 * the list
 	 */
-	async popUnhealthyRedbankPositions(count: number): Promise<Position[]> {
+	async popUnhealthyPositions<T>(count: number): Promise<T[]> {
 		if (!this.client) {
 			console.log(`ERROR: redis client not connected`)
 			return []
