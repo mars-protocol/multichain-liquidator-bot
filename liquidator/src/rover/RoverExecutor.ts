@@ -47,7 +47,6 @@ export class RoverExecutor extends BaseExecutor {
 
 	private liquidatorAccounts: Map<string, number> = new Map()
 
-	public liquidatorAccountId = ''
 	private whitelistedCoins: string[] = []
 	private vaults: string[] = []
 	private vaultDetails: Map<string, VaultInfo> = new Map()
@@ -83,10 +82,12 @@ export class RoverExecutor extends BaseExecutor {
 		await this.topUpWallets(liquidatorAddresses)
 		
 		// Fetch or create our credit accounts for each address
-		liquidatorAddresses.forEach((address: string) => {
-			// todo - what if this fails? - how do we handle this?
-			this.createCreditAccount(address).then(({liquidatorAddress, tokenId}) => this.liquidatorAccounts.set(liquidatorAddress, tokenId))
-		})
+
+		const createCreditAccountpromises : Promise<CreateCreditAccountResponse>[] = []
+		liquidatorAddresses.map((address)=> createCreditAccountpromises.push(this.createCreditAccount(address)))
+		
+		const results : CreateCreditAccountResponse[] = await Promise.all(createCreditAccountpromises)
+		results.forEach((result)=>this.liquidatorAccounts.set(result.liquidatorAddress, result.tokenId))
 
 		// We set up 3 separate tasks to run in parallel
 		//
@@ -106,7 +107,6 @@ export class RoverExecutor extends BaseExecutor {
 
 	topUpWallets = async(addresses: string[]) => {
 		const balances = await fetchBalances(this.config.hiveEndpoint, addresses)
-		this.liquidatorBalances = balances
 		const sendMsgs : MsgSendEncodeObject[] = []
 		
 		const amountToSend = this.config.minGasTokens * 2
@@ -247,18 +247,21 @@ export class RoverExecutor extends BaseExecutor {
 			return
 		}
 
+		console.log(`liquidating ${targetAccounts.length} positions`)
 		// Dispatch our liquidations 
 		const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
 		const liquidationPromises : Promise<void>[] = []
 		for (const targetAccount of targetAccounts) {
-			const liquidatorAddress : string = liquidatorAddressesIterator.next().value
+			const next = liquidatorAddressesIterator.next()
+			const liquidatorAddress : string = next.value
 			liquidationPromises.push(this.liquidate(targetAccount, liquidatorAddress))
 		}
 
-		await Promise.allSettled(liquidationPromises)
+		await Promise.all(liquidationPromises)
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
+		console.log(`liquidating ${accountId}`)
 		const roverPosition = await fetchRoverPosition(
 			accountId,
 			this.config.creditManagerAddress,
@@ -330,8 +333,9 @@ export class RoverExecutor extends BaseExecutor {
 			refundAll,
 		]
 
+		const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
 		const msg = {
-			update_credit_account: { account_id: this.liquidatorAccountId, actions },
+			update_credit_account: { account_id: liquidatorAccountId, actions },
 		}
 
 		const result = await this.client.signAndBroadcast(
