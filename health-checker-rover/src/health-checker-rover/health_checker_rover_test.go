@@ -1,7 +1,7 @@
 package health_checker_rover
 
 import (
-	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
+	"encoding/json"
 	"testing"
 )
 
@@ -32,7 +32,7 @@ func initService() HealthCheckerRover {
 func TestWeCanGenerateAndRunJobs(t *testing.T) {
 	batchSize := 200
 	mockPosition := types.RoverHealthCheckWorkItem{
-		AccountId: "25",
+		Identifier: "25",
 	}
 
 	positions := []types.RoverHealthCheckWorkItem{}
@@ -54,25 +54,26 @@ func TestWeCanGenerateAndRunJobs(t *testing.T) {
 	if len(userResults) != len(positions) {
 		t.Errorf("Incorrect number of batches, found %d but expected %d", len(userResults), len(positions))
 	}
+
 }
 
 func TestCanFilterUnhealthyPositions(t *testing.T) {
+
 	dataA :=
-		ContractQuery{
-			Health: Health{Liquidatable: true}}
+		ContractQuery{Liquidatable: true}
 
 	dataB :=
-		ContractQuery{
-			Health: Health{Liquidatable: false}}
+		ContractQuery{Liquidatable: false}
 
+	accountId := "1234"
 	// create fake positions
 	results := []UserResult{
 		{
-			Address:       "aaaaaa",
+			AccountId:     accountId,
 			ContractQuery: dataA,
 		},
 		{
-			Address:       "bbbbbb",
+			AccountId:     "2",
 			ContractQuery: dataB,
 		},
 	}
@@ -81,6 +82,17 @@ func TestCanFilterUnhealthyPositions(t *testing.T) {
 
 	unhealthy := service.produceUnhealthyPositions(results)
 
+	var accounts []string
+
+	for _, item := range unhealthy {
+		var account string
+		json.Unmarshal(item, &account)
+		accounts = append(accounts, account)
+	}
+
+	if accounts[0] != accountId {
+		t.Fatalf("expected first account to equal 1")
+	}
 	if len(unhealthy) != 1 {
 		t.Fatalf("Expected 1 unhealthy position, found %d", len(unhealthy))
 	}

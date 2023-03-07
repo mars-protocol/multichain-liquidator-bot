@@ -25,6 +25,7 @@ type ContractQuery struct {
 type Wasm struct {
 	ContractQuery ContractQuery `json:"contractQuery"`
 }
+
 type Data struct {
 	Wasm Wasm `json:"wasm"`
 }
@@ -40,10 +41,8 @@ type UserPosition struct {
 }
 
 type UserResult struct {
-	Address       string
+	AccountId     string
 	ContractQuery ContractQuery
-	Debts         []types.Asset
-	Collateral    []types.Asset
 }
 
 // BatchEventsResponse defines the format for batch position responses
@@ -105,7 +104,7 @@ func (hive *RoverHive) FetchBatch(
 
 		for accountId, data := range event.Data {
 			userResults = append(userResults, UserResult{
-				Address:       accountId,
+				AccountId:     accountId,
 				ContractQuery: data.ContractQuery,
 			})
 		}
