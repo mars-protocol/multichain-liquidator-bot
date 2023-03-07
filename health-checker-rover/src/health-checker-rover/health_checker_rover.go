@@ -142,7 +142,7 @@ func (s *HealthCheckerRover) produceUnhealthyPositions(results []UserResult) [][
 		liquidatable := userResult.ContractQuery.Liquidatable
 		if liquidatable {
 
-			positionDecoded, decodeError := json.Marshal(userResult)
+			positionDecoded, decodeError := json.Marshal(userResult.AccountId)
 			if decodeError == nil {
 				unhealthyPositions = append(unhealthyPositions, positionDecoded)
 			} else {
@@ -272,15 +272,15 @@ func (s *HealthCheckerRover) RunWorkerPool(jobs []worker_pool.Job) ([]UserResult
 		select {
 		case r, ok := <-wp.Results():
 
-			if !ok {
-				fmt.Println(fmt.Errorf("An unknown error occurred fetching data."))
-				continue
-			}
-
 			if r.Err != nil {
 				s.logger.WithFields(logrus.Fields{
 					"error": r.Err,
 				}).Error("Unable to fetch data")
+				continue
+			}
+
+			if !ok {
+				s.logger.Error("An unknown error occurred fetching data")
 				continue
 			}
 
