@@ -13,7 +13,7 @@ func Test_weCanQueryAccounts(t *testing.T) {
 	batchSize := 200
 
 	mockPosition := types.RoverHealthCheckWorkItem{
-		AccountId: "25",
+		Identifier: "25",
 	}
 
 	positions := []types.RoverHealthCheckWorkItem{}
@@ -36,6 +36,6 @@ func Test_weCanQueryAccounts(t *testing.T) {
 		t.Errorf("Length was incorrect. Expected %d but got %d", expectedLength, actualLength)
 	}
 
-	liquidatable := result[0].ContractQuery.Health.Liquidatable
+	liquidatable := result[0].ContractQuery.Liquidatable
 	fmt.Printf("liquidatable: %t", liquidatable)
 }

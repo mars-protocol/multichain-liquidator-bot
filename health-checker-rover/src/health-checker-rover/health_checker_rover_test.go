@@ -32,7 +32,7 @@ func initService() HealthCheckerRover {
 func TestWeCanGenerateAndRunJobs(t *testing.T) {
 	batchSize := 200
 	mockPosition := types.RoverHealthCheckWorkItem{
-		AccountId: "25",
+		Identifier: "25",
 	}
 
 	positions := []types.RoverHealthCheckWorkItem{}
@@ -58,21 +58,19 @@ func TestWeCanGenerateAndRunJobs(t *testing.T) {
 
 func TestCanFilterUnhealthyPositions(t *testing.T) {
 	dataA :=
-		ContractQuery{
-			Health: Health{Liquidatable: true}}
+		ContractQuery{Liquidatable: true}
 
 	dataB :=
-		ContractQuery{
-			Health: Health{Liquidatable: false}}
+		ContractQuery{Liquidatable: false}
 
 	// create fake positions
 	results := []UserResult{
 		{
-			Address:       "aaaaaa",
+			AccountId:     "1",
 			ContractQuery: dataA,
 		},
 		{
-			Address:       "bbbbbb",
+			AccountId:     "2",
 			ContractQuery: dataB,
 		},
 	}
