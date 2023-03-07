@@ -24,7 +24,7 @@ import {
 	UncollateralizedLoanLimitResponse,
 	UserDebtResponse,
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
-import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
+import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 
 interface CreateCreditAccountResponse {
 	tokenId : number
@@ -37,6 +37,7 @@ export interface RoverExecutorConfig extends BaseExecutorConfig {
 	accountNftAddress: string
 	minGasTokens: number
 	maxLiquidators: number
+	stableBalanceThreshold : number
 }
 export class RoverExecutor extends BaseExecutor {
 	private VAULT_RELOAD_WINDOW = 1800000
@@ -46,6 +47,7 @@ export class RoverExecutor extends BaseExecutor {
 	private creditLineCaps: UncollateralizedLoanLimitResponse[] = []
 
 	private liquidatorAccounts: Map<string, number> = new Map()
+	private liquidatorBalances : Map<string, Coin[]> = new Map()
 
 	private whitelistedCoins: string[] = []
 	private vaults: string[] = []
@@ -107,6 +109,7 @@ export class RoverExecutor extends BaseExecutor {
 
 	topUpWallets = async(addresses: string[]) => {
 		const balances = await fetchBalances(this.config.hiveEndpoint, addresses)
+		this.liquidatorBalances= balances
 		const sendMsgs : MsgSendEncodeObject[] = []
 		
 		const amountToSend = this.config.minGasTokens * 2
@@ -338,15 +341,27 @@ export class RoverExecutor extends BaseExecutor {
 			update_credit_account: { account_id: liquidatorAccountId, actions },
 		}
 
+		const msgs : EncodeObject[] = [
+			makeExecuteContractMessage(
+				liquidatorAddress,
+				this.config.creditManagerAddress,
+				toUtf8(JSON.stringify(msg)),
+			),
+		]
+		
+		// add msg to send liquidators STABLE balance to master address. This will only send previously accrued 
+		// winnings, but not those from the current liquidation (if successfull)
+		const liquidatorBalances = this.liquidatorBalances.get(liquidatorAddress)
+		const stable = liquidatorBalances?.find((coin)=> coin.denom === this.config.neutralAssetDenom)
+
+		if (stable!== undefined && new BigNumber(stable.amount).isGreaterThan(this.config.stableBalanceThreshold)) {
+			const sendMsg = makeSendMessage(liquidatorAddress, this.config.liquidatorMasterAddress, [stable])
+			msgs.push(sendMsg)
+		}
+		
 		const result = await this.client.signAndBroadcast(
 			liquidatorAddress,
-			[
-				makeExecuteContractMessage(
-					liquidatorAddress,
-					this.config.creditManagerAddress,
-					toUtf8(JSON.stringify(msg)),
-				),
-			],
+			msgs,
 			'auto',
 		)
 

@@ -21,7 +21,8 @@ export const getConfig = (
 			logResults: false,
 			redisEndpoint: process.env.REDIS_ENDPOINT || '', // recommend using local
 			poolsRefreshWindow: 60000,
-			maxLiquidators: 100
+			maxLiquidators: 100,
+			stableBalanceThreshold: 5000000
 		}
 	}
 
@@ -41,6 +42,7 @@ export const getConfig = (
 		logResults: false,
 		redisEndpoint: process.env.REDIS_ENDPOINT || '', // recommend using local
 		poolsRefreshWindow: 60000,
-		maxLiquidators: 100
+		maxLiquidators: 100,
+		stableBalanceThreshold : 5000000
 	}
 }
