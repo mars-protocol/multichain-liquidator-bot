@@ -13,6 +13,19 @@ export const produceUserPositionQuery = (user: string, redbankAddress: string): 
     }`
 }
 
+export const produceBalanceQuery = (
+  address: string
+) : string => {
+  return `{
+    ${address}:bank {
+      balance(address:"${address}") {
+        amount
+        denom
+      }
+    }
+}`
+}
+
 export const produceRedbankGeneralQuery = (
 	address: string,
 	redbankAddress: string,

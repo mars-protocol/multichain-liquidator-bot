@@ -28,6 +28,7 @@ export interface TestConfig {
 		lockedVault: boolean
 		unlockingVault: boolean
 		unlockedVault: boolean
+		liquidateMany: boolean
 	}
 }
 
@@ -55,15 +56,16 @@ export const testnetConfig: TestConfig = {
 
 	// configure what tests you want to run
 	tests: {
-		simpleCoin: false,
-		marketDisabled: false,
-		coinDisabled: false,
-		lpTokenCollateral: false,
-		creditLineExceeded: false,
-		illiquidRedbank: false,
-		lockedVault: false,
+		simpleCoin: true,
+		marketDisabled: true,
+		coinDisabled: true,
+		lpTokenCollateral: true,
+		creditLineExceeded: true,
+		illiquidRedbank: true,
+		lockedVault: true,
 		unlockingVault: true,
-		unlockedVault: false,
+		unlockedVault: true,
+		liquidateMany: true
 	},
 }
 
@@ -99,5 +101,6 @@ export const localnetConfig: TestConfig = {
 		lockedVault: false,
 		unlockingVault: false,
 		unlockedVault: false,
+		liquidateMany: true
 	},
 }

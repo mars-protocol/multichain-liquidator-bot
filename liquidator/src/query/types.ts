@@ -1,5 +1,6 @@
 import BigNumber from 'bignumber.js'
-import { Coin } from 'cosmology'
+import { Coin } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 import {
 	UncollateralizedLoanLimitResponse,
@@ -54,9 +55,7 @@ export interface RoverData {
 }
 
 export interface CoreDataResponse {
-	bank: {
-		balance: Coin[]
-	}
+	bank: Balances
 	wasm: {
 		markets: MarketInfo[]
 		prices: PriceResponse[]
@@ -65,6 +64,10 @@ export interface CoreDataResponse {
 		creditLineCaps: UncollateralizedLoanLimitResponse[]
 		routes: SwapperRoute[]
 	}
+}
+
+export interface Balances {
+		balance: Coin[]
 }
 
 export interface VaultInfoWasm {
@@ -78,4 +81,8 @@ export interface VaultInfoWasm {
 
 export interface VaultDataResponse {
 	[key: string]: VaultInfoWasm
+}
+
+export interface LiquidatorBalanceResponse {
+	[key: string]: Balances
 }
