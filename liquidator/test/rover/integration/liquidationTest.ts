@@ -86,7 +86,8 @@ const runTests = async (testConfig: TestConfig) => {
 		neutralAssetDenom: testConfig.usdcDenom,
 		redisEndpoint: '', // not required for integration tests
 		poolsRefreshWindow: 60000,
-		maxLiquidators
+		maxLiquidators,
+		stableBalanceThreshold: 10000000
 	}
 
 	// Set up our liquidator
