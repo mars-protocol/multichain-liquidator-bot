@@ -215,16 +215,33 @@ export class LiquidationActionGenerator {
 
 		return actions
 	}
+	
+	private getAvailablePools = (): string[] => {
+		const pools : string[] = []
+		
+		this.swapperRoutes.forEach((route) => {
+			route.route.forEach((hop) => {
+				// Check if we have already pushed that pool
+				if (pools.find((pool)=> pool === hop.pool_id) === undefined) {
+					pools.push(hop.pool_id)
+				}
+			})
+		})
+
+		return pools
+	}
 
 	private isViableRoute = (route: RouteHop[]): boolean => {
-		// Filter to just routes that are viable in the swapper
+
 		return (
 			route.filter(
 				(hop) =>
 					this.swapperRoutes.find(
 						(swapperRoute) =>
-							swapperRoute.denom_in === hop.tokenInDenom &&
-							swapperRoute.denom_out === hop.tokenOutDenom,
+							(swapperRoute.denom_in === hop.tokenInDenom &&
+							swapperRoute.denom_out === hop.tokenOutDenom) ||
+							(swapperRoute.denom_in === hop.tokenOutDenom &&
+								swapperRoute.denom_out === hop.tokenInDenom),
 					) !== undefined,
 			).length > 0
 		)
@@ -247,9 +264,13 @@ export class LiquidationActionGenerator {
 		outAmount: string,
 	): Action[] => {
 		const bnOut = new BigNumber(outAmount)
+
+		const swapperPools = this.getAvailablePools()
+		const usablePools = this.router.getPools().filter((pool)=> swapperPools.indexOf(pool.id.toString()) !== -1)
+		this.router.setPools(usablePools)
+
 		const routes: RouteHop[][] = this.router.getRoutes(assetInDenom, assetOutDenom)
 
-		// filter routes by those available in the swap router
 		const enabledRoutes = routes.filter((route) => this.isViableRoute(route))
 		const route = this.router.getRouteWithLowestInput(bnOut, enabledRoutes)
 
