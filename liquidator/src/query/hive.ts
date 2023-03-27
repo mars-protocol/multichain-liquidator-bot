@@ -1,7 +1,6 @@
 import { Position } from '../types/position'
 import fetch from 'cross-fetch'
-import { Positions } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
-import { Coin } from '@cosmjs/amino'
+import { Coin, Positions } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { MarketInfo } from '../rover/types/MarketInfo'
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 import { NO_ROVER_DATA } from '../rover/constants/errors'
@@ -12,10 +11,11 @@ import {
 	produceVaultQuery,
 } from './queries/rover'
 import { REDEEM_BASE } from '../constants'
-import { produceRedbankGeneralQuery, produceUserPositionQuery } from './queries/redbank'
+import { produceBalanceQuery, produceRedbankGeneralQuery, produceUserPositionQuery } from './queries/redbank'
 import {
 	CoreDataResponse,
 	DataResponse,
+	LiquidatorBalanceResponse,
 	RoverData,
 	VaultDataResponse,
 	VaultInfo,
@@ -122,6 +122,7 @@ export const fetchRoverPosition = async (
 	creditManagerAddress: string,
 	hiveEndpoint: string,
 ): Promise<Positions> => {
+
 	const query = { query: produceRoverAccountPositionQuery(accountId, creditManagerAddress) }
 	// post to hive endpoint
 	const response = await fetch(hiveEndpoint, {
@@ -159,4 +160,30 @@ export const fetchRedbankBatch = async (
 	})
 
 	return (await response.json()) as DataResponse[]
+}
+
+export const fetchBalances = async (hiveEndpoint: string, addresses: string[]) : Promise<Map<string, Coin[]>> => {
+
+	const queries = addresses.map((address) => {
+		return {
+			query: produceBalanceQuery(address),
+		}
+	})
+
+	const response = await fetch(hiveEndpoint, {
+		method: 'post',
+		body: JSON.stringify(queries),
+		headers: { 'Content-Type': 'application/json' },
+	})
+
+	const resultJson = await response.json() as {data : LiquidatorBalanceResponse} []
+	const balancesMap : Map<string, Coin[]>= new Map()
+	
+	resultJson.forEach((result) => {
+		const liquidatorAddress : string = Object.keys(result.data).pop()!
+		const coins : Coin[] = result.data[liquidatorAddress].balance
+		balancesMap.set(liquidatorAddress, coins)
+	})
+
+	return balancesMap
 }

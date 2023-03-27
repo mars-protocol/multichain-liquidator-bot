@@ -4,6 +4,7 @@ import {
 	produceSigningCosmWasmClient,
 	produceSigningStargateClient,
 	setPrice,
+	sleep,
 } from '../../../src/helpers'
 import { createCreditAccount, updateCreditAccount } from './roverTestHelpers'
 import {
@@ -26,6 +27,7 @@ import { toUtf8 } from '@cosmjs/encoding'
 import { TestConfig, testnetConfig } from './config'
 import BigNumber from 'bignumber.js'
 import { AMMRouter } from '../../../src/AmmRouter'
+import { RedisInterface } from '../../../src/redis'
 
 const runTests = async (testConfig: TestConfig) => {
 	// Test results
@@ -41,14 +43,20 @@ const runTests = async (testConfig: TestConfig) => {
 		unlockedVault: false,
 		coinBigger: false,
 		vaultBigger: false,
+		liquidateMany: false
 	}
+
+	const maxLiquidators  = 10
+	const accountIndexes : number[] = Array.from(Array(maxLiquidators).keys())
+
 	// set up master services + details
-	const { client, cwClient, address, wallet } = await createServices(
+	const { client, cwClient, wallet} = await createServices(
 		testConfig.rpcEndpoint,
 		testConfig.creditManagerAddress,
 		testConfig.accountNFTAddress,
 		testConfig.seed,
 		testConfig.prefix,
+		accountIndexes
 	)
 
 	const masterAddress = (await wallet.getAccounts())[0].address
@@ -67,7 +75,6 @@ const runTests = async (testConfig: TestConfig) => {
 		redbankAddress: testConfig.redbankAddress,
 		oracleAddress: testConfig.oracleAddress,
 		swapperAddress: testConfig.swapperAddress,
-		liquidatorAddress: address,
 		accountNftAddress: testConfig.accountNFTAddress,
 		gasDenom: testConfig.gasDenom,
 		hiveEndpoint: testConfig.hiveEndpoint,
@@ -77,15 +84,15 @@ const runTests = async (testConfig: TestConfig) => {
 		minGasTokens: 100000,
 		logResults: true,
 		neutralAssetDenom: testConfig.usdcDenom,
-		redisEndpoint: 'http://127.0.0.1:6379', // not required for integration tests
+		redisEndpoint: '', // not required for integration tests
 		poolsRefreshWindow: 60000,
+		maxLiquidators,
+		stableBalanceThreshold: 10000000
 	}
 
 	// Set up our liquidator
-	const executorLiquidator = new RoverExecutor(config, client, cwClient)
-	await executorLiquidator.initiate()
-	const tokenId = await executorLiquidator.setUpAccount()
-	executorLiquidator.liquidatorAccountId = tokenId
+	const executorLiquidator = new RoverExecutor(config, client, cwClient, wallet)
+	await executorLiquidator.initiateRedis()
 	await executorLiquidator.refreshData()
 
 	if (testConfig.tests.lockedVault) {
@@ -175,8 +182,128 @@ const runTests = async (testConfig: TestConfig) => {
 		)
 	}
 
+	if (testConfig.tests.liquidateMany) {
+		results.liquidateMany = await runLiquidateAllTest(
+			testConfig,
+			cwClient,
+			client,
+			executorLiquidator,
+			masterAddress,
+			config
+		)
+	}
+
 	console.log('Finished All Test Cases')
 	console.log({ results })
+}
+
+const runLiquidateAllTest = async (
+	testConfig: TestConfig,
+	cwClient: SigningCosmWasmClient,
+	client: SigningStargateClient,
+	executor: RoverExecutor,
+	masterAddress: string,
+	config: RoverExecutorConfig,
+) : Promise<boolean> => {
+	try {
+		console.log('Starting liquidate multiple test')
+		const queueName = process.env.LIQUIDATION_QUEUE_NAME!
+		const redisClient = await new RedisInterface().connect()
+
+		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
+		// Set up our liquidatees
+		const amount = '100000'
+		const victimAccountId1 = await createVictimCoinPosition(
+			testConfig,
+			client,
+			masterAddress,
+			[{ denom: 'uosmo', amount: '140000' }],
+			{
+				amount: amount,
+				denom: 'uosmo',
+			},
+			{
+				amount: new BigNumber(amount).dividedBy(estimatedPrice).dividedBy(2).toFixed(0),
+				denom: testConfig.atomDenom,
+			},
+		)
+
+		const victimAccountId2 = await createVictimCoinPosition(
+			testConfig,
+			client,
+			masterAddress,
+			[{ denom: 'uosmo', amount: '140000' }],
+			{
+				amount: amount,
+				denom: 'uosmo',
+			},
+			{
+				amount: new BigNumber(amount).dividedBy(estimatedPrice).dividedBy(2).toFixed(0),
+				denom: testConfig.atomDenom,
+			},
+		)
+
+		const victimAccountId3 = await createVictimCoinPosition(
+			testConfig,
+			client,
+			masterAddress,
+			[{ denom: 'uosmo', amount: '140000' }],
+			{
+				amount: amount,
+				denom: 'uosmo',
+			},
+			{
+				amount: new BigNumber(amount).dividedBy(estimatedPrice).dividedBy(2).toFixed(0),
+				denom: testConfig.atomDenom,
+			},
+		)
+
+		const accountIds = [victimAccountId1, victimAccountId2, victimAccountId3]
+		await redisClient.lPush(queueName, accountIds)
+
+		await setPrice(
+			cwClient,
+			masterAddress,
+			testConfig.atomDenom,
+			estimatedPrice.multipliedBy(1.35).toFixed(6),
+			config.oracleAddress,
+		)
+
+		await executor.start()
+		
+		let liquidated = false
+		let startTime = Date.now()
+		const second = 1000
+		while (!liquidated && startTime + (20 * second) > Date.now()) {
+			const healthFactorPromises = accountIds.map((accountId) => cwClient.queryContractSmart(testConfig.creditManagerAddress, {health: {account_id : accountId}}))
+			const newHealthFactorResults = await Promise.all(healthFactorPromises)
+			liquidated = (!newHealthFactorResults[0].liquidatable && !newHealthFactorResults[1].liquidatable && !newHealthFactorResults[2].liquidatable)
+
+			if (liquidated) {
+				console.log(newHealthFactorResults)
+			}
+		
+			await sleep(1 * second)
+		}
+
+		if (!liquidated) {
+			console.log('Failed to liquidate all positions')
+		}
+		console.log('Finished multi liquidation test')
+		return liquidated
+	} catch (e) {
+		console.error(e)
+		return false
+	} finally {
+		await resetPrice(
+			testConfig.atomDenom,
+			testConfig.oracleAddress,
+			masterAddress,
+			testConfig.osmoAtomPoolId,
+			client,
+		)
+		process.exit(0)
+	}
 }
 
 const runUnlockingVaultTest = async (
@@ -215,7 +342,7 @@ const runUnlockingVaultTest = async (
 			estimatedPrice.multipliedBy(2).toFixed(6),
 			config.oracleAddress,
 		)
-		await executor.liquidate(victimAccountId)
+		await executor.liquidate(victimAccountId, masterAddress)
 	} catch (e) {
 		console.error(e)
 		return false
@@ -280,7 +407,7 @@ const runLockedVaultTest = async (
 			estimatedPrice.multipliedBy(2).toFixed(6),
 			config.oracleAddress,
 		)
-		await executor.liquidate(victimAccountId)
+		await executor.liquidate(victimAccountId, masterAddress)
 		await resetPrice(
 			testConfig.atomDenom,
 			testConfig.oracleAddress,
@@ -334,7 +461,7 @@ const runCoinBorrowTest = async (
 			estimatedPrice.multipliedBy(1.4).toFixed(6),
 			config.oracleAddress,
 		)
-		await executor.liquidate(victimAccountId)
+		await executor.liquidate(victimAccountId,masterAddress)
 
 		console.log('Finished simple test')
 	} catch (e) {
@@ -481,7 +608,7 @@ const lpCoinLiquidate = async (
 		)
 
 		await executor.refreshData()
-		await executor.liquidate(victimAccountId)
+		await executor.liquidate(victimAccountId, masterAddress)
 
 		console.log('Finished simple test')
 	} catch (e) {
@@ -553,7 +680,7 @@ const liquidateCoinWithMarketDisabled = async (
 			estimatedPrice.multipliedBy(1.4).toFixed(6),
 			config.oracleAddress,
 		)
-		await executor.liquidate(victimAccountId)
+		await executor.liquidate(victimAccountId, masterAddress)
 
 		console.log('Completed market disabled test')
 	} catch (e) {
@@ -660,7 +787,7 @@ const runIlliquidRedbankTest = async (
 
 		await executor.refreshData()
 
-		await executor.liquidate(victimAccountId)
+		await executor.liquidate(victimAccountId, masterAddress)
 
 		// return assets
 		console.log('Completed illiquid market test')
@@ -683,7 +810,7 @@ const runCreditLineExceededCoinTest = async (
 	testConfig: TestConfig,
 	client: SigningStargateClient,
 	executor: RoverExecutor,
-	masterAddress: string,
+	masterAddress: string
 ): Promise<boolean> => {
 	try {
 		console.log('Starting creditLine exceeded test')
@@ -746,8 +873,9 @@ const runCreditLineExceededCoinTest = async (
 
 		// refresh market data before liquidation
 		await executor.refreshData()
-		console.log('liquidating')
-		await executor.liquidate(victimAccountId)
+
+		// todo fix tests
+		await executor.liquidate(victimAccountId, masterAddress)
 
 		console.log('Completed credit line exceeded test')
 	} catch (e) {
@@ -837,7 +965,7 @@ const nonWhitelistedCoinTest = async (
 		// refresh market data
 		await executor.refreshData()
 
-		await executor.liquidate(victimAccount)
+		await executor.liquidate(victimAccount, masterAddress)
 	} catch (e) {
 		console.error(e)
 		return false
@@ -867,7 +995,7 @@ const createServices = async (
 	accountNft: string,
 	seed: string,
 	prefix: string,
-	accountIndex: number = 0,
+	accountIndexes: number[] = [0],
 ): Promise<{
 	client: SigningStargateClient
 	cwClient: SigningCosmWasmClient
@@ -878,12 +1006,12 @@ const createServices = async (
 	address: string
 }> => {
 	const wallet =
-		accountIndex === 0
+		accountIndexes.length === 1
 			? await getWallet(seed, prefix)
-			: await getWallet(seed, prefix, [makeCosmoshubPath(0), makeCosmoshubPath(accountIndex)])
+			: await getWallet(seed, prefix, accountIndexes.map((index)=> makeCosmoshubPath(index)))
 
 	const accounts = await wallet.getAccounts()
-	const address = accounts[accountIndex].address
+	const address = accounts[accountIndexes[0]].address
 
 	const client = await produceSigningStargateClient(rpcEndpoint, wallet)
 	const cwClient = await produceSigningCosmWasmClient(rpcEndpoint, wallet)
@@ -962,7 +1090,6 @@ const resetPrice = async (
 const getEstimatedPoolPrice = (ammRouter: AMMRouter, assetDenom: string): BigNumber => {
 	const amountOut = new BigNumber(1000000000)
 	const osmoAtomRoute = ammRouter.getBestRouteGivenOutput(assetDenom, 'uosmo', amountOut)
-	console.log({ osmoAtomRoute })
 	const estimatedPrice = amountOut.dividedBy(ammRouter.getRequiredInput(amountOut, osmoAtomRoute))
 	return estimatedPrice
 }
@@ -1103,6 +1230,7 @@ const createVictimCoinPosition = async (
 
 	const victimAccountId = await createCreditAccount(victimAddress, vNft, vExec)
 
+	console.log({borrowCoin})
 	// create fist victim - todo generalise this
 	await updateCreditAccount(
 		[
