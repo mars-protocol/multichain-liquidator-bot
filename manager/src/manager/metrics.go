@@ -329,10 +329,11 @@ func (service *Manager) submitMetrics(metrics []Metric) error {
 	api := datadogV2.NewMetricsApi(apiClient)
 
 	for _, metric := range metrics {
+		metricName := fmt.Sprintf("%s_", service.workItemType) + metric.Name
 		body := datadogV2.MetricPayload{
 			Series: []datadogV2.MetricSeries{
 				{
-					Metric: metric.Name,
+					Metric: metricName,
 					Type:   datadogV2.METRICINTAKETYPE_UNSPECIFIED.Ptr(),
 					Points: []datadogV2.MetricPoint{
 						{
@@ -352,12 +353,12 @@ func (service *Manager) submitMetrics(metrics []Metric) error {
 		_, _, err := api.SubmitMetrics(ctx, body, *datadogV2.NewSubmitMetricsOptionalParameters())
 		if err != nil {
 			service.logger.WithFields(logrus.Fields{
-				"metric": metric.Name,
+				"metric": metricName,
 				"error":  err,
 			}).Warning("Unable to submit metric to DataDog")
 		} else {
 			service.logger.WithFields(logrus.Fields{
-				"metric": metric.Name,
+				"metric": metricName,
 				"value":  metric.Value,
 			}).Debug("Submitted metric")
 		}
