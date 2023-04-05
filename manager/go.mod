@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.16.12
 	github.com/aws/aws-sdk-go-v2/config v1.17.3
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.18.17
-	github.com/docker/docker v20.10.17+incompatible
+	github.com/docker/docker v23.0.3+incompatible
 	github.com/gogo/protobuf v1.3.3
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
