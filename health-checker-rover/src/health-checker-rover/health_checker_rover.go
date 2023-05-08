@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"time"
+	"strings"
 
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
@@ -141,8 +142,8 @@ func (s *HealthCheckerRover) produceUnhealthyPositions(results []UserResult) [][
 	for _, userResult := range results {
 		liquidatable := userResult.ContractQuery.Liquidatable
 		if liquidatable {
-
-			positionDecoded, decodeError := json.Marshal(userResult.AccountId)
+			s.logger.Infof("User %v is liquidatable", userResult.AccountId)
+			positionDecoded, decodeError := json.Marshal(strings.TrimPrefix(userResult.AccountId, "account_"))
 			if decodeError == nil {
 				unhealthyPositions = append(unhealthyPositions, positionDecoded)
 			} else {
@@ -240,7 +241,10 @@ func (s *HealthCheckerRover) Run() error {
 			s.logger.WithFields(logrus.Fields{
 				"total": len(unhealthyPositions),
 			}).Info("Found unhealthy positions")
+
 		}
+
+
 		// Log the total amount of unhealthy positions
 		s.metricsCache.IncrementBy("health_checker_rover.unhealthy.total", int64(len(unhealthyPositions)))
 
