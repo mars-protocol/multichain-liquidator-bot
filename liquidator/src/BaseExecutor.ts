@@ -119,15 +119,37 @@ export class BaseExecutor {
 			this.config.oracleAddress,
 		)
 
-		this.markets = wasm.markets.map((market: MarketInfo) => this.applyAvailableLiquidity(market))
 		bank.balance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
 		wasm.prices.forEach((price: PriceResponse) => this.prices.set(price.denom, Number(price.price)))
-
+		
+		await this.refreshMarketData()
 		await this.refreshPoolData()
+	}
+
+	refreshMarketData = async() => {
+		let markets : MarketInfo[] = []
+		let fetching = true
+		let start_after = ""
+		while (fetching) {
+			const response = await this.queryClient.queryContractSmart(this.config.redbankAddress, {
+				markets: {
+					start_after,
+				},
+			})
+		
+			start_after = response[response.length - 1] ? response[response.length - 1].denom : ""
+			markets = markets.concat(response)
+			fetching = response.length === 5
+		}
+
+		this.markets = markets.map((market: MarketInfo) =>
+			this.applyAvailableLiquidity(market),
+		)
 	}
 
 	refreshPoolData = async () => {
 		const currentTime = Date.now()
+
 		if (this.poolsNextRefresh < currentTime) {
 
 			const pools = await this.loadPools()
@@ -146,6 +168,12 @@ export class BaseExecutor {
 				`${this.config.lcdEndpoint}/osmosis/gamm/v1beta1/pools${nextKey}`,
 			)
 			const responseJson: any = await response.json()
+			
+			if (responseJson.pagination === undefined) {
+				fetchedAllPools = true
+				return pools
+			}
+
 			const pagination = camelCaseKeys(responseJson.pagination) as Pagination
 
 			// osmosis lcd query returns total pool count as 0 after page 1 (but returns the correct count on page 1), so we need to only set it once

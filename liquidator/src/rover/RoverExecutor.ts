@@ -18,7 +18,6 @@ import BigNumber from 'bignumber.js'
 import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { MarketInfo } from './types/MarketInfo'
 import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/errors'
 import {
 	UncollateralizedLoanLimitResponse,
@@ -71,7 +70,7 @@ export class RoverExecutor extends BaseExecutor {
 	// Entry to rover executor
 	start = async () => {
 		await this.initiateRedis()
-
+		await this.refreshData()
 		// set up accounts
 		const accounts = await this.wallet.getAccounts()
 
@@ -94,9 +93,9 @@ export class RoverExecutor extends BaseExecutor {
 		// We set up 3 separate tasks to run in parallel
 		//
 		// Refresh the data such as pool data, vaults,
-		setInterval(this.refreshData, 5*1000)
+		setInterval(this.refreshData, 30*1000)
 		// Ensure our liquidator wallets have more than enough funds to operate
-		setInterval(this.updateLiquidatorBalances, 5*1000)
+		setInterval(this.updateLiquidatorBalances, 20*1000)
 		// check for and dispatch liquidations
 		setInterval(this.run, 200)
 	}
@@ -180,14 +179,14 @@ export class RoverExecutor extends BaseExecutor {
 			this.vaults,
 		)
 
-		this.markets = roverData.markets.map((market: MarketInfo) =>
-			this.applyAvailableLiquidity(market),
-		)
+		await this.refreshMarketData()
+		
 		roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
 		roverData.prices.forEach((price: PriceResponse) =>
 			this.prices.set(price.denom, Number(price.price)),
 		)
 		this.whitelistedCoins = roverData.whitelistedAssets! as string[]
+
 		this.vaultDetails = roverData.vaultInfo
 		this.creditLines = roverData.creditLines
 		this.creditLineCaps = roverData.creditLineCaps
@@ -250,7 +249,6 @@ export class RoverExecutor extends BaseExecutor {
 			return
 		}
 
-		console.log(`liquidating ${targetAccounts.length} positions`)
 		// Dispatch our liquidations 
 		const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
 		const liquidationPromises : Promise<void>[] = []
@@ -373,9 +371,11 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	findBestCollateral = (collaterals: Coin[], vaultPositions: VaultPosition[]): Collateral => {
+
 		const largestCollateralCoin = collaterals
 			.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
 			.pop()
+			
 		const largestCollateralVault = vaultPositions
 			.sort(
 				(vaultA, vaultB) =>
@@ -473,7 +473,7 @@ export class RoverExecutor extends BaseExecutor {
 		let vaultType: VaultPositionType = safeLocked.isGreaterThan(safeUnlocked)
 			? 'l_o_c_k_e_d'
 			: 'u_n_l_o_c_k_e_d'
-
+		
 		const largestVaultValue = this.calculateVaultSharesValue(vaultAmount, vault.vault.address)
 
 		const largestUnlockingValue = largestUnlocking
