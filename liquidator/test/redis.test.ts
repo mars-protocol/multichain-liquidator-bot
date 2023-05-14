@@ -22,6 +22,6 @@ describe('Redis Tests', () => {
 
 		const returnedPositions = await redisInterface.popUnhealthyPositions<Position>(25)
 		// // first in last out - so index is 1
-		expect(returnedPositions[1].Address).toBe(position.Address)
+		expect(returnedPositions[1].Identifier).toBe(position.Identifier)
 	})
 })
