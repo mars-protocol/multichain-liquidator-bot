@@ -11,6 +11,6 @@ export const generateRandomAsset = (): AssetResponse => {
 
 export const generateRandomPosition = (): Position => {
 	return {
-		Address: Math.random().toString(),
+		Identifier: Math.random().toString(),
 	}
 }

@@ -88,8 +88,6 @@ type DeploymentConfig struct {
 }
 
 type Config struct {
-	runtime.BaseConfig
-
 	EnvironmentConfig
 	DeploymentConfig
 }
@@ -386,7 +384,6 @@ func main() {
 
 	var environmentConfig EnvironmentConfig
 	err := envconfig.Process("", &environmentConfig)
-
 	if err != nil {
 		log.Fatalf("Unable to process config: %s", err)
 	}

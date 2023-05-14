@@ -309,6 +309,8 @@ func (service *Manager) Run() error {
 			service.logger.WithFields(logrus.Fields{
 				"offset": workItem.ContractPageOffset,
 				"limit":  workItem.ContractPageLimit,
+				"item":  string(item),
+				"queue": service.collectorQueueName,
 			}).Info("Submitted work to collector queue")
 		}
 
