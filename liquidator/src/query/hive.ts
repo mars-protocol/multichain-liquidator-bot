@@ -124,6 +124,7 @@ export const fetchRoverPosition = async (
 ): Promise<Positions> => {
 
 	const query = { query: produceRoverAccountPositionQuery(accountId, creditManagerAddress) }
+
 	// post to hive endpoint
 	const response = await fetch(hiveEndpoint, {
 		method: 'post',
@@ -149,7 +150,7 @@ export const fetchRedbankBatch = async (
 ): Promise<DataResponse[]> => {
 	const queries = positions.map((position) => {
 		return {
-			query: produceUserPositionQuery(position.Address, redbankAddress),
+			query: produceUserPositionQuery(position.Identifier, redbankAddress),
 		}
 	})
 

@@ -198,7 +198,7 @@ const pushPositionsToRedis = async (
 	for (const index in addresses) {
 		console.log(`pushing position to redis: ${addresses[index]}`)
 		const position: Position = {
-			Address: addresses[index],
+			Identifier: addresses[index],
 		}
 
 		await redisClient.lPush(queueName, JSON.stringify(position))

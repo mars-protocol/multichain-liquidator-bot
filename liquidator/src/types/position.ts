@@ -1,3 +1,3 @@
 export interface Position {
-	Address: string
+	Identifier: string
 }
