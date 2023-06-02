@@ -3,15 +3,15 @@ import { Coin } from '@cosmjs/proto-signing'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { RedisInterface } from './redis.js'
 import { AMMRouter } from './AmmRouter.js'
-import fetch from 'cross-fetch'
-import { Pagination, Pool } from './types/Pool.js'
 import 'dotenv/config.js'
 import { MarketInfo } from './rover/types/MarketInfo.js'
 import { CSVWriter, Row } from './CsvWriter.js'
-import { camelCaseKeys } from './helpers.js'
+
 import BigNumber from 'bignumber.js'
 import { fetchRedbankData } from './query/hive.js'
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types.js'
+import { PoolDataProviderInterface } from './amm/PoolDataProviderInterface.js'
+import { AstroportPoolProvider } from './amm/AstroportPoolProvider.js'
 
 export interface BaseExecutorConfig {
 	lcdEndpoint: string
@@ -31,21 +31,11 @@ export interface BaseExecutorConfig {
  * @param config holds the neccessary configuration for the executor to operate
  */
 export class BaseExecutor {
-	// Configuration should always be override by extending class
-	public config: BaseExecutorConfig
-
-	// Helpers
-	public ammRouter: AMMRouter
 
 	// Data
 	public prices: Map<string, number> = new Map()
 	public balances: Map<string, number> = new Map()
 	public markets: MarketInfo[] = []
-
-	// clients
-	public client: SigningStargateClient
-	public queryClient: CosmWasmClient
-	public redis: RedisInterface
 
 	// variables
 	private poolsNextRefresh = 0
@@ -61,19 +51,20 @@ export class BaseExecutor {
 	])
 
 	constructor(
-		config: BaseExecutorConfig,
-		client: SigningStargateClient,
-		queryClient: CosmWasmClient,
-	) {
-		this.config = config
-		this.ammRouter = new AMMRouter()
-		this.redis = new RedisInterface()
-		this.client = client
-		this.queryClient = queryClient
-	}
+		public config: BaseExecutorConfig,
+		private client: SigningStargateClient,
+		private queryClient: CosmWasmClient,
+		private poolProvider: PoolDataProviderInterface,
+		private redis : RedisInterface = new RedisInterface(),
+		public ammRouter : AMMRouter = new AMMRouter()
+	) {}
 
 	async initiateRedis(): Promise<void> {
 		await this.redis.connect(this.config.redisEndpoint)
+	}
+
+	async initiateAstroportPoolProvider(): Promise<void> {
+		await (this.poolProvider as AstroportPoolProvider).initiate()
 	}
 
 	applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {
@@ -152,45 +143,9 @@ export class BaseExecutor {
 
 		if (this.poolsNextRefresh < currentTime) {
 
-			const pools = await this.loadPools()
+			const pools = await this.poolProvider.loadPools()
 			this.ammRouter.setPools(pools)
 			this.poolsNextRefresh = Date.now() + this.config.poolsRefreshWindow
 		}
-	}
-
-	loadPools = async (): Promise<Pool[]> => {
-		let fetchedAllPools = false
-		let nextKey = ''
-		let pools: Pool[] = []
-		let totalPoolCount = 0
-		while (!fetchedAllPools) {
-			const response = await fetch(
-				`${this.config.lcdEndpoint}/osmosis/gamm/v1beta1/pools${nextKey}`,
-			)
-			const responseJson: any = await response.json()
-			
-			if (responseJson.pagination === undefined) {
-				fetchedAllPools = true
-				return pools
-			}
-
-			const pagination = camelCaseKeys(responseJson.pagination) as Pagination
-
-			// osmosis lcd query returns total pool count as 0 after page 1 (but returns the correct count on page 1), so we need to only set it once
-			if (totalPoolCount === 0) {
-				totalPoolCount = pagination.total
-			}
-
-			const poolsRaw = responseJson.pools as Pool[]
-
-			poolsRaw.forEach((pool) => pools.push(camelCaseKeys(pool) as Pool))
-
-			nextKey = `?pagination.key=${pagination.nextKey}`
-			if (pools.length >= totalPoolCount) {
-				fetchedAllPools = true
-			}
-		}
-
-		return pools
 	}
 }
