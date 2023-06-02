@@ -111,9 +111,7 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
                 return pairs
             } else {
 
-                batchPairs.forEach((pair) => {
-                    pairs.push(pair)
-                })
+                pairs.concat(batchPairs)
 
                 let assets = pairs[pairs.length - 1].asset_infos
                 startAfter = `[
