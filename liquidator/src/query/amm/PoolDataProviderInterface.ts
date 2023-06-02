@@ -1,4 +1,4 @@
-import { Pool } from "../types/Pool";
+import { Pool } from "../../types/Pool";
 
 export interface PoolDataProviderInterface {
 

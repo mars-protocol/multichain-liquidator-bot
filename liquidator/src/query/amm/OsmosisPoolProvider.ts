@@ -1,5 +1,5 @@
-import { camelCaseKeys } from "../helpers";
-import { Pagination, Pool } from "../types/Pool";
+import { camelCaseKeys } from "../../helpers";
+import { Pagination, Pool } from "../../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
 
 export class OsmosisPoolProvider implements PoolDataProviderInterface {

@@ -1,4 +1,4 @@
-import { AstroportPoolProvider } from "../../src/amm/AstroportPoolProvider"
+import { AstroportPoolProvider } from "../../src/query/amm/AstroportPoolProvider"
 
 describe("Astroport Pool Provider Tests", () => {
     const astroportFactoryContract = "neutron1jj0scx400pswhpjes589aujlqagxgcztw04srynmhf0f6zplzn2qqmhwj7"

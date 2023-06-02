@@ -17,7 +17,7 @@ import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
-import { PoolDataProviderInterface } from '../amm/PoolDataProviderInterface.js'
+import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface.js'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 
