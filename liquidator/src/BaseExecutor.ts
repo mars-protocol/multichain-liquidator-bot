@@ -133,9 +133,6 @@ export class BaseExecutor {
 	}
 
 	refreshPoolData = async () => {
-		// check chain here
-		// astroport - we do astroport pool data provider
-		// osmosis - we do osmosis pool data provider
 		const currentTime = Date.now()
 
 		if (this.poolsNextRefresh < currentTime) {
