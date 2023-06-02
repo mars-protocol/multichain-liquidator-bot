@@ -60,8 +60,9 @@ export class RoverExecutor extends BaseExecutor {
 		client: SigningStargateClient,
 		queryClient: CosmWasmClient,
 		wallet: DirectSecp256k1HdWallet,
+		poolProvider: PoolDataProviderInterface,
 	) {
-		super(config, client, queryClient)
+		super(config, client, queryClient, poolProvider)
 		this.config = config
 		this.liquidationActionGenerator = new LiquidationActionGenerator(this.ammRouter)
 		this.wallet = wallet
@@ -70,7 +71,9 @@ export class RoverExecutor extends BaseExecutor {
 	// Entry to rover executor
 	start = async () => {
 		await this.initiateRedis()
+		await this.initiateAstroportPoolProvider()
 		await this.refreshData()
+		
 		// set up accounts
 		const accounts = await this.wallet.getAccounts()
 

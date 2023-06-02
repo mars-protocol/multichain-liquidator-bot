@@ -9,6 +9,9 @@ import { getConfig as getRoverConfig } from './rover/config/osmosis'
 import { RoverExecutor } from './rover/RoverExecutor'
 import { getSecretManager } from './secretManager'
 import { Network } from './types/network'
+import { PoolDataProviderInterface } from './amm/PoolDataProviderInterface.js'
+import { OsmosisPoolProvider } from './amm/OsmosisPoolProvider.js'
+import { AstroportPoolProvider } from './amm/AstroportPoolProvider.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -24,7 +27,7 @@ export const main = async () => {
 	const addressCount = process.env.MAX_LIQUIDATORS || 1
 	const paths: HdPath[] = []
 
-	while (paths.length < addressCount) {
+	while (paths.length < Number(addressCount)) {
 		paths.push(makeCosmoshubPath(paths.length))
 	}
 
@@ -41,17 +44,31 @@ export const main = async () => {
 	// Produce network
 	const networkEnv = process.env.NETWORK || "LOCALNET"
 	const network  = networkEnv === "MAINNET" ? Network.MAINNET : networkEnv === "TESTNET" ? Network.TESTNET : Network.LOCALNET
+
+	const poolProvider = getPoolProvider(process.env.CHAIN_NAME!)
+
 	switch (executorType) {
 		case REDBANK:
-			await launchRedbank(client, queryClient, network, liquidatorMasterAddress)
+			await launchRedbank(client, queryClient, network, liquidatorMasterAddress, poolProvider)
 			return
 		case ROVER:
-			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator)
+			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator, poolProvider)
 			return
 		default:
 			throw new Error(
 				`Invalid executor type. Executor type must be either ${REDBANK} or ${ROVER}, recieved ${executorType}`,
 			)
+	}
+}
+
+const getPoolProvider = (chainName: string) : PoolDataProviderInterface => {
+	switch (chainName) {
+		case "osmosis":
+			return new OsmosisPoolProvider(process.env.LCD_ENDPOINT!)
+		case "neutron":
+			return new AstroportPoolProvider(process.env.ASTROPORT_FACTORY_CONTRACT!, process.env.GRAPHQL_ENDPOINT!)
+		default:
+			throw new Error(`Invalid chain name. Chain name must be either osmosis or neutron, recieved ${chainName}`)
 	}
 }
 
@@ -61,12 +78,15 @@ const launchRover = async (
 	network: Network,
 	liquidatorMasterAddress: string,
 	liquidatorWallet: DirectSecp256k1HdWallet,
+	poolProvider : PoolDataProviderInterface
+
 ) => {
 	await new RoverExecutor(
 		getRoverConfig(liquidatorMasterAddress, network),
 		client,
 		wasmClient,
-		liquidatorWallet
+		liquidatorWallet,
+		poolProvider
 	).start()
 }
 
@@ -75,11 +95,14 @@ const launchRedbank = async (
 	wasmClient: CosmWasmClient,
 	network: Network,
 	liquidatorAddress: string,
+	poolProvider : PoolDataProviderInterface
+
 ) => {
 	await new RedbankExecutor(
 		getRedbankConfig(liquidatorAddress, network),
 		client,
 		wasmClient,
+		poolProvider
 	).start()
 }
 

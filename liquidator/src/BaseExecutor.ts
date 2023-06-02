@@ -10,6 +10,8 @@ import { CSVWriter, Row } from './CsvWriter.js'
 import BigNumber from 'bignumber.js'
 import { fetchRedbankData } from './query/hive.js'
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types.js'
+import { PoolDataProviderInterface } from './amm/PoolDataProviderInterface.js'
+import { AstroportPoolProvider } from './amm/AstroportPoolProvider.js'
 
 export interface BaseExecutorConfig {
 	lcdEndpoint: string
@@ -49,7 +51,7 @@ export class BaseExecutor {
 	])
 
 	constructor(
-		private config: BaseExecutorConfig,
+		public config: BaseExecutorConfig,
 		private client: SigningStargateClient,
 		private queryClient: CosmWasmClient,
 		private poolProvider: PoolDataProviderInterface,
@@ -59,6 +61,10 @@ export class BaseExecutor {
 
 	async initiateRedis(): Promise<void> {
 		await this.redis.connect(this.config.redisEndpoint)
+	}
+
+	async initiateAstroportPoolProvider(): Promise<void> {
+		await (this.poolProvider as AstroportPoolProvider).initiate()
 	}
 
 	applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {

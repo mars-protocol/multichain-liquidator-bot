@@ -17,6 +17,7 @@ import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
+import { PoolDataProviderInterface } from '../amm/PoolDataProviderInterface.js'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 
@@ -43,8 +44,9 @@ export class RedbankExecutor extends BaseExecutor {
 		config: RedbankExecutorConfig,
 		client: SigningStargateClient,
 		queryClient: CosmWasmClient,
+		poolProvider: PoolDataProviderInterface
 	) {
-		super(config, client, queryClient)
+		super(config, client, queryClient, poolProvider)
 		this.config = config
 	}
 
