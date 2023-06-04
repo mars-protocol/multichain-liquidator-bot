@@ -52,10 +52,10 @@ export class BaseExecutor {
 
 	constructor(
 		public config: BaseExecutorConfig,
-		private client: SigningStargateClient,
-		private queryClient: CosmWasmClient,
+		public client: SigningStargateClient,
+		public queryClient: CosmWasmClient,
 		private poolProvider: PoolDataProviderInterface,
-		private redis : RedisInterface = new RedisInterface(),
+		public redis : RedisInterface = new RedisInterface(),
 		public ammRouter : AMMRouter = new AMMRouter()
 	) {}
 

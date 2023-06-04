@@ -24,6 +24,7 @@ import {
 	UserDebtResponse,
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
+import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface'
 
 interface CreateCreditAccountResponse {
 	tokenId : number
