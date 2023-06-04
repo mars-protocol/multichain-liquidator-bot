@@ -2,7 +2,7 @@ import { sleep } from "../../helpers";
 import { Pool, PoolAsset } from "../../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
 import fetch from 'cross-fetch'
-import { Asset, AssetInfo, AssetInfoNative, ContractQueryPairs, ContractQueryPool, Pair, PoolResponseData, Query, ResponseData } from "./types/AstroportTypes";
+import { Asset, AssetInfoCW, AssetInfoNative, ContractQueryPairs, ContractQueryPool, Pair, PoolResponseData, Query, ResponseData } from "./types/AstroportTypes";
 
 export class AstroportPoolProvider implements PoolDataProviderInterface {
     
@@ -190,7 +190,7 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
         return startAfter
     }
 
-    private produceStartAfterAsset = (asset : AssetInfo | AssetInfoNative) => { 
+    private produceStartAfterAsset = (asset : AssetInfoCW | AssetInfoNative) => { 
         if ("token" in asset) {
             return `{
                 token: {

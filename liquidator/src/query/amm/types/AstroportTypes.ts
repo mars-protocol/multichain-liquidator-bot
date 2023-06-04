@@ -10,7 +10,7 @@ export interface Token {
     native_token: NativeToken;
   }
   
-  export interface AssetInfo {
+  export interface AssetInfoCW {
     token: Token;
   }
   
@@ -19,7 +19,7 @@ export interface Token {
   }
   
   export interface Pair {
-    asset_infos: AssetInfoNative[] | AssetInfo[];
+    asset_infos: AssetInfoNative[] | AssetInfoCW[];
     contract_addr: string;
     liquidity_token: string;
     pair_type: PairType;
@@ -54,7 +54,7 @@ export interface Token {
   }
   
   export interface Asset {
-    info: AssetInfo | AssetInfoNative;
+    info: AssetInfoCW | AssetInfoNative;
     amount: string;
   }
   
