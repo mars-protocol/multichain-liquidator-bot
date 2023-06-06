@@ -9,9 +9,11 @@ import { getConfig as getRoverConfig } from './rover/config/osmosis'
 import { RoverExecutor } from './rover/RoverExecutor'
 import { getSecretManager } from './secretManager'
 import { Network } from './types/network'
-import { PoolDataProviderInterface } from './amm/PoolDataProviderInterface.js'
-import { OsmosisPoolProvider } from './amm/OsmosisPoolProvider.js'
-import { AstroportPoolProvider } from './amm/AstroportPoolProvider.js'
+import { PoolDataProviderInterface } from './query/amm/PoolDataProviderInterface.js'
+import { OsmosisPoolProvider } from './query/amm/OsmosisPoolProvider.js'
+import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
+import { Osmosis } from './execute/Osmosis.js'
+import { ExchangeInterface } from './execute/ExchangeInterface.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -95,14 +97,16 @@ const launchRedbank = async (
 	wasmClient: CosmWasmClient,
 	network: Network,
 	liquidatorAddress: string,
-	poolProvider : PoolDataProviderInterface
+	poolProvider : PoolDataProviderInterface,
+	exchangeInterface : ExchangeInterface
 
 ) => {
 	await new RedbankExecutor(
 		getRedbankConfig(liquidatorAddress, network),
 		client,
 		wasmClient,
-		poolProvider
+		poolProvider,
+
 	).start()
 }
 

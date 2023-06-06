@@ -5,21 +5,19 @@ import { Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import { coins, EncodeObject } from '@cosmjs/proto-signing'
 
-import { makeExecuteContractMessage, makeWithdrawMessage, sleep } from '../helpers'
-import { osmosis, cosmwasm } from 'osmojs'
+import { produceExecuteContractMessage, produceWithdrawMessage, sleep } from '../helpers'
+import { cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
 import { fetchRedbankBatch } from '../query/hive'
 
 import BigNumber from 'bignumber.js'
-import { Long } from 'osmojs/types/codegen/helpers.js'
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
-import { PoolDataProviderInterface } from '../amm/PoolDataProviderInterface.js'
-
-const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
+import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface.js'
+import { ExchangeInterface } from '../execute/ExchangeInterface.js'
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
@@ -44,7 +42,8 @@ export class RedbankExecutor extends BaseExecutor {
 		config: RedbankExecutorConfig,
 		client: SigningStargateClient,
 		queryClient: CosmWasmClient,
-		poolProvider: PoolDataProviderInterface
+		poolProvider: PoolDataProviderInterface,
+		private exchangeInterface: ExchangeInterface
 	) {
 		super(config, client, queryClient, poolProvider)
 		this.config = config
@@ -143,7 +142,7 @@ export class RedbankExecutor extends BaseExecutor {
 			const denom = collateral.denom
 			msgs.push(
 				executeContract(
-					makeWithdrawMessage(liquidatorAddress, denom, this.config.redbankAddress)
+					produceWithdrawMessage(liquidatorAddress, denom, this.config.redbankAddress)
 						.value as MsgExecuteContract,
 				),
 			)
@@ -188,16 +187,14 @@ export class RedbankExecutor extends BaseExecutor {
 							.toFixed(0)
 
 						expectedNeutralCoins = expectedNeutralCoins.plus(minOutput)
+						
 						msgs.push(
-							swapExactAmountIn({
-								sender: liquidatorAddress,
-								// cast to long because osmosis felt it neccessary to create their own Long rather than use the js one
-								routes: bestRoute?.map((route) => {
-									return { poolId: route.poolId as Long, tokenOutDenom: route.tokenOutDenom }
-								}),
-								tokenIn: { denom: collateral.denom, amount: Number(collateralAmount).toFixed(0) },
-								tokenOutMinAmount: minOutput,
-							}),
+							this.exchangeInterface.produceSwapMessage(
+								bestRoute,
+								{ denom: collateral.denom, amount: collateralAmount.toFixed(0) },
+								minOutput,
+								liquidatorAddress,
+							)
 						)
 					}
 				}
@@ -241,15 +238,12 @@ export class RedbankExecutor extends BaseExecutor {
 					)
 
 					msgs.push(
-						swapExactAmountIn({
-							sender: liquidatorAddress,
-							routes: bestRoute?.map((route) => {
-								return { poolId: route.poolId as Long, tokenOutDenom: route.tokenOutDenom }
-							}),
-							tokenIn: { denom: this.config.neutralAssetDenom, amount: amountToSwap.toFixed(0) },
-							// allow for 1% slippage for debt what we estimated
-							tokenOutMinAmount: debtAmountRequiredFromSwap.toFixed(0),
-						}),
+						this.exchangeInterface.produceSwapMessage(
+							bestRoute,
+							{ denom: this.config.neutralAssetDenom, amount: amountToSwap.toFixed(0) },
+							debtAmountRequiredFromSwap.toFixed(0),
+							liquidatorAddress,
+						)
 					)
 				}
 			}
@@ -263,7 +257,7 @@ export class RedbankExecutor extends BaseExecutor {
 			liquidate: { user: tx.user_address, collateral_denom: tx.collateral_denom },
 		})
 
-		return makeExecuteContractMessage(
+		return produceExecuteContractMessage(
 			this.config.liquidatorMasterAddress,
 			this.config.redbankAddress,
 			toUtf8(msg),
@@ -283,7 +277,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 		const msg = toUtf8(JSON.stringify({ liquidate_many: { liquidations: txs } }))
 
-		return makeExecuteContractMessage(
+		return produceExecuteContractMessage(
 			this.config.liquidatorMasterAddress,
 			this.config.liquidationFiltererAddress,
 			msg,
