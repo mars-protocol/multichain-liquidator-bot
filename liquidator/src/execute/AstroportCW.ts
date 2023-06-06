@@ -3,7 +3,7 @@ import { Coin } from "marsjs-types/creditmanager/generated/mars-credit-manager/M
 import { RouteHop } from "../types/RouteHop";
 import { ExchangeInterface } from "./ExchangeInterface";
 import { AssetInfoCW, AssetInfoNative } from "../query/amm/types/AstroportTypes";
-import { makeExecuteContractMessage } from "../helpers";
+import { produceExecuteContractMessage } from "../helpers";
 import { toUtf8 } from '@cosmjs/encoding'
 
 interface AstroSwap {
@@ -42,7 +42,7 @@ export class AstroportCW implements ExchangeInterface {
             minimumRecieve
         }
 
-        return makeExecuteContractMessage(
+        return produceExecuteContractMessage(
             sender,
             this.astroportRouterContract,
             toUtf8(JSON.stringify(msg)),

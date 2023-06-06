@@ -5,7 +5,7 @@ import { Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import { coins, EncodeObject } from '@cosmjs/proto-signing'
 
-import { makeExecuteContractMessage, makeWithdrawMessage, sleep } from '../helpers'
+import { produceExecuteContractMessage, produceWithdrawMessage, sleep } from '../helpers'
 import { cosmwasm } from 'osmojs'
 
 import 'dotenv/config.js'
@@ -142,7 +142,7 @@ export class RedbankExecutor extends BaseExecutor {
 			const denom = collateral.denom
 			msgs.push(
 				executeContract(
-					makeWithdrawMessage(liquidatorAddress, denom, this.config.redbankAddress)
+					produceWithdrawMessage(liquidatorAddress, denom, this.config.redbankAddress)
 						.value as MsgExecuteContract,
 				),
 			)
@@ -257,7 +257,7 @@ export class RedbankExecutor extends BaseExecutor {
 			liquidate: { user: tx.user_address, collateral_denom: tx.collateral_denom },
 		})
 
-		return makeExecuteContractMessage(
+		return produceExecuteContractMessage(
 			this.config.liquidatorMasterAddress,
 			this.config.redbankAddress,
 			toUtf8(msg),
@@ -277,7 +277,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 		const msg = toUtf8(JSON.stringify({ liquidate_many: { liquidations: txs } }))
 
-		return makeExecuteContractMessage(
+		return produceExecuteContractMessage(
 			this.config.liquidatorMasterAddress,
 			this.config.liquidationFiltererAddress,
 			msg,

@@ -220,7 +220,7 @@ export const borrow = async (
 	return await client.execute(sender, redbankAddress, msg, 'auto')
 }
 
-export const makeExecuteContractMessage = (
+export const produceExecuteContractMessage = (
 	sender: string,
 	contract: string,
 	msg: Uint8Array,
@@ -239,7 +239,7 @@ export const makeExecuteContractMessage = (
 	return executeContractMsg
 }
 
-export const makeSendMessage = (
+export const produceSendMessage = (
 	sender: string,
 	recipient: string,
 	funds: Coin[],
@@ -254,7 +254,7 @@ export const makeSendMessage = (
 	}
 }
 
-export const makeDepositMessage = (
+export const produceDepositMessage = (
 	sender: string,
 	redBankContractAddress: string,
 	coins: Coin[],
@@ -272,7 +272,7 @@ export const makeDepositMessage = (
 	return executeContractMsg
 }
 
-export const makeBorrowMessage = (
+export const produceBorrowMessage = (
 	sender: string,
 	assetDenom: string,
 	amount: string,
@@ -291,7 +291,7 @@ export const makeBorrowMessage = (
 	return executeContractMsg
 }
 
-export const makeWithdrawMessage = (
+export const produceWithdrawMessage = (
 	sender: string,
 	assetDenom: string,
 	redBankContractAddress: string,
@@ -302,7 +302,7 @@ export const makeWithdrawMessage = (
           "denom": "${assetDenom}"
         } 
       }`)
-	return makeExecuteContractMessage(sender, redBankContractAddress, msg, [])
+	return produceExecuteContractMessage(sender, redBankContractAddress, msg, [])
 }
 
 interface MsgSwapEncodeObject {
@@ -310,7 +310,7 @@ interface MsgSwapEncodeObject {
 	value: MsgSwapExactAmountIn
 }
 
-export const makeRepayMessage = (
+export const produceRepayMessage = (
 	sender: string,
 	redBankContractAddress: string,
 	coins: Coin[],
@@ -328,7 +328,7 @@ export const makeRepayMessage = (
 	return executeContractMsg
 }
 
-export const makeSwapMessage = (
+export const produceSwapMessage = (
 	liquidatorAddress: string,
 	tokenIn: Coin,
 	route: SwapAmountInRoute[],

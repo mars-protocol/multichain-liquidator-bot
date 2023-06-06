@@ -1,5 +1,5 @@
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
-import { makeExecuteContractMessage, makeSendMessage, sleep } from '../helpers'
+import { produceExecuteContractMessage, produceSendMessage, sleep } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
 import { fetchBalances, fetchRoverData, fetchRoverPosition } from '../query/hive'
 import { LiquidationActionGenerator } from './LiquidationActionGenerator'
@@ -123,7 +123,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			if (osmoBalance === undefined || osmoBalance < this.config.minGasTokens) {
 				// send message to send gas tokens to our liquidator
-				sendMsgs.push(makeSendMessage(this.config.liquidatorMasterAddress,balanceKey, [{denom: this.config.gasDenom, amount : amountToSend.toFixed(0)}]))
+				sendMsgs.push(produceSendMessage(this.config.liquidatorMasterAddress,balanceKey, [{denom: this.config.gasDenom, amount : amountToSend.toFixed(0)}]))
 			}
 		}
 
@@ -212,7 +212,7 @@ export class RoverExecutor extends BaseExecutor {
 			const result = await this.client.signAndBroadcast(
 				liquidatorAddress,
 				[
-					makeExecuteContractMessage(
+					produceExecuteContractMessage(
 						liquidatorAddress,
 						this.config.creditManagerAddress,
 						toUtf8(`{ "create_credit_account": {} }`),
@@ -344,7 +344,7 @@ export class RoverExecutor extends BaseExecutor {
 		}
 
 		const msgs : EncodeObject[] = [
-			makeExecuteContractMessage(
+			produceExecuteContractMessage(
 				liquidatorAddress,
 				this.config.creditManagerAddress,
 				toUtf8(JSON.stringify(msg)),
@@ -357,7 +357,7 @@ export class RoverExecutor extends BaseExecutor {
 		const stable = liquidatorBalances?.find((coin)=> coin.denom === this.config.neutralAssetDenom)
 
 		if (stable!== undefined && new BigNumber(stable.amount).isGreaterThan(this.config.stableBalanceThreshold)) {
-			const sendMsg = makeSendMessage(liquidatorAddress, this.config.liquidatorMasterAddress, [stable])
+			const sendMsg = produceSendMessage(liquidatorAddress, this.config.liquidatorMasterAddress, [stable])
 			msgs.push(sendMsg)
 		}
 		
