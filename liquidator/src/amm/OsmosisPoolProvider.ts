@@ -18,17 +18,20 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 				)
 				const responseJson: any = await response.json()
 	
-				pools = responseJson.pools.map((data: any) => {
+				// clear any residual pools from errored attemps etc
+				pools = []
+
+				responseJson.pools.forEach((data: any) => {
 					if (data['@type'] === '/osmosis.concentratedliquidity.v1beta1.Pool') {
 					  const result =  camelCaseKeys(data) as ConcentratedLiquidityPool;
 					  result.poolType = PoolType.CONCENTRATED_LIQUIDITY
-					  return result
+					  pools.push(result)
 					} else if (data['@type'] === '/osmosis.gamm.v1beta1.Pool') {
 						const result = camelCaseKeys(data) as XYKPool
 						result.poolType = PoolType.XYK
 						result.token0 = result.poolAssets[0].token.denom
 						result.token1 = result.poolAssets[1].token.denom
-						return result
+						pools.push(result)
 					} else {
 					  // just skip, 
 					  console.log('unsupported pool type')
