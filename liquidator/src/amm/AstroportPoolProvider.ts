@@ -102,7 +102,6 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
             const responseData : ResponseData = await response.json();
             const contractQueryData = responseData.data.wasm.contractQuery as ContractQueryPairs
 
-            // console.log(contractQueryData)
             // Filter out pairs that are not XYK
             const batchPairs = contractQueryData.pairs
                                 .filter((pair) => pair.pair_type.xyk !== undefined)
