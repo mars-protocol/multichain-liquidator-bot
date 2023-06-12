@@ -23,16 +23,31 @@ export interface XYKPool extends Pool {
 }
 
 export interface ConcentratedLiquidityPool extends Pool { 
-	incentives_address: string;
-	spread_rewards_address: string;
-	current_tick_liquidity: string;
-	current_sqrt_price: string;
-	current_tick: string;
-	tick_spacing: string;
-	exponent_at_price_one: string;
-	spread_factor: string;
-	last_liquidity_update: string;
+	incentivesAddress: string;
+	spreadRewardsAddress: string;
+	currentTickLiquidity: string;
+	currentSqrtPrice: string;
+	currentTick: string;
+	tickSpacing: string;
+	exponentAtPriceOne: string;
+	spreadFactor: string;
+	lastLiquidityUpdate: string;
+	liquidityDepths:{
+		zeroToOne: LiquidityDepth[],
+		oneToZero: LiquidityDepth[]
+	}
 }
+
+export interface LiquidityDepth {
+	liquidityNet: string;
+	tickIndex: string;
+  }
+  
+ export interface Data {
+	liquidityDepths: LiquidityDepth[];
+	currentTick: string;
+	currentLiquidity: string;
+  }
 
 export interface Pagination {
 	nextKey: string

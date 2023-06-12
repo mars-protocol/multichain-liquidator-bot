@@ -1,5 +1,6 @@
+import { Int } from "@keplr-wallet/unit";
 import { camelCaseKeys } from "../helpers";
-import { ConcentratedLiquidityPool, Pagination, Pool, PoolType, XYKPool } from "../types/Pool";
+import { ConcentratedLiquidityPool, LiquidityDepth, Pagination, Pool, PoolType, XYKPool } from "../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
 
 export class OsmosisPoolProvider implements PoolDataProviderInterface {
@@ -45,8 +46,41 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 			}		
 		}
 
-		// fetch concentrated liquidity pools
+		// append tick data.
+		await Promise.all(pools
+					.filter(pool => pool.poolType === PoolType.CONCENTRATED_LIQUIDITY)
+					.map(pool => this.fetchTickData(pool as ConcentratedLiquidityPool))
+				)
 
 		return pools
+	}
+
+	private fetchTickData = async(pool : ConcentratedLiquidityPool) : Promise<ConcentratedLiquidityPool> => {
+		const minTick = new Int(-162000000);
+		const maxTick = new Int(342000000);
+		// need to fetch token in and token out
+		const zeroToOneTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token0}&use_cur_tick=true&bound_tick=${minTick.toString()}`
+		const oneToZeroTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token1}&use_cur_tick=true&bound_tick=${maxTick.toString()}`
+
+		const zeroToOneTicks = await this.fetchDepths(zeroToOneTicksUrl)
+		const oneToZeroTicks = await this.fetchDepths(oneToZeroTicksUrl)
+
+		pool.liquidityDepths = {
+			zeroToOne: zeroToOneTicks,
+			oneToZero: oneToZeroTicks
+		}
+
+		return pool
+	}
+
+	private fetchDepths = async(url : string) : Promise<LiquidityDepth[]> => {
+		const responseJson = await this.sendRequest(url);
+		return responseJson.liquidity_depths.map((depth: any) => camelCaseKeys(depth)) as LiquidityDepth[]
+		
+	}
+
+	private sendRequest = async (url: string) : Promise<any> => {
+		const response = await fetch(url)
+		return await response.json()
 	}
 }
