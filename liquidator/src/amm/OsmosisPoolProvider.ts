@@ -1,5 +1,6 @@
+import { Int } from "@keplr-wallet/unit";
 import { camelCaseKeys } from "../helpers";
-import { Pagination, Pool } from "../types/Pool";
+import { ConcentratedLiquidityPool, LiquidityDepth, Pagination, Pool, PoolType, XYKPool } from "../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
 
 export class OsmosisPoolProvider implements PoolDataProviderInterface {
@@ -7,38 +8,79 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
     constructor(private lcdEndpoint: string) {}
 
     loadPools = async (): Promise<Pool[]> => {
-		let fetchedAllPools = false
-		let nextKey = ''
+		let fetched = false
 		let pools: Pool[] = []
-		let totalPoolCount = 0
-		while (!fetchedAllPools) {
-			const response = await fetch(
-				`${this.lcdEndpoint}/osmosis/gamm/v1beta1/pools${nextKey}`,
-			)
-			const responseJson: any = await response.json()
-			
-			if (responseJson.pagination === undefined) {
-				fetchedAllPools = true
-				return pools
-			}
+		let retryCount = 0
 
-			const pagination = camelCaseKeys(responseJson.pagination) as Pagination
+		while (!fetched && retryCount < 5) {
+			try {
+				const response = await fetch(
+					`${this.lcdEndpoint}/osmosis/poolmanager/v1beta1/all-pools`,
+				)
+				const responseJson: any = await response.json()
+	
+				// clear any residual pools from errored attemps etc
+				pools = []
 
-			// osmosis lcd query returns total pool count as 0 after page 1 (but returns the correct count on page 1), so we need to only set it once
-			if (totalPoolCount === 0) {
-				totalPoolCount = pagination.total
-			}
-
-			const poolsRaw = responseJson.pools as Pool[]
-
-			poolsRaw.forEach((pool) => pools.push(camelCaseKeys(pool) as Pool))
-
-			nextKey = `?pagination.key=${pagination.nextKey}`
-			if (pools.length >= totalPoolCount) {
-				fetchedAllPools = true
-			}
+				responseJson.pools.forEach((data: any) => {
+					if (data['@type'] === '/osmosis.concentratedliquidity.v1beta1.Pool') {
+					  const result =  camelCaseKeys(data) as ConcentratedLiquidityPool;
+					  result.poolType = PoolType.CONCENTRATED_LIQUIDITY
+					  pools.push(result)
+					} else if (data['@type'] === '/osmosis.gamm.v1beta1.Pool') {
+						const result = camelCaseKeys(data) as XYKPool
+						result.poolType = PoolType.XYK
+						result.token0 = result.poolAssets[0].token.denom
+						result.token1 = result.poolAssets[1].token.denom
+						pools.push(result)
+					} else {
+					  // just skip, 
+					  console.log('unsupported pool type')
+					}
+				  });
+	
+				fetched = true
+			} catch {
+				retryCount++
+				console.log('retrying fetch')
+			}		
 		}
 
+		// append tick data.
+		await Promise.all(pools
+					.filter(pool => pool.poolType === PoolType.CONCENTRATED_LIQUIDITY)
+					.map(pool => this.fetchTickData(pool as ConcentratedLiquidityPool))
+				)
+
 		return pools
+	}
+
+	private fetchTickData = async(pool : ConcentratedLiquidityPool) : Promise<ConcentratedLiquidityPool> => {
+		const minTick = new Int(-162000000);
+		const maxTick = new Int(342000000);
+		// need to fetch token in and token out
+		const zeroToOneTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token0}&use_cur_tick=true&bound_tick=${minTick.toString()}`
+		const oneToZeroTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token1}&use_cur_tick=true&bound_tick=${maxTick.toString()}`
+
+		const zeroToOneTicks = await this.fetchDepths(zeroToOneTicksUrl)
+		const oneToZeroTicks = await this.fetchDepths(oneToZeroTicksUrl)
+
+		pool.liquidityDepths = {
+			zeroToOne: zeroToOneTicks,
+			oneToZero: oneToZeroTicks
+		}
+
+		return pool
+	}
+
+	private fetchDepths = async(url : string) : Promise<LiquidityDepth[]> => {
+		const responseJson = await this.sendRequest(url);
+		return responseJson.liquidity_depths.map((depth: any) => camelCaseKeys(depth)) as LiquidityDepth[]
+		
+	}
+
+	private sendRequest = async (url: string) : Promise<any> => {
+		const response = await fetch(url)
+		return await response.json()
 	}
 }

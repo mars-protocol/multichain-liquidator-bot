@@ -1,5 +1,5 @@
 import { sleep } from "../helpers";
-import { Pool, PoolAsset } from "../types/Pool";
+import { Pool, PoolAsset, PoolType, XYKPool } from "../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
 import fetch from 'cross-fetch'
 import { Asset, AssetInfo, AssetInfoNative, ContractQueryPairs, ContractQueryPool, Pair, PoolResponseData, Query, ResponseData } from "./types/AstroportTypes";
@@ -59,11 +59,15 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
                     const address : string = Object.keys(poolResponse.data)[0]
         
                     const queryData : ContractQueryPool = poolResponse.data[address]!.contractQuery
-                    const pool : Pool = {
+                    const poolAssets = this.producePoolAssets(queryData.assets)
+                    const pool : XYKPool = {
                         address : address,
                         id : index as unknown as Long,
-                        poolAssets : this.producePoolAssets(queryData.assets),
-                        swapFee : "0.00",
+                        poolAssets : poolAssets,
+                        swapFee : "0.003",
+                        token0 : poolAssets[0].token.denom,
+                        token1: poolAssets[1].token.denom,
+                        poolType : PoolType.XYK
                     }
         
                     return pool
