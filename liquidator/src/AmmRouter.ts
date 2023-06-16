@@ -1,9 +1,10 @@
 import BigNumber from 'bignumber.js'
-import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from './math.js'
+import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from './math'
 import { RouteHop } from './types/RouteHop'
-import { Pool } from './types/Pool'
-const BASE_ASSET_INDEX = 0
-const QUOTE_ASSET_INDEX = 1
+import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from './types/Pool'
+import { ConcentratedLiquidityMath } from "./amm/osmosis/math/concentrated"
+import { Coin, Dec, Int } from '@keplr-wallet/unit'
+const { calcOutGivenIn, calcInGivenOut } = ConcentratedLiquidityMath
 
 export interface AMMRouterInterface {
 	getRoutes(tokenInDenom: string, tokenOutDenom: string): RouteHop[][]
@@ -47,13 +48,65 @@ export class AMMRouter implements AMMRouterInterface {
 
 		// for each hop
 		route.forEach((routeHop) => {
-			const amountBeforeFees = calculateOutputXYKPool(
-				new BigNumber(routeHop.x1),
-				new BigNumber(routeHop.y1),
-				new BigNumber(tokenInAmount),
-			)
-			amountAfterFees = amountBeforeFees.minus(amountBeforeFees.multipliedBy(routeHop.swapFee))
-			tokenInAmount = amountAfterFees
+
+			const pool = routeHop.pool
+
+			switch (pool.poolType) {
+				case PoolType.XYK:
+					const xykPool= pool as XYKPool
+					const x1 = new BigNumber(
+						xykPool.poolAssets.find(
+							(poolAsset) => poolAsset.token.denom === routeHop.tokenInDenom,
+						)?.token.amount!,
+					)
+
+					const y1 = new BigNumber(
+						xykPool.poolAssets.find(
+							(poolAsset) => poolAsset.token.denom === routeHop.tokenOutDenom,
+						)?.token.amount!,
+					)
+
+					const amountBeforeFees = calculateOutputXYKPool(
+						x1,
+						y1,
+						new BigNumber(tokenInAmount),
+					)
+					amountAfterFees = amountBeforeFees.minus(amountBeforeFees.multipliedBy(routeHop.pool.swapFee))
+					tokenInAmount = amountAfterFees
+					break
+				case PoolType.CONCENTRATED_LIQUIDITY:
+
+					const clPool = pool as ConcentratedLiquidityPool
+
+					const tokenIn : Coin = {
+						denom: routeHop.tokenInDenom,
+						amount: new Int(tokenInAmount.toFixed(0))
+					}
+
+					const tokenDenom0 = clPool.token0
+					const poolLiquidity = new Dec(clPool.currentTickLiquidity)
+					const inittedTicks = tokenIn.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
+					const curSqrtPrice = new Dec(clPool.currentSqrtPrice)
+					const swapFee = new Dec(clPool.swapFee)
+
+					const result = calcOutGivenIn({
+						tokenIn,
+						tokenDenom0,
+						poolLiquidity,
+						inittedTicks,
+						curSqrtPrice,
+						swapFee,
+					  });
+
+					if (result === "no-more-ticks") {
+						tokenInAmount = new BigNumber(0)
+						break
+					}
+
+					const { amountOut } = result
+					tokenInAmount = new BigNumber(amountOut.toString())
+					break
+			}
 		})
 
 		return amountAfterFees
@@ -69,13 +122,65 @@ export class AMMRouter implements AMMRouterInterface {
 
 		// for each hop
 		route.forEach((routeHop) => {
-			const amountInBeforeFees = calculateRequiredInputXYKPool(
-				new BigNumber(routeHop.x1),
-				new BigNumber(routeHop.y1),
-				new BigNumber(tokenOutRequired),
-			)
-			amountAfterFees = amountInBeforeFees.plus(tokenOutRequired.multipliedBy(routeHop.swapFee))
-			tokenOutRequired = amountAfterFees
+			const pool = routeHop.pool
+			switch (routeHop.pool.poolType) {
+				case PoolType.XYK:
+					const xykPool=  pool as XYKPool
+					const x1 = new BigNumber(
+						xykPool.poolAssets.find(
+							(poolAsset) => poolAsset.token.denom === routeHop.tokenInDenom,
+						)?.token.amount!,
+					)
+
+					const y1 = new BigNumber(
+						xykPool.poolAssets.find(
+							(poolAsset) => poolAsset.token.denom === routeHop.tokenOutDenom,
+						)?.token.amount!,
+					)
+
+					const amountInBeforeFees = calculateRequiredInputXYKPool(
+						new BigNumber(x1),
+						new BigNumber(y1),
+						new BigNumber(tokenOutRequired),
+					)
+					amountAfterFees = amountInBeforeFees.plus(tokenOutRequired.multipliedBy(routeHop.pool.swapFee))
+					tokenOutRequired = amountAfterFees
+					break
+				case PoolType.CONCENTRATED_LIQUIDITY:
+
+					const clPool = pool as ConcentratedLiquidityPool
+
+					const tokenOut : Coin = {
+						denom: routeHop.tokenOutDenom,
+						amount: new Int(tokenOutRequired.toFixed(0))
+					}
+
+					const tokenDenom0 = clPool.token0
+					const poolLiquidity = new Dec(clPool.currentTickLiquidity)
+					const inittedTicks = tokenOut.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
+					const curSqrtPrice = new Dec(clPool.currentSqrtPrice)
+					const swapFee = new Dec(clPool.swapFee)
+
+					const result = calcInGivenOut({
+						tokenOut,
+						tokenDenom0,
+						poolLiquidity,
+						inittedTicks,
+						curSqrtPrice,
+						swapFee,
+					  })
+
+					if (result === "no-more-ticks") {
+						tokenOutRequired = new BigNumber(0)
+						break
+					} 
+
+					const { amountIn } = result
+					amountAfterFees = new BigNumber(amountIn.toString())
+					tokenOutRequired = amountAfterFees
+					break
+				
+			}
 		})
 
 		return amountAfterFees
@@ -150,9 +255,8 @@ export class AMMRouter implements AMMRouterInterface {
 		const possibleStartingPairs = pools.filter((pool) => {
 			return (
 				// todo  - support stableswap
-				pool.poolAssets?.length > 1 &&
-				(pool.poolAssets[BASE_ASSET_INDEX].token.denom === tokenInDenom ||
-					pool.poolAssets[QUOTE_ASSET_INDEX].token.denom === tokenInDenom) &&
+				(pool.token0 === tokenInDenom ||
+					pool.token1 === tokenInDenom) &&
 				// ensure we don't use the same pools
 				usedPools.find((poolId) => pool.id === poolId) === undefined
 			)
@@ -166,28 +270,17 @@ export class AMMRouter implements AMMRouterInterface {
 		// if we find an ending par(s), we have found the end of our route
 		const endingPairs = possibleStartingPairs.filter(
 			(pool) =>
-				pool.poolAssets[BASE_ASSET_INDEX].token.denom === targetTokenOutDenom ||
-				pool.poolAssets[QUOTE_ASSET_INDEX].token.denom === targetTokenOutDenom,
+				pool.token0 === targetTokenOutDenom ||
+				pool.token1 === targetTokenOutDenom,
 		)
 
-		// console.log(`endingPairs: ${endingPairs.length}`)
 		if (endingPairs.length > 0 && tokenInDenom !== targetTokenOutDenom) {
 			endingPairs.forEach((pool) => {
 				const hop: RouteHop = {
 					poolId: pool.id,
 					tokenInDenom: tokenInDenom,
 					tokenOutDenom: targetTokenOutDenom,
-					swapFee: Number(pool.swapFee || '0'),
-					x1: new BigNumber(
-						pool.poolAssets.find(
-							(poolAsset) => poolAsset.token.denom === tokenInDenom,
-						)?.token.amount!,
-					),
-					y1: new BigNumber(
-						pool.poolAssets.find(
-							(poolAsset) => poolAsset.token.denom === targetTokenOutDenom,
-						)?.token.amount!,
-					),
+					pool: pool,
 				}
 
 				// deep copy the array
@@ -200,20 +293,14 @@ export class AMMRouter implements AMMRouterInterface {
 		} else {
 			// Else, we have not found the route. Iterate recursively through the pools building valid routes.
 			possibleStartingPairs.forEach((pool) => {
-				const base = pool.poolAssets[BASE_ASSET_INDEX]
-				const quote = pool.poolAssets[QUOTE_ASSET_INDEX]
-
 				// We have no garauntee that index [0] will be the token in so we need to calculate that ourselves
-				const tokenOut = tokenInDenom === base.token.denom ? quote : base
-				const tokenIn = tokenOut === base ? quote! : base!
+				const tokenOut = tokenInDenom === pool.token0 ? pool.token1 : pool.token0
 
 				const nextHop: RouteHop = {
 					poolId: pool.id,
 					tokenInDenom,
-					tokenOutDenom: tokenOut.token.denom,
-					swapFee: Number(pool.swapFee || 0),
-					x1: new BigNumber(tokenIn.token.amount),
-					y1: new BigNumber(tokenOut.token.amount),
+					tokenOutDenom: tokenOut,
+					pool: pool,
 				}
 
 				// deep copy so we don't mess up other links in the search
@@ -222,7 +309,7 @@ export class AMMRouter implements AMMRouterInterface {
 				newRoute.push(nextHop)
 
 				this.buildRoutesForTrade(
-					tokenOut.token.denom!,
+					tokenOut,
 					targetTokenOutDenom,
 					pools,
 					newRoute,
