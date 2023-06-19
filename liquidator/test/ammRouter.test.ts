@@ -2,11 +2,8 @@ import { AMMRouter } from '../src/AmmRouter'
 import { ConcentratedLiquidityPool, PoolAsset, PoolType, XYKPool } from '../src/types/Pool'
 import Long from 'long'
 import BigNumber from 'bignumber.js'
-import { Coin, Dec, Int } from '@keplr-wallet/unit'
+import { Dec, Int } from '@keplr-wallet/unit'
 import { LiquidityDepth } from '../src/amm/osmosis/math/concentrated'
-
-import { ConcentratedLiquidityMath } from "../src/amm/osmosis/math/concentrated"
-const { calcOutGivenIn, calcInGivenOut } = ConcentratedLiquidityMath
 
 const generateRandomPoolAsset = (
 	denom: string = Math.random().toString(),
@@ -19,7 +16,6 @@ const generateRandomPoolAsset = (
 		},
 	}
 }
-
 
 const generateRandomXykPool = (poolAssets?: PoolAsset[]): XYKPool => {
 	if (!poolAssets) poolAssets = [generateRandomPoolAsset(), generateRandomPoolAsset()]

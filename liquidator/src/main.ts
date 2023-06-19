@@ -12,8 +12,8 @@ import { Network } from './types/network'
 import { PoolDataProviderInterface } from './query/amm/PoolDataProviderInterface.js'
 import { OsmosisPoolProvider } from './query/amm/OsmosisPoolProvider.js'
 import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
-import { Osmosis } from './execute/Osmosis.js'
 import { ExchangeInterface } from './execute/ExchangeInterface.js'
+import { Osmosis } from './execute/Osmosis.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -43,6 +43,8 @@ export const main = async () => {
 	const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!)
 	const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
 
+	// todo depnendent on network
+	const exchangeInterface = new Osmosis()
 	// Produce network
 	const networkEnv = process.env.NETWORK || "LOCALNET"
 	const network  = networkEnv === "MAINNET" ? Network.MAINNET : networkEnv === "TESTNET" ? Network.TESTNET : Network.LOCALNET
@@ -51,7 +53,7 @@ export const main = async () => {
 
 	switch (executorType) {
 		case REDBANK:
-			await launchRedbank(client, queryClient, network, liquidatorMasterAddress, poolProvider)
+			await launchRedbank(client, queryClient, network, liquidatorMasterAddress, poolProvider, exchangeInterface)
 			return
 		case ROVER:
 			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator, poolProvider)
@@ -106,7 +108,7 @@ const launchRedbank = async (
 		client,
 		wasmClient,
 		poolProvider,
-
+		exchangeInterface
 	).start()
 }
 

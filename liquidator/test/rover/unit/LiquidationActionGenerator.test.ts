@@ -11,7 +11,7 @@ import {
 	Decimal,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { Collateral, Debt, PositionType } from '../../../src/rover/types/RoverPosition'
-import { Pool } from '../../../src/types/Pool'
+import { PoolType, XYKPool } from '../../../src/types/Pool'
 import Long from 'long'
 import { NO_ROUTE_FOR_SWAP } from '../../../src/rover/constants/errors'
 
@@ -25,9 +25,12 @@ describe('Liquidation Actions generator Unit Tests', () => {
 
 	const randomAssetAmount = 10000000000
 
-	const poolA: Pool = {
+	const poolA: XYKPool = {
 		address: 'abc',
 		id: new Long(Math.random() * 10000),
+		token0:otherDenom,
+		token1:debtDenom,
+		poolType: PoolType.XYK,
 		poolAssets: [
 			{
 				token: {

@@ -17,7 +17,6 @@ export class Osmosis implements ExchangeInterface {
             }),
             tokenIn,
             tokenOutMinAmount: minimumRecieve,
-        }),
+        })
     }
-
 }

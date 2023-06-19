@@ -28,6 +28,7 @@ import { TestConfig, testnetConfig } from './config'
 import BigNumber from 'bignumber.js'
 import { AMMRouter } from '../../../src/AmmRouter'
 import { RedisInterface } from '../../../src/redis'
+import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
 
 const runTests = async (testConfig: TestConfig) => {
 	// Test results
@@ -90,8 +91,10 @@ const runTests = async (testConfig: TestConfig) => {
 		stableBalanceThreshold: 10000000
 	}
 
+	const poolProvider = new OsmosisPoolProvider(testConfig.lcdEndpoint)
+
 	// Set up our liquidator
-	const executorLiquidator = new RoverExecutor(config, client, cwClient, wallet)
+	const executorLiquidator = new RoverExecutor(config, client, cwClient, wallet, poolProvider)
 	await executorLiquidator.initiateRedis()
 	await executorLiquidator.refreshData()
 
