@@ -1,5 +1,5 @@
 import fetchMock from 'fetch-mock';
-import { OsmosisPoolProvider } from '../../src/amm/OsmosisPoolProvider';
+import { OsmosisPoolProvider } from '../../src/query/amm/OsmosisPoolProvider';
 import { PoolType } from '../../src/types/Pool';
 
 describe('Osmosis Pool Provider', () => {

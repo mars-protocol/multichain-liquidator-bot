@@ -1,5 +1,5 @@
 import { sleep } from "../../helpers";
-import { Pool, PoolAsset, PoolType } from "../../types/Pool";
+import { Pool, PoolAsset, PoolType, XYKPool } from "../../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
 import fetch from 'cross-fetch'
 import { Asset, AssetInfoCW, AssetInfoNative, ContractQueryPairs, ContractQueryPool, Pair, PoolResponseData, Query, ResponseData } from "./types/AstroportTypes";

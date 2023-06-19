@@ -25,14 +25,14 @@ import {
 	osmosisAminoConverters,
 	osmosisProtoRegistry,
 } from 'osmojs'
-import {
-	MsgSwapExactAmountIn,
-	SwapAmountInRoute,
-} from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
+
+import { MsgSwapExactAmountIn } from 'osmojs/types/codegen/osmosis/poolmanager/v1beta1/tx'
+
 import { AminoTypes, GasPrice, MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { camelCase } from 'lodash'
 import { HdPath } from '@cosmjs/crypto'
 import { Pool } from './types/Pool'
+import { SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/poolmanager/v1beta1/swap_route'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -130,7 +130,7 @@ export const findUnderlying = (lpToken: string, pools: Pool[]): string[] | undef
 	const pool = pools.find((pool) => pool.id.toString() === poolId)
 	if (!pool) return undefined
 
-	return pool.poolAssets.map((pool) => pool.token.denom)
+	return [pool.token0, pool.token1]
 }
 
 export const setPrice = async (

@@ -23,6 +23,7 @@ import {
 import { findUnderlying } from '../helpers'
 import { SwapperRoute } from '../types/swapper'
 import { VaultInfo } from '../query/types'
+import { PoolType, XYKPool } from '../types/Pool'
 
 export class LiquidationActionGenerator {
 	private router: AMMRouter
@@ -318,7 +319,12 @@ export class LiquidationActionGenerator {
 		// todo log id - this shouldn't happen though
 		if (!pool) throw new Error(`${POOL_NOT_FOUND} : ${poolId}`)
 
-		pool.poolAssets
+		// todo = support CL/Stableswap on rover
+		if (pool.poolType === PoolType.CONCENTRATED_LIQUIDITY || pool.poolType === PoolType.STABLESWAP) {
+			return []
+		}
+		
+		(pool as XYKPool).poolAssets
 			.filter((poolAsset) => poolAsset.token.denom !== borrowDenom)
 			.forEach(
 				(poolAsset) =>
