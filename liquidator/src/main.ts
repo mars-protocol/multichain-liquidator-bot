@@ -3,8 +3,7 @@ import { HdPath } from '@cosmjs/crypto'
 import { DirectSecp256k1HdWallet, makeCosmoshubPath } from '@cosmjs/proto-signing'
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from './helpers.js'
-import { getConfig as getRedbankConfig } from './redbank/config/osmosis.js'
-import { RedbankExecutor } from './redbank/RedbankExecutor'
+import { RedbankExecutor, RedbankExecutorConfig } from './redbank/RedbankExecutor'
 import { getConfig as getRoverConfig } from './rover/config/osmosis'
 import { RoverExecutor } from './rover/RoverExecutor'
 import { getSecretManager } from './secretManager'
@@ -14,6 +13,7 @@ import { OsmosisPoolProvider } from './query/amm/OsmosisPoolProvider.js'
 import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
 import { ExchangeInterface } from './execute/ExchangeInterface.js'
 import { Osmosis } from './execute/Osmosis.js'
+import { getConfig } from './redbank/config/getConfig.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -53,7 +53,7 @@ export const main = async () => {
 
 	switch (executorType) {
 		case REDBANK:
-			await launchRedbank(client, queryClient, network, liquidatorMasterAddress, poolProvider, exchangeInterface)
+			await launchRedbank(client, queryClient, getConfig(liquidatorMasterAddress, network, process.env.CHAIN_NAME!), poolProvider, exchangeInterface)
 			return
 		case ROVER:
 			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator, poolProvider)
@@ -70,7 +70,7 @@ const getPoolProvider = (chainName: string) : PoolDataProviderInterface => {
 		case "osmosis":
 			return new OsmosisPoolProvider(process.env.LCD_ENDPOINT!)
 		case "neutron":
-			return new AstroportPoolProvider(process.env.ASTROPORT_FACTORY_CONTRACT!, process.env.GRAPHQL_ENDPOINT!)
+			return new AstroportPoolProvider(process.env.ASTROPORT_FACTORY_CONTRACT!, process.env.HIVE_ENDPOINT!)
 		default:
 			throw new Error(`Invalid chain name. Chain name must be either osmosis or neutron, recieved ${chainName}`)
 	}
@@ -97,14 +97,13 @@ const launchRover = async (
 const launchRedbank = async (
 	client: SigningStargateClient,
 	wasmClient: CosmWasmClient,
-	network: Network,
-	liquidatorAddress: string,
+	redbankConfig : RedbankExecutorConfig,
 	poolProvider : PoolDataProviderInterface,
 	exchangeInterface : ExchangeInterface
 
 ) => {
 	await new RedbankExecutor(
-		getRedbankConfig(liquidatorAddress, network),
+		redbankConfig,
 		client,
 		wasmClient,
 		poolProvider,
