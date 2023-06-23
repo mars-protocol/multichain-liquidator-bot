@@ -22,6 +22,10 @@ import { Position } from '../../../src/types/position'
 import 'dotenv/config.js'
 import { RedbankExecutor, RedbankExecutorConfig } from '../../../src/redbank/RedbankExecutor'
 import { localnetConfig, TestConfig } from './config.js'
+import { PoolDataProviderInterface } from '../../../src/query/amm/PoolDataProviderInterface'
+import { ExchangeInterface } from '../../../src/execute/ExchangeInterface'
+import { Osmosis } from '../../../src/execute/Osmosis.js'
+import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
 
 const EXECUTOR_QUEUE = 'executor_queue'
 const redisInterface = new RedisInterface()
@@ -157,9 +161,11 @@ const runTest = async (testConfig: TestConfig, numberOfPositions: number) => {
 		usdc: await cwClient.getBalance(liquidatorAccount, testConfig.usdcDenom),
 	}
 
+	const poolProvider = new OsmosisPoolProvider(testConfig.lcdEndpoint)
+	const exchangeInterface = new Osmosis()
 	console.log(`================= executing liquidations =================`)
 	// execute liquidations
-	await dispatchLiquidations(sgClient, cwClient, config)
+	await dispatchLiquidations(sgClient, cwClient, config, poolProvider, exchangeInterface)
 
 	for (const index in useableAddresses) {
 		const health = await queryHealth(cwClient, useableAddresses[index], testConfig.redbankAddress)
@@ -209,8 +215,11 @@ const dispatchLiquidations = async (
 	client: SigningStargateClient,
 	cwClient: CosmWasmClient,
 	config: RedbankExecutorConfig,
+	poolProvider: PoolDataProviderInterface,
+	exchangeInterface: ExchangeInterface,
+
 ) => {
-	const executor = new RedbankExecutor(config, client, cwClient)
+	const executor = new RedbankExecutor(config, client, cwClient, poolProvider, exchangeInterface)
 
 	await executor.initiateRedis()
 	await executor.run()

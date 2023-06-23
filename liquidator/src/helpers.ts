@@ -25,14 +25,14 @@ import {
 	osmosisAminoConverters,
 	osmosisProtoRegistry,
 } from 'osmojs'
-import {
-	MsgSwapExactAmountIn,
-	SwapAmountInRoute,
-} from 'osmojs/types/codegen/osmosis/gamm/v1beta1/tx'
+
+import { MsgSwapExactAmountIn } from 'osmojs/types/codegen/osmosis/poolmanager/v1beta1/tx'
+
 import { AminoTypes, GasPrice, MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { camelCase } from 'lodash'
 import { HdPath } from '@cosmjs/crypto'
 import { Pool } from './types/Pool'
+import { SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/poolmanager/v1beta1/swap_route'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -130,7 +130,7 @@ export const findUnderlying = (lpToken: string, pools: Pool[]): string[] | undef
 	const pool = pools.find((pool) => pool.id.toString() === poolId)
 	if (!pool) return undefined
 
-	return pool.poolAssets.map((pool) => pool.token.denom)
+	return [pool.token0, pool.token1]
 }
 
 export const setPrice = async (
@@ -220,7 +220,7 @@ export const borrow = async (
 	return await client.execute(sender, redbankAddress, msg, 'auto')
 }
 
-export const makeExecuteContractMessage = (
+export const produceExecuteContractMessage = (
 	sender: string,
 	contract: string,
 	msg: Uint8Array,
@@ -239,7 +239,7 @@ export const makeExecuteContractMessage = (
 	return executeContractMsg
 }
 
-export const makeSendMessage = (
+export const produceSendMessage = (
 	sender: string,
 	recipient: string,
 	funds: Coin[],
@@ -254,7 +254,7 @@ export const makeSendMessage = (
 	}
 }
 
-export const makeDepositMessage = (
+export const produceDepositMessage = (
 	sender: string,
 	redBankContractAddress: string,
 	coins: Coin[],
@@ -272,7 +272,7 @@ export const makeDepositMessage = (
 	return executeContractMsg
 }
 
-export const makeBorrowMessage = (
+export const produceBorrowMessage = (
 	sender: string,
 	assetDenom: string,
 	amount: string,
@@ -291,7 +291,7 @@ export const makeBorrowMessage = (
 	return executeContractMsg
 }
 
-export const makeWithdrawMessage = (
+export const produceWithdrawMessage = (
 	sender: string,
 	assetDenom: string,
 	redBankContractAddress: string,
@@ -302,7 +302,7 @@ export const makeWithdrawMessage = (
           "denom": "${assetDenom}"
         } 
       }`)
-	return makeExecuteContractMessage(sender, redBankContractAddress, msg, [])
+	return produceExecuteContractMessage(sender, redBankContractAddress, msg, [])
 }
 
 interface MsgSwapEncodeObject {
@@ -310,7 +310,7 @@ interface MsgSwapEncodeObject {
 	value: MsgSwapExactAmountIn
 }
 
-export const makeRepayMessage = (
+export const produceRepayMessage = (
 	sender: string,
 	redBankContractAddress: string,
 	coins: Coin[],
@@ -328,7 +328,7 @@ export const makeRepayMessage = (
 	return executeContractMsg
 }
 
-export const makeSwapMessage = (
+export const produceSwapMessage = (
 	liquidatorAddress: string,
 	tokenIn: Coin,
 	route: SwapAmountInRoute[],

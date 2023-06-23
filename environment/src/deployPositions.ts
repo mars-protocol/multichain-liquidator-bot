@@ -4,7 +4,7 @@ import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { RedisClientType } from "redis";
 import { Coin, makeCosmoshubPath } from "@cosmjs/amino";
 import { RedisInterface } from "../../liquidator/src/redis.js"
-import { deposit, loadSeeds, makeBorrowMessage, makeDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../liquidator/src/helpers.js"
+import { deposit, loadSeeds, produceBorrowMessage, produceDepositMessage as produceDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../liquidator/src/helpers.js"
 import { createClient, recoverWallet, requiredEnvironmentVariables } from "./helpers.js";
 import 'dotenv/config.js'
 import path from "path";
@@ -192,7 +192,7 @@ const createPositions = async(
         try {
         const address = useableAddresses[index]
         console.log(`DEPOSITING : ${depositAmount} osmo`)
-        const depositMsg = makeDepositMessage(
+        const depositMsg = produceDepositMessage(
             address,
             OSMO_DENOM,
             addresses.redBank,
@@ -204,7 +204,7 @@ const createPositions = async(
         console.log(`BORROWING ${borrowAmount} USDC`)
 
         // make borrow message based off of ltv
-        const borrowMsg = makeBorrowMessage(
+        const borrowMsg = produceBorrowMessage(
             address,
             USDC_DENOM,
             borrowAmount,

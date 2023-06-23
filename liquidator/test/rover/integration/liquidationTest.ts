@@ -1,6 +1,6 @@
 import {
 	getWallet,
-	makeExecuteContractMessage,
+	produceExecuteContractMessage,
 	produceSigningCosmWasmClient,
 	produceSigningStargateClient,
 	setPrice,
@@ -28,6 +28,7 @@ import { TestConfig, testnetConfig } from './config'
 import BigNumber from 'bignumber.js'
 import { AMMRouter } from '../../../src/AmmRouter'
 import { RedisInterface } from '../../../src/redis'
+import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
 
 const runTests = async (testConfig: TestConfig) => {
 	// Test results
@@ -90,8 +91,10 @@ const runTests = async (testConfig: TestConfig) => {
 		stableBalanceThreshold: 10000000
 	}
 
+	const poolProvider = new OsmosisPoolProvider(testConfig.lcdEndpoint)
+
 	// Set up our liquidator
-	const executorLiquidator = new RoverExecutor(config, client, cwClient, wallet)
+	const executorLiquidator = new RoverExecutor(config, client, cwClient, wallet, poolProvider)
 	await executorLiquidator.initiateRedis()
 	await executorLiquidator.refreshData()
 
@@ -538,12 +541,12 @@ const lpCoinLiquidate = async (
 		await client.signAndBroadcast(
 			masterAddress,
 			[
-				makeExecuteContractMessage(
+				produceExecuteContractMessage(
 					masterAddress,
 					testConfig.oracleAddress,
 					toUtf8(JSON.stringify(gammPriceMsg)),
 				),
-				makeExecuteContractMessage(
+				produceExecuteContractMessage(
 					masterAddress,
 					testConfig.oracleAddress,
 					toUtf8(JSON.stringify(atomPriceMsg)),
@@ -766,17 +769,17 @@ const runIlliquidRedbankTest = async (
 		await client.signAndBroadcast(
 			masterAddress,
 			[
-				makeExecuteContractMessage(
+				produceExecuteContractMessage(
 					masterAddress,
 					testConfig.redbankAddress,
 					toUtf8(JSON.stringify(creditLineMsg)),
 				),
-				makeExecuteContractMessage(
+				produceExecuteContractMessage(
 					masterAddress,
 					testConfig.oracleAddress,
 					toUtf8(JSON.stringify(priceMsg)),
 				),
-				makeExecuteContractMessage(
+				produceExecuteContractMessage(
 					masterAddress,
 					testConfig.redbankAddress,
 					toUtf8(JSON.stringify(borrowMessage)),
@@ -857,12 +860,12 @@ const runCreditLineExceededCoinTest = async (
 		await client.signAndBroadcast(
 			masterAddress,
 			[
-				makeExecuteContractMessage(
+				produceExecuteContractMessage(
 					masterAddress,
 					testConfig.redbankAddress,
 					toUtf8(JSON.stringify(creditLineMsg)),
 				),
-				makeExecuteContractMessage(
+				produceExecuteContractMessage(
 					masterAddress,
 					testConfig.oracleAddress,
 					toUtf8(JSON.stringify(priceMsg)),
@@ -894,7 +897,7 @@ const runCreditLineExceededCoinTest = async (
 		await client.signAndBroadcast(
 			masterAddress,
 			[
-				makeExecuteContractMessage(
+				produceExecuteContractMessage(
 					masterAddress,
 					testConfig.redbankAddress,
 					toUtf8(
@@ -907,7 +910,7 @@ const runCreditLineExceededCoinTest = async (
 						}),
 					),
 				),
-				makeExecuteContractMessage(
+				produceExecuteContractMessage(
 					masterAddress,
 					testConfig.oracleAddress,
 					toUtf8(JSON.stringify(resetAtomPriceMsg)),
@@ -1041,7 +1044,7 @@ const updateMarketBorrow = async (
 	await client.signAndBroadcast(
 		masterAddress,
 		[
-			makeExecuteContractMessage(
+			produceExecuteContractMessage(
 				masterAddress,
 				redbankAddress,
 				toUtf8(
@@ -1077,7 +1080,7 @@ const resetPrice = async (
 	await client.signAndBroadcast(
 		masterAddress,
 		[
-			makeExecuteContractMessage(
+			produceExecuteContractMessage(
 				masterAddress,
 				oracleAddress,
 				toUtf8(JSON.stringify(resetAtomPriceMsg)),
@@ -1102,7 +1105,7 @@ const seedRedbank = async (
 	await client.signAndBroadcast(
 		masterAddress,
 		[
-			makeExecuteContractMessage(
+			produceExecuteContractMessage(
 				masterAddress,
 				testConfig.redbankAddress,
 				toUtf8(JSON.stringify({ deposit: {} })),
