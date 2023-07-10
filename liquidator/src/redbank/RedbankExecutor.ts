@@ -18,6 +18,7 @@ import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface.js'
 import { ExchangeInterface } from '../execute/ExchangeInterface.js'
+import { AssetParamsBaseForAddr } from '../types/marsParams.js'
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
@@ -37,6 +38,7 @@ export interface RedbankExecutorConfig extends BaseExecutorConfig {
  */
 export class RedbankExecutor extends BaseExecutor {
 	public config: RedbankExecutorConfig
+	private  assetParams : AssetParamsBaseForAddr[] = []
 
 	constructor(
 		config: RedbankExecutorConfig,
@@ -52,6 +54,11 @@ export class RedbankExecutor extends BaseExecutor {
 	async start() {
 		await this.initiateRedis()
 		await this.initiateAstroportPoolProvider()
+		await this.fetchAssetParams()
+
+
+		// fetch asset params every 10 minutes
+		setInterval(this.fetchAssetParams, 600*1000)
 
 		// run
 		while (true) {
@@ -60,6 +67,47 @@ export class RedbankExecutor extends BaseExecutor {
 			} catch (e) {
 				console.log('ERROR:', e)
 			}
+		}
+	}
+
+	async fetchAssetParams() {
+		const maxRetries = 5
+		const limit = 5
+	
+		// while not returning empty, get all asset params
+		let assetParams : AssetParamsBaseForAddr[] = []
+		let fetching = true
+		let startAfter = ""
+		let retries = 0
+		while (fetching) {
+			try {
+				const response = await this.queryClient.queryContractSmart(this.config.redbankAddress, {
+					all_asset_params: {
+						limit,
+						start_after: startAfter,
+					  },
+				})
+				
+				startAfter = response[response.length - 1] ? response[response.length - 1].denom : ""
+				assetParams = assetParams.concat(response)
+				fetching = response.length === 5
+				retries = 0
+			} catch(ex) {
+				console.warn(ex)
+				retries++
+				if (retries > maxRetries) {
+					console.warn("Max retries exceeded, exiting", maxRetries)
+					fetching = false
+				} else {
+					await sleep(5000)
+					console.info("Retrying...")
+				}
+			}
+		}
+
+		// if we fail to fetch, we don't want to overwrite the existing asset params
+		if (retries < maxRetries) {
+			this.assetParams = assetParams
 		}
 	}
 
