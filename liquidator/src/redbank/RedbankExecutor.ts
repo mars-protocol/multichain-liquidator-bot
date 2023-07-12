@@ -18,6 +18,11 @@ import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface.js'
 import { ExchangeInterface } from '../execute/ExchangeInterface.js'
+import { OsmosisPriceSourceForString } from '../types/marsOracleOsmosis.types.js'
+import { OsmosisOraclePriceFetcher as MarsOraclePriceFetcher } from '../query/oracle/OsmosisOraclePriceFetcher.js'
+import { PythPriceFetcher } from '../query/oracle/PythPriceFetcher.js'
+import { WasmPriceSourceForString } from '../types/marsOracleWasm.types.js'
+import { OraclePrice } from '../query/oracle/PriceFetcherInterface.js'
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
@@ -26,6 +31,13 @@ export interface RedbankExecutorConfig extends BaseExecutorConfig {
 	liquidatableAssets: string[]
 	safetyMargin: number
 }
+
+export interface PriceSourceResponse {
+	denom: string,
+	price_source: OsmosisPriceSourceForString | WasmPriceSourceForString
+}
+
+export const XYX_PRICE_SOURCE = "xyk_liquidity_token"
 
 /**
  * Executor class is the entry point for the executor service
@@ -37,6 +49,11 @@ export interface RedbankExecutorConfig extends BaseExecutorConfig {
  */
 export class RedbankExecutor extends BaseExecutor {
 	public config: RedbankExecutorConfig
+
+	private priceSources : PriceSourceResponse[] = []
+
+	private marsOraclePriceFetcher : MarsOraclePriceFetcher = new MarsOraclePriceFetcher(this.queryClient)
+	private pythOraclePriceFetcher : PythPriceFetcher = new PythPriceFetcher()
 
 	constructor(
 		config: RedbankExecutorConfig,
@@ -52,7 +69,12 @@ export class RedbankExecutor extends BaseExecutor {
 	async start() {
 		await this.initiateRedis()
 		await this.initiateAstroportPoolProvider()
+		await this.updatePriceSources()
 
+
+		// update price sources every 10 mins after initial load
+		setInterval(this.updatePriceSources, 1000 * 60 * 10)
+		
 		// run
 		while (true) {
 			try {
@@ -60,6 +82,99 @@ export class RedbankExecutor extends BaseExecutor {
 			} catch (e) {
 				console.log('ERROR:', e)
 			}
+		}
+	}
+
+	private updatePriceSources = async () => {
+		let priceSources : PriceSourceResponse[] = []
+		let fetching = true
+		let start_after = ""
+		let retries = 0
+
+		const maxRetries = 5
+		const limit = 10
+
+		while (fetching) {
+			try {
+				const response = await this.queryClient.queryContractSmart(this.config.oracleAddress, {
+					price_sources: {
+						limit,
+						start_after,
+					},
+				})
+			
+				start_after = response[response.length - 1] ? response[response.length - 1].denom : ""
+				priceSources = priceSources.concat(response)
+				fetching = response.length === limit
+				retries = 0
+			} catch(e) {
+				console.warn(e)
+				retries++
+				if (retries >= maxRetries) {
+					console.warn("Max retries exceeded, exiting", maxRetries)
+					fetching = false
+				} else {
+					await sleep(5000)
+					console.info("Retrying...")
+				}
+			}
+		}
+
+		// don't override if we did not fetch all data.
+		if (retries < maxRetries) {
+			this.priceSources = priceSources
+		}
+	}
+
+	private updateOraclePrices = async () => {
+
+		// settle all price sources
+		// push to our price map
+	}
+
+	private fetchOraclePrice = async (denom: string) : Promise<OraclePrice> => {
+		const priceSource : PriceSourceResponse | undefined = this.priceSources.find(ps => ps.denom === denom)
+		if (!priceSource) {
+			console.error(`No price source found for ${denom}`)
+		}
+
+		switch (priceSource?.[Object.keys(priceSource)[0]]) {
+			case 'fixed':
+			case 'spot':
+				// todo - support via pool query. But is this ever used? 
+			case 'arithmetic_twap':
+			case 'geometric_twap':
+			case 'xyk_liquidity_token':
+			case 'lsd':
+			case 'staked_geometric_twap':
+				return this.marsOraclePriceFetcher.fetchPrice({
+					oracleAddress: this.config.oracleAddress,
+					priceDenom: denom
+				})
+			case 'pyth':
+
+				const pyth : {
+					price_feed_id: string,
+					denom_decimals : number
+				//@ts-expect-error - our generated types don't handle this case
+				} =  priceSource.price_source.pyth
+				
+				return this.pythOraclePriceFetcher.fetchPrice({
+					priceFeedId:pyth.price_feed_id,
+					denomDecimals: pyth.denom_decimals,
+					denom: denom
+				})
+				break;
+			  // Handle other cases for different price source types	  
+			default:
+				// Handle unknown or unsupported price source types
+				console.warn('Unknown price source type');
+				return this.marsOraclePriceFetcher.fetchPrice({
+					oracleAddress: this.config.oracleAddress,
+					priceDenom: denom
+				})
+				break;
+			// iterate, fetch price source correctly
 		}
 	}
 
