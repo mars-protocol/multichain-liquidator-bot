@@ -16,13 +16,14 @@ import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
-import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface.js'
+import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface'
 import { ExchangeInterface } from '../execute/ExchangeInterface.js'
-import { OsmosisPriceSourceForString } from '../types/marsOracleOsmosis.types.js'
-import { OsmosisOraclePriceFetcher as MarsOraclePriceFetcher } from '../query/oracle/OsmosisOraclePriceFetcher.js'
-import { PythPriceFetcher } from '../query/oracle/PythPriceFetcher.js'
-import { WasmPriceSourceForString } from '../types/marsOracleWasm.types.js'
-import { OraclePrice } from '../query/oracle/PriceFetcherInterface.js'
+import { AssetParamsBaseForAddr } from '../types/marsParams.js'
+import { OsmosisPriceSourceForString } from '../types/marsOracleOsmosis.types'
+import { OsmosisOraclePriceFetcher as MarsOraclePriceFetcher } from '../query/oracle/OsmosisOraclePriceFetcher'
+import { PythPriceFetcher } from '../query/oracle/PythPriceFetcher'
+import { WasmPriceSourceForString } from '../types/marsOracleWasm.types'
+import { OraclePrice } from '../query/oracle/PriceFetcherInterface'
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
@@ -49,6 +50,7 @@ export const XYX_PRICE_SOURCE = "xyk_liquidity_token"
  */
 export class RedbankExecutor extends BaseExecutor {
 	public config: RedbankExecutorConfig
+	private  assetParams : AssetParamsBaseForAddr[] = []
 
 	private priceSources : PriceSourceResponse[] = []
 
@@ -70,11 +72,14 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.initiateRedis()
 		await this.initiateAstroportPoolProvider()
 		await this.updatePriceSources()
+		await this.fetchAssetParams()
 
 
+		// fetch asset params every 10 minutes
+		setInterval(this.fetchAssetParams, 600*1000)
 		// update price sources every 10 mins after initial load
 		setInterval(this.updatePriceSources, 1000 * 60 * 10)
-		
+
 		// run
 		while (true) {
 			try {
@@ -82,6 +87,47 @@ export class RedbankExecutor extends BaseExecutor {
 			} catch (e) {
 				console.log('ERROR:', e)
 			}
+		}
+	}
+
+	async fetchAssetParams() {
+		const maxRetries = 5
+		const limit = 5
+	
+		// while not returning empty, get all asset params
+		let assetParams : AssetParamsBaseForAddr[] = []
+		let fetching = true
+		let startAfter = ""
+		let retries = 0
+		while (fetching) {
+			try {
+				const response = await this.queryClient.queryContractSmart(this.config.redbankAddress, {
+					all_asset_params: {
+						limit,
+						start_after: startAfter,
+					  },
+				})
+				
+				startAfter = response[response.length - 1] ? response[response.length - 1].denom : ""
+				assetParams = assetParams.concat(response)
+				fetching = response.length === 5
+				retries = 0
+			} catch(ex) {
+				console.warn(ex)
+				retries++
+				if (retries > maxRetries) {
+					console.warn("Max retries exceeded, exiting", maxRetries)
+					fetching = false
+				} else {
+					await sleep(5000)
+					console.info("Retrying...")
+				}
+			}
+		}
+
+		// if we fail to fetch, we don't want to overwrite the existing asset params
+		if (retries < maxRetries) {
+			this.assetParams = assetParams
 		}
 	}
 
