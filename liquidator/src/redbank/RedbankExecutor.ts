@@ -53,6 +53,7 @@ export class RedbankExecutor extends BaseExecutor {
 	private  assetParams : AssetParamsBaseForAddr[] = []
 
 	private priceSources : PriceSourceResponse[] = []
+	private oraclePrices : Map<string, BigNumber> = new Map()
 
 	private marsOraclePriceFetcher : MarsOraclePriceFetcher = new MarsOraclePriceFetcher(this.queryClient)
 	private pythOraclePriceFetcher : PythPriceFetcher = new PythPriceFetcher()
@@ -72,6 +73,7 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.initiateRedis()
 		await this.initiateAstroportPoolProvider()
 		await this.updatePriceSources()
+		await this.updateOraclePrices()
 		await this.fetchAssetParams()
 
 
@@ -79,13 +81,15 @@ export class RedbankExecutor extends BaseExecutor {
 		setInterval(this.fetchAssetParams, 600*1000)
 		// update price sources every 10 mins after initial load
 		setInterval(this.updatePriceSources, 1000 * 60 * 10)
+		// update prices every min
+		setInterval(this.updateOraclePrices, 1000 * 60 )
 
 		// run
 		while (true) {
 			try {
 				await this.run()
 			} catch (e) {
-				console.log('ERROR:', e)
+				console.error('ERROR:', e)
 			}
 		}
 	}
@@ -175,7 +179,16 @@ export class RedbankExecutor extends BaseExecutor {
 	private updateOraclePrices = async () => {
 
 		// settle all price sources
-		// push to our price map
+		const priceResults : PromiseSettledResult<OraclePrice>[] = await Promise.allSettled(this.priceSources.map(async (priceSource) => await this.fetchOraclePrice(priceSource.denom)))
+		priceResults.forEach((oraclePriceResult) => {
+			const successfull = oraclePriceResult.status === 'fulfilled'
+			const oraclePrice = successfull ? oraclePriceResult.value : null
+	
+			// push successfull price results
+			if (successfull && oraclePrice) {
+				this.oraclePrices.set(oraclePrice.denom, oraclePrice.price)
+			}
+		})
 	}
 
 	private fetchOraclePrice = async (denom: string) : Promise<OraclePrice> => {
@@ -193,7 +206,7 @@ export class RedbankExecutor extends BaseExecutor {
 			case 'xyk_liquidity_token':
 			case 'lsd':
 			case 'staked_geometric_twap':
-				return this.marsOraclePriceFetcher.fetchPrice({
+				return await this.marsOraclePriceFetcher.fetchPrice({
 					oracleAddress: this.config.oracleAddress,
 					priceDenom: denom
 				})
@@ -205,7 +218,7 @@ export class RedbankExecutor extends BaseExecutor {
 				//@ts-expect-error - our generated types don't handle this case
 				} =  priceSource.price_source.pyth
 				
-				return this.pythOraclePriceFetcher.fetchPrice({
+				return await this.pythOraclePriceFetcher.fetchPrice({
 					priceFeedId:pyth.price_feed_id,
 					denomDecimals: pyth.denom_decimals,
 					denom: denom
@@ -215,7 +228,7 @@ export class RedbankExecutor extends BaseExecutor {
 			default:
 				// Handle unknown or unsupported price source types
 				console.warn('Unknown price source type');
-				return this.marsOraclePriceFetcher.fetchPrice({
+				return await this.marsOraclePriceFetcher.fetchPrice({
 					oracleAddress: this.config.oracleAddress,
 					priceDenom: denom
 				})
