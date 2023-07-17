@@ -26,6 +26,7 @@ import {
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface'
 
+
 interface CreateCreditAccountResponse {
 	tokenId : number
 	liquidatorAddress : string

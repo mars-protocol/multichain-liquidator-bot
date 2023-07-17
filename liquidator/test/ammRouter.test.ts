@@ -1,5 +1,5 @@
 import { AMMRouter } from '../src/AmmRouter'
-import { ConcentratedLiquidityPool, PoolAsset, PoolType, XYKPool } from '../src/types/Pool'
+import { ConcentratedLiquidityPool, PoolAsset, PoolType, StableswapPool, XYKPool } from '../src/types/Pool'
 import Long from 'long'
 import BigNumber from 'bignumber.js'
 import { Dec, Int } from '@keplr-wallet/unit'
@@ -82,8 +82,47 @@ const generateRandomCLPool = (
 			zeroToOne
 		} 
 	}
+}
 
+const generateRandomSSPool = (
+	denomA: string, 
+	denomB: string, 
+	denomAAmount: string = '100',
+	denomBAmount: string = '100'
+): StableswapPool => {
 
+return {
+	address: 'osmo1j4xmzkea5t8s077t0s39vs5psp6f6dacpjswn64ln2v4pncwxg3qjs30zl',
+	id: (Math.random() * 10000000) as unknown as Long,
+	swapFee: '0.002',
+	poolType: PoolType.STABLESWAP,
+	token0: denomA,
+	token1: denomB,
+	poolParams: {
+		swapFee: '0.002',
+		exitFee: '0.002'
+	},
+	futurePoolGovernor: 'osmo1j4xmzkea5t8s077t0s39vs5psp6f6dacpjswn64ln2v4pncwxg3qjs30zl',
+	totalShares: {
+		denom: denomA,
+		amount: '100'
+	},
+	poolLiquidity: [
+		{
+			denom: denomA,
+			amount: denomAAmount
+		},
+		{
+			denom: denomB,
+			amount: denomBAmount
+		},
+	],
+	scalingFactors: [
+		'1',
+		'1'
+	],
+	scalingFactorController: 'osmo1j4xmzkea5t8s077t0s39vs5psp6f6dacpjswn64ln2v4pncwxg3qjs30zl'
+}
 }
 
 describe('Osmosis Router Tests', () => {
@@ -409,7 +448,6 @@ describe('Osmosis Router Tests', () => {
 	test('We find get best route to CL pool', () => {
 		// routea = "osmo:atom:stable		osmo->atom (xyk) atom -> stable(xyk)
 		// routeb = "osmo:atom(cl):stable - osmo->atom (xyk) atom->stable(cl)
-		// just make the price really bad on the second amm pool
 
 		const osmoDenom = 'osmo'
 		const atomDenom = 'atom'
@@ -447,5 +485,37 @@ describe('Osmosis Router Tests', () => {
 		expect(bestRouteInput[1].pool.poolType).toBe(bestRouteOutput[1].pool.poolType)
 		expect(bestRouteInput[1].pool.poolType).toBe(PoolType.CONCENTRATED_LIQUIDITY)
 		expect(bestRouteOutput[1].pool.poolType).toBe(PoolType.CONCENTRATED_LIQUIDITY)
+	})
+
+	test('We find get best route to SS pool', () => {
+		// routea = "atom:stAtom	atom->stAtom (xyk)
+		// routeb = "atom:stAtom	atom->stAtom (ss)
+
+		const atomDenom = 'atom'
+		const stDenom = 'statom'
+
+		const pool = generateRandomSSPool(atomDenom, stDenom, '100000', '100000')
+
+		const pools = [
+			generateRandomXykPool([
+				generateRandomPoolAsset(stDenom, '100000'),
+				generateRandomPoolAsset(atomDenom, '100000'),
+			]),
+			pool
+		]
+
+		const router = new AMMRouter()
+		router.setPools(pools)
+
+		// swap 1% of atom for stAtom
+		const bestRouteInput = router.getBestRouteGivenInput(atomDenom, stDenom, new BigNumber(1000)) 
+		const bestRouteOutput = router.getBestRouteGivenOutput(atomDenom, stDenom, new BigNumber(1000))
+
+		expect(bestRouteInput[0].poolId).toBe(bestRouteOutput[0].poolId)
+		expect(bestRouteInput[1].poolId).toBe(bestRouteOutput[1].poolId)
+		expect(bestRouteInput[0].pool.poolType).toBe(bestRouteOutput[0].pool.poolType)
+		expect(bestRouteInput[1].pool.poolType).toBe(bestRouteOutput[1].pool.poolType)
+		expect(bestRouteInput[1].pool.poolType).toBe(PoolType.STABLESWAP)
+		expect(bestRouteOutput[1].pool.poolType).toBe(PoolType.STABLESWAP)
 	})
 })

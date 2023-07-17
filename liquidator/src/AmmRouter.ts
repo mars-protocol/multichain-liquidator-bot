@@ -1,9 +1,11 @@
 import BigNumber from 'bignumber.js'
 import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from './math'
 import { RouteHop } from './types/RouteHop'
-import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from './types/Pool'
+import { ConcentratedLiquidityPool, Pool, PoolType, StableswapPool, XYKPool } from './types/Pool'
 import { ConcentratedLiquidityMath } from "./amm/osmosis/math/concentrated"
+
 import { Coin, Dec, Int } from '@keplr-wallet/unit'
+import { StableSwapMath, StableSwapToken } from '@osmosis-labs/math'
 const { calcOutGivenIn, calcInGivenOut } = ConcentratedLiquidityMath
 
 export interface AMMRouterInterface {
@@ -106,6 +108,33 @@ export class AMMRouter implements AMMRouterInterface {
 					const { amountOut } = result
 					tokenInAmount = new BigNumber(amountOut.toString())
 					break
+				case PoolType.STABLESWAP:
+
+					const ssPool = pool as StableswapPool
+
+					// Produce scaling tokens
+					// @ts-expect-error - osmosis types are out of date
+					const tokens : StableSwapToken[] = ssPool.poolLiquidity.map((poolLiquidity, index) => {
+						return {
+							amount: new Dec(poolLiquidity.amount),
+							denom: poolLiquidity.denom,
+							scalingFactor : new BigNumber(ssPool.scalingFactors[index])
+						}
+					})
+
+					const ssOutGivenInIncludingFees = StableSwapMath.calcOutGivenIn(
+						tokens,
+						{
+							// @ts-expect-error - osmosis types are out of date
+							amount: new Int(tokenInAmount.toString()),
+							denom: routeHop.tokenInDenom,
+						},
+						routeHop.tokenOutDenom,
+						new Dec(ssPool.poolParams.swapFee),
+					)
+
+					tokenInAmount = new BigNumber(ssOutGivenInIncludingFees.toString())
+					break
 			}
 		})
 
@@ -179,7 +208,35 @@ export class AMMRouter implements AMMRouterInterface {
 					amountAfterFees = new BigNumber(amountIn.toString())
 					tokenOutRequired = amountAfterFees
 					break
-				
+
+					case PoolType.STABLESWAP:
+
+					const ssPool = pool as StableswapPool
+
+					// Produce scaling tokens
+					//@ts-expect-error - osmosis type import is behind
+					const tokens : StableSwapToken[] = ssPool.poolLiquidity.map((poolLiquidity, index) => {
+						return {
+							amount: new Dec(poolLiquidity.amount),
+							denom: poolLiquidity.denom,
+							scalingFactor : new BigNumber(ssPool.scalingFactors[index])
+						}
+					})
+
+					const ssInGivenOutIncludingFees = StableSwapMath.calcInGivenOut(
+						tokens,
+						{
+							//@ts-expect-error - osmosis type import is behind
+							amount: new Int(tokenOutRequired.toString()),
+							denom: routeHop.tokenOutDenom,
+						},
+						routeHop.tokenOutDenom,
+						new Dec(ssPool.poolParams.swapFee),
+					)
+
+					tokenOutRequired = new BigNumber(ssInGivenOutIncludingFees.toString())
+					break
+					
 			}
 		})
 
@@ -254,7 +311,6 @@ export class AMMRouter implements AMMRouterInterface {
 		// all pairs that have our sell asset, and are not previously in our route
 		const possibleStartingPairs = pools.filter((pool) => {
 			return (
-				// todo  - support stableswap
 				(pool.token0 === tokenInDenom ||
 					pool.token1 === tokenInDenom) &&
 				// ensure we don't use the same pools

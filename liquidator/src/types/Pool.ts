@@ -38,6 +38,18 @@ export interface ConcentratedLiquidityPool extends Pool {
 		oneToZero: LiquidityDepth[]
 	}
 }
+
+export interface StableswapPool extends Pool {
+    poolParams: {
+      swapFee: string;
+      exitFee: string;
+    };
+    futurePoolGovernor: string;
+    totalShares:Coin
+    poolLiquidity: Coin[];
+    scalingFactors: string[];
+    scalingFactorController: string;
+}
   
  export interface Data {
 	liquidityDepths: LiquidityDepth[];

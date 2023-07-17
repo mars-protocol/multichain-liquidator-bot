@@ -1,6 +1,6 @@
 import { Int } from "@keplr-wallet/unit";
 import { camelCaseKeys } from "../../helpers";
-import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from "../../types/Pool";
+import { ConcentratedLiquidityPool, Pool, PoolType, StableswapPool as StableswapPool, XYKPool } from "../../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
 import { LiquidityDepth } from "../../amm/osmosis/math/concentrated/types";
 
@@ -34,9 +34,12 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 						result.token0 = result.poolAssets[0].token.denom
 						result.token1 = result.poolAssets[1].token.denom
 						pools.push(result)
-					} else {
-					  // just skip, 
-					  console.log('unsupported pool type')
+					} else if (data['@type'] === '/osmosis.gamm.poolmodels.stableswap.v1beta1.Pool') {
+						const result = camelCaseKeys(data) as StableswapPool
+						result.poolType = PoolType.STABLESWAP
+						result.token0 = result.poolLiquidity[0].denom
+						result.token1 = result.poolLiquidity[1].denom
+						pools.push(result)
 					}
 				  });
 	
