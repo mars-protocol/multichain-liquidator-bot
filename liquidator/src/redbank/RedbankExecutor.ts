@@ -1,4 +1,4 @@
-import { LiquidationTx } from '../types/liquidation.js'
+import { LiquidationTx } from '../types/liquidation'
 import { Position } from '../types/position'
 import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
@@ -15,7 +15,7 @@ import BigNumber from 'bignumber.js'
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
-import { Collateral, DataResponse } from '../query/types.js'
+import { Collateral, DataResponse, Debt } from '../query/types.js'
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface'
 import { ExchangeInterface } from '../execute/ExchangeInterface.js'
 import { AssetParamsBaseForAddr } from '../types/marsParams.js'
@@ -305,6 +305,52 @@ export class RedbankExecutor extends BaseExecutor {
 		})
 
 		return { txs, debtsToRepay }
+	}
+
+	calculateCR(
+		debts: Debt[],
+		collaterals : Collateral[]
+	) : BigNumber{
+		const totalDebtValue = this.getTotalValueOfCoinArray(debts)
+		const totalCollateralValue = this.getTotalValueOfCoinArray(collaterals)
+
+		// Calculated as CR = Total Assets / Total Debt
+		return totalCollateralValue.dividedBy(totalDebtValue)
+	}
+
+	calculateMaxDebtRepayable(
+		targetHealthFactor : number,
+		debts : Debt[],
+		collaterals: Collateral[],
+		loanToValue : number,
+		totalLiquidationFee: number
+	) : BigNumber {
+
+		const totalDebtValue = this.getTotalValueOfCoinArray(debts)
+		const totalCollateralValue = this.getTotalValueOfCoinArray(collaterals)
+		const thf = new BigNumber(targetHealthFactor)
+		const ltv = new BigNumber(loanToValue)
+		
+		// MDR = ((THF*Debt_0) - (LTV*Collateral_0))/(THF - (LTV * (1 + TLF)))
+		return (
+			(
+				thf.multipliedBy(totalDebtValue)).minus((ltv.multipliedBy(totalCollateralValue))
+				.dividedBy(
+					thf.minus(ltv.multipliedBy(1+totalLiquidationFee))
+				)
+			)
+		)
+
+
+
+	}
+
+	getTotalValueOfCoinArray(coins: Coin[]) {
+		return  coins.reduce((acc, debt) => {
+			const price = new BigNumber(this.prices[debt.denom] || 0);
+			const value = new BigNumber(debt.amount).multipliedBy(price);
+			return acc.plus(value); // Accumulate the total value
+		  }, new BigNumber(0));
 	}
 
 	appendWithdrawMessages(
