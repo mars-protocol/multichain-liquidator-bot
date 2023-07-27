@@ -9,7 +9,7 @@ import {
 import { MarketInfo } from '../rover/types/MarketInfo'
 import { SwapperRoute } from '../types/swapper'
 
-export interface AssetResponse {
+export interface AssetResponse extends Coin {
 	denom: string
 	amount_scaled: string
 	amount: string
