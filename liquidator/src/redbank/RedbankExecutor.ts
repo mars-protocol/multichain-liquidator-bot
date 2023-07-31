@@ -306,7 +306,7 @@ export class RedbankExecutor extends BaseExecutor {
 				const largestCollateralValue = new BigNumber(largestCollateral.amount)
 					.multipliedBy(1-liquidationBonus)
 					.multipliedBy(collateralPrice)
-					
+
 				const maxRepayableValue = maxDebtRepayableValue.isGreaterThan(largestCollateralValue) ? largestCollateralValue : maxDebtRepayableValue
 				const maxRepayableAmount = maxRepayableValue.dividedBy(this.prices.get(debtDenom) || 0)
 
