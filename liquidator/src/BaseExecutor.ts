@@ -18,6 +18,7 @@ export interface BaseExecutorConfig {
 	hiveEndpoint: string
 	oracleAddress: string
 	redbankAddress: string
+	marsParamsAddress: string
 	liquidatorMasterAddress: string
 	gasDenom: string
 	neutralAssetDenom: string

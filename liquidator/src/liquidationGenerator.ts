@@ -22,8 +22,8 @@ const sortAssetArrayByAmount = (
 export const getLargestCollateral = (
 	collaterals: Collateral[],
 	prices: Map<string, number>,
-): string => {
-	return sortAssetArrayByAmount(collaterals, prices)[0].denom
+): Collateral => {
+	return sortAssetArrayByAmount(collaterals, prices)[0] as Collateral
 }
 
 export const getLargestDebt = (debts: Debt[], prices: Map<string, number>): AssetResponse => {

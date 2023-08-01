@@ -20,6 +20,7 @@ export const getConfig = (
 				redbankAddress: 'osmo1c3ljch9dfw5kf52nfwpxd2zmj2ese7agnx0p9tenkrryasrle5sqf3ftpg',
 				redisEndpoint: process.env.REDIS_ENDPOINT!,
 				poolsRefreshWindow: 60000,
+				liquidationProfitMarginPercent: 0.01
 		  }
 		: {
 				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
@@ -35,5 +36,6 @@ export const getConfig = (
 				redbankAddress: 'osmo1t0dl6r27phqetfu0geaxrng0u9zn8qgrdwztapt5xr32adtwptaq6vwg36',
 				redisEndpoint: '',
 				poolsRefreshWindow: 60000,
+				liquidationProfitMarginPercent: 0.01
 		  }
 }
