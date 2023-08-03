@@ -24,6 +24,7 @@ export interface BaseExecutorConfig {
 	logResults: boolean
 	redisEndpoint: string
 	poolsRefreshWindow: number
+	astroportFactory?: string
 }
 
 /**
@@ -103,6 +104,7 @@ export class BaseExecutor {
 
 	refreshData = async () => {
 		// dispatch hive request and parse it
+
 		const { wasm, bank } = await fetchRedbankData(
 			this.config.hiveEndpoint,
 			this.config.liquidatorMasterAddress,

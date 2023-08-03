@@ -14,6 +14,7 @@ import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
 import { ExchangeInterface } from './execute/ExchangeInterface.js'
 import { Osmosis } from './execute/Osmosis.js'
 import { getConfig } from './redbank/config/getConfig.js'
+import { BaseExecutorConfig } from './BaseExecutor.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -49,11 +50,13 @@ export const main = async () => {
 	const networkEnv = process.env.NETWORK || "LOCALNET"
 	const network  = networkEnv === "MAINNET" ? Network.MAINNET : networkEnv === "TESTNET" ? Network.TESTNET : Network.LOCALNET
 
-	const poolProvider = getPoolProvider(process.env.CHAIN_NAME!)
+	const redbankConfig = getConfig(liquidatorMasterAddress, network, process.env.CHAIN_NAME!)
+
+	const poolProvider = getPoolProvider(process.env.CHAIN_NAME!, redbankConfig)
 
 	switch (executorType) {
 		case REDBANK:
-			await launchRedbank(client, queryClient, getConfig(liquidatorMasterAddress, network, process.env.CHAIN_NAME!), poolProvider, exchangeInterface)
+			await launchRedbank(client, queryClient, redbankConfig, poolProvider, exchangeInterface)
 			return
 		case ROVER:
 			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator, poolProvider)
@@ -65,12 +68,13 @@ export const main = async () => {
 	}
 }
 
-const getPoolProvider = (chainName: string) : PoolDataProviderInterface => {
+const getPoolProvider = (chainName: string, config: BaseExecutorConfig) : PoolDataProviderInterface => {
 	switch (chainName) {
 		case "osmosis":
 			return new OsmosisPoolProvider(process.env.LCD_ENDPOINT!)
 		case "neutron":
-			return new AstroportPoolProvider(process.env.ASTROPORT_FACTORY_CONTRACT!, process.env.HIVE_ENDPOINT!)
+
+			return new AstroportPoolProvider(config.astroportFactory!, process.env.HIVE_ENDPOINT!)
 		default:
 			throw new Error(`Invalid chain name. Chain name must be either osmosis or neutron, recieved ${chainName}`)
 	}
