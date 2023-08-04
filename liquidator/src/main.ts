@@ -15,6 +15,7 @@ import { ExchangeInterface } from './execute/ExchangeInterface.js'
 import { Osmosis } from './execute/Osmosis.js'
 import { getConfig } from './redbank/config/getConfig.js'
 import { BaseExecutorConfig } from './BaseExecutor.js'
+import { AstroportCW } from './execute/AstroportCW.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -28,31 +29,33 @@ export const main = async () => {
 
 	// produce paths for the number of addresses we want under our seed
 	const addressCount = process.env.MAX_LIQUIDATORS || 1
-	const paths: HdPath[] = []
+	const chainName = process.env.CHAIN_NAME!
+	const prefix = process.env.PREFIX!
+	const hdPaths: HdPath[] = []
 
-	while (paths.length < Number(addressCount)) {
-		paths.push(makeCosmoshubPath(paths.length))
+	while (hdPaths.length < Number(addressCount)) {
+		hdPaths.push(makeCosmoshubPath(hdPaths.length))
 	}
 
 	const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(await sm.getSeedPhrase(), {
-		prefix: process.env.PREFIX!,
-		hdPaths: paths,
+		prefix ,
+		hdPaths,
 	})
 	const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
 
 	// produce clients
 	const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!)
 	const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
-
-	// todo depnendent on network
-	const exchangeInterface = new Osmosis()
-	// Produce network
 	const networkEnv = process.env.NETWORK || "LOCALNET"
 	const network  = networkEnv === "MAINNET" ? Network.MAINNET : networkEnv === "TESTNET" ? Network.TESTNET : Network.LOCALNET
 
-	const redbankConfig = getConfig(liquidatorMasterAddress, network, process.env.CHAIN_NAME!)
+	const redbankConfig = getConfig(liquidatorMasterAddress, network, chainName)
 
-	const poolProvider = getPoolProvider(process.env.CHAIN_NAME!, redbankConfig)
+	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
+	// Produce network
+
+
+	const poolProvider = getPoolProvider(chainName, redbankConfig)
 
 	switch (executorType) {
 		case REDBANK:

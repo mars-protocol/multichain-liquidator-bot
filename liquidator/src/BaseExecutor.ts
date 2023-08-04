@@ -15,6 +15,7 @@ import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
 
 export interface BaseExecutorConfig {
 	lcdEndpoint: string
+	chainName: string
 	hiveEndpoint: string
 	oracleAddress: string
 	redbankAddress: string
@@ -25,6 +26,7 @@ export interface BaseExecutorConfig {
 	redisEndpoint: string
 	poolsRefreshWindow: number
 	astroportFactory?: string
+	astroportRouter?: string
 }
 
 /**
