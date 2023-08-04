@@ -15,6 +15,7 @@ import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
 
 export interface BaseExecutorConfig {
 	lcdEndpoint: string
+	chainName: string
 	hiveEndpoint: string
 	oracleAddress: string
 	redbankAddress: string
@@ -24,6 +25,8 @@ export interface BaseExecutorConfig {
 	logResults: boolean
 	redisEndpoint: string
 	poolsRefreshWindow: number
+	astroportFactory?: string
+	astroportRouter?: string
 }
 
 /**
@@ -103,6 +106,7 @@ export class BaseExecutor {
 
 	refreshData = async () => {
 		// dispatch hive request and parse it
+
 		const { wasm, bank } = await fetchRedbankData(
 			this.config.hiveEndpoint,
 			this.config.liquidatorMasterAddress,

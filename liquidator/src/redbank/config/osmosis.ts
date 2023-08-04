@@ -10,6 +10,7 @@ export const getConfig = (
 				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
 				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!, // todo hardcode here
 				safetyMargin: 0.05,
+				chainName: "osmosis",
 				lcdEndpoint: process.env.LCD_ENDPOINT!, // use env vars in order to be able to quickly change
 				gasDenom: 'uosmo',
 				hiveEndpoint: process.env.HIVE_ENDPOINT!,
@@ -24,6 +25,7 @@ export const getConfig = (
 		: {
 				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
 				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
+				chainName: "osmosis",
 				safetyMargin: 0.05,
 				lcdEndpoint: process.env.LCD_ENDPOINT!,
 				gasDenom: 'uosmo',

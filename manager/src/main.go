@@ -193,9 +193,9 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 	// The deployers need the container images for collector, health-checker
 	// and liquidator
 
-	executorServiceId := fmt.Sprintf("%s-executor", workItemType)
-	collectorServiceId := fmt.Sprintf("%s-collector", workItemType)
-	healthCheckServiceId := fmt.Sprintf("%s-health-check", workItemType)
+	executorServiceId := fmt.Sprintf("%s-executor-%s", workItemType, environmentConfig.ChainID)
+	collectorServiceId := fmt.Sprintf("%s-collector-%s", workItemType, environmentConfig.ChainID)
+	healthCheckServiceId := fmt.Sprintf("%s-health-check-%s", workItemType, environmentConfig.ChainID)
 	switch strings.ToLower(environmentConfig.DeployerType) {
 	case DeployerTypeDocker:
 
@@ -347,9 +347,9 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 
 func getDeploymentConfig(environmentConfig EnvironmentConfig, serviceType types.WorkItemType) DeploymentConfig {
 
-	executorServiceId := fmt.Sprintf("%s-executor", serviceType)
-	collectorServiceId := fmt.Sprintf("%s-collector", serviceType)
-	healthCheckServiceId := fmt.Sprintf("%s-health-check", environmentConfig.WorkItemType)
+	executorServiceId := fmt.Sprintf("%s-executor-%s", serviceType, environmentConfig.ChainID)
+	collectorServiceId := fmt.Sprintf("%s-collector-%s", serviceType, environmentConfig.ChainID)
+	healthCheckServiceId := fmt.Sprintf("%s-health-check-%s", environmentConfig.WorkItemType, environmentConfig.ChainID)
 
 	redisDatabaseIndex := RedbankDatabaseIndex
 	if environmentConfig.WorkItemType == types.Rover {

@@ -51,8 +51,11 @@ export class RedbankExecutor extends BaseExecutor {
 
 	async start() {
 		await this.initiateRedis()
-		await this.initiateAstroportPoolProvider()
 
+		if (this.config.chainName === "neutron") {
+			await this.initiateAstroportPoolProvider()
+		}
+		
 		// run
 		while (true) {
 			try {
