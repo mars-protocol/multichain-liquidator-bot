@@ -2,7 +2,7 @@
 // Integration tests for the liquidation logic
 // **********************************************
 
-import { makeCosmoshubPath } from '@cosmjs/amino'
+import { StdFee, makeCosmoshubPath } from '@cosmjs/amino'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { HdPath } from '@cosmjs/crypto'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
@@ -28,7 +28,7 @@ import { Osmosis } from '../../../src/execute/Osmosis.js'
 import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
 
 const EXECUTOR_QUEUE = 'executor_queue'
-const redisInterface = new RedisInterface()
+const redisInterface = new RedisInterface(EXECUTOR_QUEUE)
 
 // run test
 const runTest = async (testConfig: TestConfig, numberOfPositions: number) => {
@@ -57,47 +57,74 @@ const runTest = async (testConfig: TestConfig, numberOfPositions: number) => {
 	const cwClient = await produceSigningCosmWasmClient(testConfig.rpcEndpoint, wallet)
 	const sgClient = await produceSigningStargateClient(testConfig.rpcEndpoint, wallet)
 
+	const baseTokenAmount = 20000000
+
 	const deployerAddress = accounts[0].address
+
 	// let liquidator be second account
-	const liquidatorAccount = accounts[1].address
+	const liquidatorAddress = accounts[1].address
 
-	// send some tokens to redbank to ensure
-	console.log('seeding redbank')
 
-	await sgClient.sendTokens(
-		deployerAddress,
-		liquidatorAccount,
-		[{ amount: '1000000', denom: testConfig.usdcDenom }],
-		'auto',
-	)
-	await sgClient.sendTokens(
-		deployerAddress,
-		liquidatorAccount,
-		[{ amount: '1000000', denom: testConfig.gasDenom }],
-		'auto',
-	)
-	await sgClient.sendTokens(
-		deployerAddress,
-		testConfig.redbankAddress,
-		[{ amount: '10000000', denom: testConfig.atomDenom }],
-		'auto',
-	)
+	// await cwClient.execute(deployerAddress, "osmo1wug8sewp6cedgkmrmvhl3lf3tulagm9hnvy8p0rppz9yjw0g4wtqcm3670", {
+	// 	set_address: {
+	// 		address: "osmo1zwugj8tz9nq63m3lxcfpunp0xr5lnlxdr0yyn4gpftx3ham09m4skn73ew",
+	// 		address_type: "credit_manager"
+	// 	}
+	// },
+	// "auto")
+
+	let initialBalance = {
+		uosmo: await cwClient.getBalance(liquidatorAddress, testConfig.gasDenom),
+		// uatom: await cwClient.getBalance(liquidatorAddress, testConfig.atomDenom),
+		// uusdc: await cwClient.getBalance(liquidatorAccount, testConfig.usdcDenom),
+	}
+
+	// Top up balance
+	for (const key of Object.keys(initialBalance)) { 
+		const amount = Number(initialBalance[key].amount)
+		const difference = amount - baseTokenAmount
+		if (difference < 0) {
+
+			const sendingFee : StdFee = {
+				amount: [{ amount: '100000', denom: testConfig.gasDenom }],
+				gas : '200000'
+			}
+
+			console.log(`sending ${Math.abs(difference)} ${key} to ${liquidatorAddress}`)
+			await sgClient.sendTokens(
+				deployerAddress,
+				liquidatorAddress,
+				[{ amount: Math.abs(difference).toString(), denom: key }],
+				sendingFee,
+			)
+
+		}
+	}
+
+	initialBalance = {
+		uosmo: await cwClient.getBalance(liquidatorAddress, testConfig.gasDenom),
+		// uatom: await cwClient.getBalance(liquidatorAddress, testConfig.atomDenom),
+		// uusdc: await cwClient.getBalance(liquidatorAccount, testConfig.usdcDenom),
+	}
 
 	const config = {
 		gasDenom: 'uosmo',
 		hiveEndpoint: testConfig.hiveEndpoint,
 		lcdEndpoint: testConfig.lcdEndpoint,
-		liquidatableAssets: ['osmo', 'atom', 'usdc'],
-		neutralAssetDenom: 'usdc',
-		liquidatorMasterAddress: liquidatorAccount,
+		liquidatableAssets: ['uosmo', 'uatom', 'uusdc'],
+		neutralAssetDenom: 'uosmo',
+		liquidatorMasterAddress: liquidatorAddress,
 		liquidationFiltererAddress: testConfig.liquidationFiltererAddress,
 		oracleAddress: testConfig.oracleAddress,
 		redbankAddress: testConfig.redbankAddress,
 		safetyMargin: 0.05,
 		logResults: true,
-		queueName: 'redbank-queue',
+		queueName: EXECUTOR_QUEUE,
 		redisEndpoint: '',
 		poolsRefreshWindow: 60000,
+		liquidationProfitMarginPercent: 0.01,
+
+		marsParamsAddress: 'osmo10qt8wg0n7z740ssvf3urmvgtjhxpyp74hxqvqt7z226gykuus7eqxj2v4d',
 	}
 
 	const osmoToSend = { amount: '11000000', denom: testConfig.gasDenom }
@@ -112,64 +139,64 @@ const runTest = async (testConfig: TestConfig, numberOfPositions: number) => {
 	)
 
 	// set prices, both at 1
-	console.log(`setting prices`)
 	await setPrice(cwClient, deployerAddress, testConfig.gasDenom, '1', testConfig.oracleAddress)
-	await setPrice(cwClient, deployerAddress, testConfig.atomDenom, '1', testConfig.oracleAddress)
+	await setPrice(cwClient, deployerAddress, testConfig.atomDenom, '2', testConfig.oracleAddress)
 
 	console.log(`seeding redbank with intial deposit`)
 
+	// const redbankBalance = await
 	// create relatively large position with deployer, to ensure all other positions can borrow liquidate without issue
-	// await deposit(cwClient, deployerAddress, testConfig.atomDenom, '1000000', testConfig.redbankAddress)
-	await sgClient.sendTokens(
-		deployerAddress,
-		testConfig.redbankAddress,
-		[{ amount: '10000000000', denom: testConfig.atomDenom }],
-		'auto',
-	)
-	await sgClient.sendTokens(
-		deployerAddress,
-		testConfig.redbankAddress,
-		[{ amount: '10000000000', denom: testConfig.gasDenom }],
-		'auto',
-	)
+	await deposit(cwClient, deployerAddress, testConfig.gasDenom, '20000000', testConfig.redbankAddress)
+	await deposit(cwClient, deployerAddress, testConfig.atomDenom, '1000000', testConfig.redbankAddress)
 
-	console.log('Setting up positions')
+	// await sgClient.sendTokens(
+	// 	deployerAddress,
+	// 	testConfig.redbankAddress,
+	// 	[{ amount: '10000000000', denom: testConfig.atomDenom }],
+	// 	'auto',
+	// )
+
+	// await sgClient.sendTokens(
+	// 	deployerAddress,
+	// 	testConfig.redbankAddress,
+	// 	[{ amount: '10000000000', denom: testConfig.gasDenom }],
+	// 	'auto',
+	// )
+
+	console.log('Creating Positions...')
 	const length = useableAddresses.length
 	let index = 0
 	while (index < length) {
 		const address = useableAddresses[index]
 		try {
-			await deposit(cwClient, address, testConfig.gasDenom, '10000', testConfig.redbankAddress)
-			await borrow(cwClient, address, testConfig.atomDenom, '3000', testConfig.redbankAddress)
-			console.log(`created position for address ${address}`)
+			await deposit(cwClient, address, testConfig.atomDenom, '10000000', testConfig.redbankAddress)
+			await borrow(cwClient, address, testConfig.gasDenom, '8000000', testConfig.redbankAddress)
+
+			console.log(`- created position for address ${address}`)
 		} catch (e) {
-			console.log(`error occurred creating positions for ${address}`)
-			console.log(e)
+			console.error(`- error occurred creating position for ${address}`)
+			console.error(e)
 		}
 
 		index += 1
 	}
 
-	await pushPositionsToRedis(useableAddresses, redisClient, EXECUTOR_QUEUE)
+	await pushPositionsToRedis(useableAddresses, redisClient, 'testing-queue')
 
 	// manipulate price
-	await setPrice(cwClient, deployerAddress, testConfig.atomDenom, '2.2', testConfig.oracleAddress)
-
-	const initialBalance = {
-		uosmo: await cwClient.getBalance(liquidatorAccount, testConfig.gasDenom),
-		atom: await cwClient.getBalance(liquidatorAccount, testConfig.atomDenom),
-		usdc: await cwClient.getBalance(liquidatorAccount, testConfig.usdcDenom),
-	}
+	await setPrice(cwClient, deployerAddress, testConfig.atomDenom, '1', testConfig.oracleAddress)
 
 	const poolProvider = new OsmosisPoolProvider(testConfig.lcdEndpoint)
 	const exchangeInterface = new Osmosis()
-	console.log(`================= executing liquidations =================`)
+	console.log(`Waiting for liquidations to complete...`)
 	// execute liquidations
 	await dispatchLiquidations(sgClient, cwClient, config, poolProvider, exchangeInterface)
 
 	for (const index in useableAddresses) {
 		const health = await queryHealth(cwClient, useableAddresses[index], testConfig.redbankAddress)
-		if (Number(health.health_status.borrowing.liq_threshold_hf) < 1) {
+		const ltv = Number(health.health_status.borrowing.liq_threshold_hf)
+		console.log({ ltv })
+		if ( ltv < 1) {
 			console.log(`${useableAddresses[index]} is still unhealthy`)
 		} else {
 			console.log(`${useableAddresses[index]} is healthy`)
@@ -177,16 +204,16 @@ const runTest = async (testConfig: TestConfig, numberOfPositions: number) => {
 	}
 
 	const updatedBalance = {
-		uosmo: await cwClient.getBalance(liquidatorAccount, testConfig.gasDenom),
-		atom: await cwClient.getBalance(liquidatorAccount, testConfig.atomDenom),
-		usdc: await cwClient.getBalance(liquidatorAccount, testConfig.usdcDenom),
+		uosmo: await cwClient.getBalance(liquidatorAddress, testConfig.gasDenom),
+		atom: await cwClient.getBalance(liquidatorAddress, testConfig.atomDenom),
+		usdc: await cwClient.getBalance(liquidatorAddress, testConfig.usdcDenom),
 	}
 
 	console.log({
 		updatedBalance,
 		initialBalance,
 	})
-	const gains = Number(updatedBalance.usdc.amount) - Number(initialBalance.usdc.amount)
+	const gains = Number(updatedBalance[config.neutralAssetDenom].amount) - Number(initialBalance[config.neutralAssetDenom].amount)
 
 	if (gains < 0) {
 		console.error('ERROR : Updated balance was smaller than initial balance. Asset')
@@ -202,7 +229,6 @@ const pushPositionsToRedis = async (
 	queueName: string,
 ) => {
 	for (const index in addresses) {
-		console.log(`pushing position to redis: ${addresses[index]}`)
 		const position: Position = {
 			Identifier: addresses[index],
 		}
@@ -221,13 +247,22 @@ const dispatchLiquidations = async (
 ) => {
 	const executor = new RedbankExecutor(config, client, cwClient, poolProvider, exchangeInterface)
 
+	// await executor.initiateRedis()
+
 	await executor.initiateRedis()
+
+	// todo
+	// await this.initiateAstroportPoolProvider()
+	await executor.updatePriceSources()
+	await executor.updateOraclePrices()
+	await executor.fetchAssetParams()
+	await executor.fetchTargetHealthFactor()
 	await executor.run()
 }
 const main = async () => {
 	const config = localnetConfig
 	await runTest(config, 1)
-	await runTest(config, 5)
+	// await runTest(config, 5)
 }
 main().catch((e) => {
 	console.log(e)
