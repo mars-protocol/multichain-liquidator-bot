@@ -269,6 +269,7 @@ func setUpManager(
 		executorDeployer, err = deployer.NewAWSECS(
 			environmentConfig.ExecutorServiceTitle,
 			environmentConfig.ExecutorTaskDefinition,
+			environmentConfig.ExecutorImage,
 			serviceConfig.ExecutorConfig,
 			logger,
 		)
