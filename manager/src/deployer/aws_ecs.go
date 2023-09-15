@@ -46,6 +46,7 @@ type awsECSConfig struct {
 // the given container in the specified cluster
 func NewAWSECS(
 	service string,
+	taskDefinition string,
 	container string,
 	containerEnv map[string]string,
 	logger *logrus.Entry,
@@ -75,7 +76,7 @@ func NewAWSECS(
 	// Get or create the AWS ECS task definition for the ECS service deployment
 	taskDefinitionARN, err := getOrCreateTaskDefinition(
 		client,
-		service,
+		taskDefinition,
 		container,
 		ecsConfig.CpuUnits,
 		ecsConfig.MemoryMB,
