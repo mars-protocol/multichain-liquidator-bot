@@ -47,6 +47,14 @@ const (
 type EnvironmentConfig struct {
 	runtime.BaseConfig
 
+	CollectorTaskDefinition   string `envconfig:"COLLECTOR_TASK_DEFINITION_TITLE" required:"true"`
+	HealthCheckTaskDefinition string `envconfig:"HEALTHCHECK_TASK_DEFINITION_TITLE" required:"true"`
+	ExecutorTaskDefinition    string `envconfig:"EXECUTOR_TASK_DEFINITION_TITLE" required:"true"`
+
+	CollectorServiceTitle   string `envconfig:"COLLECTOR_SERVICE_TITLE" required:"true"`
+	HealthCheckServiceTitle string `envconfig:"HEALTHCHECK_SERVICE_TITLE" required:"true"`
+	ExecutorServiceTitle    string `envconfig:"EXECUTOR_SERVICE_TITLE" required:"true"`
+
 	ChainID              string `envconfig:"CHAIN_ID" required:"true"`
 	HiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
 	RPCEndpoint          string `envconfig:"RPC_ENDPOINT" required:"true"`
@@ -103,7 +111,6 @@ func getRedisDatabase(workItemType types.WorkItemType) int {
 func getExecutorServiceConfig(environmentConfig EnvironmentConfig, executorServiceId string, serviceType types.WorkItemType) map[string]string {
 	executorEnv := make(map[string]string)
 	executorEnv["RPC_ENDPOINT"] = environmentConfig.RPCEndpoint
-
 	executorEnv["LIQUIDATION_QUEUE_NAME"] = executorServiceId
 	executorEnv["LCD_ENDPOINT"] = environmentConfig.LCDEndpoint
 	executorEnv["HIVE_ENDPOINT"] = environmentConfig.HiveEndpoint
@@ -139,6 +146,7 @@ func getHealthCheckerServiceConfig(environmentConfig EnvironmentConfig, healthCh
 	}
 
 	healthCheckerEnv := make(map[string]string)
+
 	healthCheckerEnv["LOG_LEVEL"] = environmentConfig.BaseConfig.LogLevel
 	healthCheckerEnv["LOG_FORMAT"] = environmentConfig.BaseConfig.LogFormat
 	healthCheckerEnv["SERVICE_NAME"] = environmentConfig.BaseConfig.ServiceName + healthCheckServiceId
@@ -157,7 +165,11 @@ func getHealthCheckerServiceConfig(environmentConfig EnvironmentConfig, healthCh
 	return healthCheckerEnv
 }
 
-func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentConfig, logger *log.Entry, workItemType types.WorkItemType) *manager.Manager {
+func setUpManager(
+	serviceConfig DeploymentConfig,
+	environmentConfig EnvironmentConfig,
+	logger *log.Entry,
+	workItemType types.WorkItemType) *manager.Manager {
 	logger.Info("Setting up manager")
 	var queueProvider interfaces.Queuer
 	queueProvider, err := queue.NewRedis(
@@ -192,26 +204,25 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 	// Set up the deployer, AWS or Docker
 	// The deployers need the container images for collector, health-checker
 	// and liquidator
+	// TODO pass in config
 
-	executorServiceId := fmt.Sprintf("%s-executor", workItemType)
-	collectorServiceId := fmt.Sprintf("%s-collector", workItemType)
-	healthCheckServiceId := fmt.Sprintf("%s-health-check", workItemType)
 	switch strings.ToLower(environmentConfig.DeployerType) {
 	case DeployerTypeDocker:
 
 		// Set up the collector's deployer
 		collectorDeployer, err = deployer.NewDocker(
-			collectorServiceId,
+			environmentConfig.CollectorServiceTitle,
 			environmentConfig.CollectorImage,
 			serviceConfig.CollectorConfig,
 			logger,
 		)
+
 		if err != nil {
 			logger.Fatal(err)
 		}
 
 		healthCheckerDeployer, err = deployer.NewDocker(
-			healthCheckServiceId,
+			environmentConfig.HealthCheckServiceTitle,
 			environmentConfig.HealthCheckerImage,
 			serviceConfig.HealthCheckerConfig,
 			logger,
@@ -219,7 +230,7 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 
 		// Set up the executor's deployer
 		executorDeployer, err = deployer.NewDocker(
-			executorServiceId,
+			environmentConfig.ExecutorServiceTitle,
 			environmentConfig.ExecutorImage,
 			serviceConfig.ExecutorConfig,
 			logger,
@@ -232,7 +243,8 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 
 		// Set up the collector's deployer
 		collectorDeployer, err = deployer.NewAWSECS(
-			collectorServiceId,
+			environmentConfig.CollectorServiceTitle,
+			environmentConfig.CollectorTaskDefinition,
 			environmentConfig.CollectorImage,
 			serviceConfig.CollectorConfig,
 			logger,
@@ -242,7 +254,8 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 		}
 
 		healthCheckerDeployer, err = deployer.NewAWSECS(
-			healthCheckServiceId,
+			environmentConfig.HealthCheckServiceTitle,
+			environmentConfig.HealthCheckTaskDefinition,
 			environmentConfig.HealthCheckerImage,
 			serviceConfig.HealthCheckerConfig,
 			logger,
@@ -254,7 +267,8 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 
 		// Set up the executor's deployer
 		executorDeployer, err = deployer.NewAWSECS(
-			executorServiceId,
+			environmentConfig.ExecutorServiceTitle,
+			environmentConfig.ExecutorTaskDefinition,
 			environmentConfig.ExecutorImage,
 			serviceConfig.ExecutorConfig,
 			logger,
@@ -270,7 +284,7 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 	switch strings.ToLower(serviceConfig.ScalingType) {
 	case ScalingTypeWatermark:
 		// Set up the collector's scaler with the given deployer
-		scalers[collectorServiceId], err = scaler.NewQueueWatermark(
+		scalers[environmentConfig.CollectorServiceTitle], err = scaler.NewQueueWatermark(
 			queueProvider,
 			serviceConfig.CollectorQueueName,
 			collectorDeployer,
@@ -284,7 +298,7 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 		}
 
 		// Set up the health checker's scaler with the given deployer
-		scalers[healthCheckServiceId], err = scaler.NewQueueWatermark(
+		scalers[environmentConfig.HealthCheckServiceTitle], err = scaler.NewQueueWatermark(
 			queueProvider,
 			serviceConfig.HealthCheckQueueName,
 			healthCheckerDeployer,
@@ -298,7 +312,7 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 		}
 
 		// Set up the executor's scaler with the given deployer
-		scalers[executorServiceId], err = scaler.NewQueueWatermark(
+		scalers[environmentConfig.ExecutorServiceTitle], err = scaler.NewQueueWatermark(
 			queueProvider,
 			serviceConfig.ExecutorQueueName,
 			executorDeployer,
@@ -347,9 +361,9 @@ func setUpManager(serviceConfig DeploymentConfig, environmentConfig EnvironmentC
 
 func getDeploymentConfig(environmentConfig EnvironmentConfig, serviceType types.WorkItemType) DeploymentConfig {
 
-	executorServiceId := fmt.Sprintf("%s-executor", serviceType)
-	collectorServiceId := fmt.Sprintf("%s-collector", serviceType)
-	healthCheckServiceId := fmt.Sprintf("%s-health-check", environmentConfig.WorkItemType)
+	executorServiceId := environmentConfig.ExecutorServiceTitle
+	collectorServiceId := environmentConfig.CollectorServiceTitle
+	healthCheckServiceId := environmentConfig.HealthCheckServiceTitle
 
 	redisDatabaseIndex := RedbankDatabaseIndex
 	if environmentConfig.WorkItemType == types.Rover {
