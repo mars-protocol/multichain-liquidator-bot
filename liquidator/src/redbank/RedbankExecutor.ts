@@ -15,7 +15,7 @@ import BigNumber from 'bignumber.js'
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
-import { Collateral, DataResponse, Debt } from '../query/types.js'
+import { Collateral, DataResponse } from '../query/types.js'
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface'
 import { ExchangeInterface } from '../execute/ExchangeInterface.js'
 import { AssetParamsBaseForAddr } from '../types/marsParams.js'
@@ -24,6 +24,8 @@ import { OsmosisOraclePriceFetcher as MarsOraclePriceFetcher } from '../query/or
 import { PythPriceFetcher } from '../query/oracle/PythPriceFetcher'
 import { WasmPriceSourceForString } from '../types/marsOracleWasm.types'
 import { OraclePrice } from '../query/oracle/PriceFetcherInterface'
+import { calculateCollateralRatio, calculateLiquidationBonus, calculateMaxDebtRepayable, getLiquidationThresholdHealthFactor } from './LiquidationHelpers'
+
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
@@ -140,7 +142,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 	}
 
-	private updatePriceSources = async () => {
+	updatePriceSources = async () => {
 		let priceSources : PriceSourceResponse[] = []
 		let fetching = true
 		let start_after = ""
@@ -181,10 +183,11 @@ export class RedbankExecutor extends BaseExecutor {
 		}
 	}
 
-	private updateOraclePrices = async () => {
+	updateOraclePrices = async () => {
 
 		// settle all price sources
 		const priceResults : PromiseSettledResult<OraclePrice>[] = await Promise.allSettled(this.priceSources.map(async (priceSource) => await this.fetchOraclePrice(priceSource.denom)))
+
 		priceResults.forEach((oraclePriceResult) => {
 			const successfull = oraclePriceResult.status === 'fulfilled'
 			const oraclePrice = successfull ? oraclePriceResult.value : null
@@ -228,16 +231,13 @@ export class RedbankExecutor extends BaseExecutor {
 					denomDecimals: pyth.denom_decimals,
 					denom: denom
 				})
-				break;
 			  // Handle other cases for different price source types	  
 			default:
 				// Handle unknown or unsupported price source types
-				console.warn('Unknown price source type');
 				return await this.marsOraclePriceFetcher.fetchPrice({
 					oracleAddress: this.config.oracleAddress,
 					priceDenom: denom
 				})
-				break;
 			// iterate, fetch price source correctly
 		}
 	}
@@ -271,42 +271,55 @@ export class RedbankExecutor extends BaseExecutor {
 				const debtPrice = this.prices.get(debtDenom)
 				const collateralPrice = this.prices.get(largestCollateralDenom)
 
-				if (!debtParams || !debtPrice || !collateralPrice || !collateralParams) continue 
 
-				const collateralLtv = Number(collateralParams.max_loan_to_value)
+				if (!debtParams || !debtPrice || !collateralPrice || !collateralParams) continue 
 				const lbStart = Number(collateralParams.liquidation_bonus.starting_lb)
 				const lbSlope = Number(collateralParams.liquidation_bonus.slope)
 				const lbMax = Number(collateralParams.liquidation_bonus.max_lb)
 				const lbMin = Number(collateralParams.liquidation_bonus.min_lb)
-				const positionLtv = this.calculatePositionLtv(position.debts, position.collaterals)
 				const protocolLiquidationFee = Number(debtParams.protocol_liquidation_fee)
-				
-				// Calculate debt we can repay
+
+				const ltHealthFactor = getLiquidationThresholdHealthFactor(
+
+					position.collaterals,
+					position.debts,
+					this.prices,
+					this.assetParams
+				)
+
+				const liquidationBonus = calculateLiquidationBonus(
+					lbStart, 
+					lbSlope, 
+					ltHealthFactor, 
+					lbMax, 
+					lbMin, 
+					calculateCollateralRatio(
+						position.debts, 
+						position.collaterals, 
+						this.prices
+					).toNumber()
+				)
+			
+				// Neutral available to us for this specific liquidation
 				const remainingNeutral = availableValue.minus(totalDebtValue)
 
 				// max debt the protocol will allow us to repay
-				const maxDebtRepayableValue = this.calculateMaxDebtRepayable(
+				const maxDebtRepayableValue = calculateMaxDebtRepayable(
 					this.targetHealthFactor,
 					position.debts,
 					position.collaterals,
-					collateralLtv,
-					protocolLiquidationFee
+					this.assetParams,
+					liquidationBonus,
+					this.prices,
+					largestCollateralDenom
 				)
 
-				const liquidationBonus = this.calculateLiquidationBonus(
-					lbStart,
-					lbSlope,
-					positionLtv,
-					lbMax,
-					lbMin,
-					this.calculateCollateralRatio(position.debts, position.collaterals).toNumber(),
-				)
-
-				// Capp the repay amount by the collateral we are claiming. We need to factor in the liquidation bonus - as that comes out of the available collateral
+				// Cap the repay amount by the collateral we are claiming. We need to factor in the liquidation bonus - as that comes out of the available collateral
 				const largestCollateralValue = new BigNumber(largestCollateral.amount)
 					.multipliedBy(1-liquidationBonus)
 					.multipliedBy(collateralPrice)
 
+				// todo Make sure that the max repayable is less than the debt
 				const maxRepayableValue = maxDebtRepayableValue.isGreaterThan(largestCollateralValue) ? largestCollateralValue : maxDebtRepayableValue
 				const maxRepayableAmount = maxRepayableValue.dividedBy(this.prices.get(debtDenom) || 0)
 
@@ -315,41 +328,42 @@ export class RedbankExecutor extends BaseExecutor {
 					? maxRepayableAmount
 					: remainingNeutral.dividedBy(debtPrice)
 
-
-				
-
-				const buyDebtRoute = this.ammRouter.getBestRouteGivenOutput(
-					this.config.neutralAssetDenom,
-					debtDenom,
-					amountToRepay,
-				)
+				// If our debt is the same as our neutral, we skip this step
+				const buyDebtRoute = this.config.neutralAssetDenom === debtDenom 
+					? [] 
+					: this.ammRouter.getBestRouteGivenOutput(
+							this.config.neutralAssetDenom,
+							debtDenom,
+						amountToRepay,
+					)
 
 				const neutralToSell = this.ammRouter.getRequiredInput(
 					amountToRepay,
 					buyDebtRoute
 				)
+
 				const valueToRepay = amountToRepay.multipliedBy(debtPrice)
 
 				// calculate how much collateral we get back
-				const collateralValueToBeWon = new BigNumber(valueToRepay).multipliedBy(
-					1 + liquidationBonus
-				)
+				const collateralValueToBeWon = (new BigNumber(valueToRepay).multipliedBy(
+					1 + liquidationBonus)).multipliedBy(1-protocolLiquidationFee)
 
-				const collateralAmountToBeWon = collateralValueToBeWon.dividedBy(collateralPrice).multipliedBy(1 - protocolLiquidationFee)
+				const collateralAmountToBeWon = collateralValueToBeWon.dividedBy(collateralPrice)
 				const collateralToNeutralRoute = this.ammRouter.getBestRouteGivenInput(
 					largestCollateralDenom,
 					this.config.neutralAssetDenom,
 					collateralAmountToBeWon
 				)
+
 				const neutralWon = this.ammRouter.getOutput(
 					collateralAmountToBeWon,
 					collateralToNeutralRoute
 				)
-				const amountWon = neutralWon.minus(neutralToSell)
+
+				const amountWon = neutralWon.minus(valueToRepay)
 
 				// This is displayed as a fraction, not a percentage - for instance 3% will be 0.03
 				const winningPercentage = amountWon.dividedBy(neutralToSell)
-				
 				if (winningPercentage.isGreaterThan(this.config.liquidationProfitMarginPercent)) { 
 					// profitable to liquidate this position
 					const liquidateTx = {
@@ -379,92 +393,6 @@ export class RedbankExecutor extends BaseExecutor {
 		return { txs, debtsToRepay }
 	}
 
-	calculatePositionLtv(
-		debts: Debt[],
-		collaterals: Collateral[]
-	) : number {
-
-		const totalDebtValue = this.getTotalValueOfCoinArray(debts)
-		const totalCollateralValue = this.getTotalLtvValueOfCollateral(collaterals)
-
-		// Calculated as CR = Total Assets / Total Debt
-		return totalCollateralValue.dividedBy(totalDebtValue).toNumber()
-
-	}
-
-	calculateCollateralRatio(
-		debts: Debt[],
-		collaterals : Collateral[]
-	) : BigNumber{
-		const totalDebtValue = this.getTotalValueOfCoinArray(debts)
-		const totalCollateralValue = this.getTotalValueOfCoinArray(collaterals)
-
-		// Calculated as CR = Total Assets / Total Debt
-		return totalCollateralValue.dividedBy(totalDebtValue)
-	}
-
-	// This is the maximum amount of debt the protocol will allow us to repay in this position
-	// Formula
-	// MDR = ((THF*Debt_0) - (LTV*Collateral_0))/(THF - (LTV * (1 + TLF)))
-	calculateMaxDebtRepayable(
-		targetHealthFactor : number,
-		debts : Debt[],
-		collaterals: Collateral[],
-		assetLtv : number,
-		totalLiquidationFee: number
-	) : BigNumber {
-
-		const totalDebtValue = this.getTotalValueOfCoinArray(debts)
-		const totalCollateralValue = this.getTotalValueOfCoinArray(collaterals)
-		const thf = new BigNumber(targetHealthFactor)
-		const ltv = new BigNumber(assetLtv)
-		
-		return (
-			(
-				thf.multipliedBy(totalDebtValue)).minus((ltv.multipliedBy(totalCollateralValue))
-				.dividedBy(
-					thf.minus(ltv.multipliedBy(1+totalLiquidationFee))
-				)
-			)
-		)
-	}
-
-	calculateLiquidationBonus(
-		bonusStart : number,
-		slope: number,
-		healthFactor : number,
-		maxLbSetting : number,
-		minLbSetting : number,
-		collateralRatio : number
-	) :number {
-
-		//maxLB* = max(min(CR - 1, maxLB), minLB)
-		const maxLBCalc = Math.max(Math.min(collateralRatio - 1, maxLbSetting), minLbSetting)
-
-		//Liquidation Bonus = min(B + (slope * (1 - HF)), maxLB*)
-		const liquidationBonus = Math.min(bonusStart + (slope * (1-healthFactor)), maxLBCalc)
-
-		return liquidationBonus
-	}
-
-	getTotalLtvValueOfCollateral(collateral: Collateral[]) {
-		return  collateral.reduce((acc, collateral) => {
-			if (collateral.enabled === false) return acc
-			
-			const price = new BigNumber(this.prices[collateral.denom] || 0);
-			const value = new BigNumber(collateral.amount).multipliedBy(price);
-			const assetLtv = new BigNumber(this.assetParams.get(collateral.denom)?.max_loan_to_value || 0)
-			return acc.plus(value.multipliedBy(assetLtv));
-		  }, new BigNumber(0));
-	}
-
-	getTotalValueOfCoinArray(coins: Coin[]) {
-		return  coins.reduce((acc, debt) => {
-			const price = new BigNumber(this.prices[debt.denom] || 0);
-			const value = new BigNumber(debt.amount).multipliedBy(price);
-			return acc.plus(value); // Accumulate the total value
-		  }, new BigNumber(0));
-	}
 
 	appendWithdrawMessages(
 		collateralsWon: Collateral[],
