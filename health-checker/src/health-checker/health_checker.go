@@ -158,6 +158,7 @@ func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte
 		if err != nil {
 			s.logger.Errorf("An Error Occurred decoding health status. %v", err)
 		} else if ltv < 1 {
+			s.logger.Info("healthstatus : ", userResult)
 			positionDecoded, decodeError := json.Marshal(userResult)
 			if decodeError == nil {
 				unhealthyPositions = append(unhealthyPositions, positionDecoded)

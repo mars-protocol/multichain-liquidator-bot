@@ -67,7 +67,11 @@ export class BaseExecutor {
 	}
 
 	async initiateAstroportPoolProvider(): Promise<void> {
-		await (this.poolProvider as AstroportPoolProvider).initiate()
+		const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
+
+		if (astroportPoolProvider) {
+  			await astroportPoolProvider.initiate();
+		}
 	}
 
 	applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {
