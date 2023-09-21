@@ -19,7 +19,7 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
         this.pairs = await this.fetchPairContracts(this.astroportFactory)
 
         // refresh pool contracts every 30 minutes
-        setInterval(this.fetchPairContracts, 1000 * 60 * 30)
+        setInterval(() => {this.fetchPairContracts(this.astroportFactory)}, 1000 * 60 * 30)
     }
 
     setPairs = (pairs: Pair[]) => {
