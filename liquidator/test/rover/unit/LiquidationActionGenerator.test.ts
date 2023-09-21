@@ -77,7 +77,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 				}
 				const market = generateRandomMarket(debtDenom)
 				market.available_liquidity = debtToRepay * 1000
-				market.borrow_enabled = true
 				markets.push(market)
 				const borrowActions = liquidationActionGenerator.produceBorrowActions(
 					debt,
@@ -120,7 +119,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 
 				const market = generateRandomMarket(debtDenom)
 				market.available_liquidity = debtToRepay / 1.5
-				market.borrow_enabled = true
 				markets.push(market)
 				const borrowActions = liquidationActionGenerator.produceBorrowActions(
 					debt,
@@ -161,7 +159,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 				}
 				const market = generateRandomMarket(debtDenom)
 				market.available_liquidity = debtToRepay * 1000
-				market.borrow_enabled = true
 				markets.push(market)
 				const borrowActions = liquidationActionGenerator.produceBorrowActions(
 					debt,
@@ -204,7 +201,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 				}
 				const market = generateRandomMarket(otherDenom)
 				market.available_liquidity = debtToRepay * 1000
-				market.borrow_enabled = true
 
 				markets.push(market)
 
@@ -259,12 +255,10 @@ describe('Liquidation Actions generator Unit Tests', () => {
 
 				const market = generateRandomMarket(debtDenom)
 				market.available_liquidity = debtToRepay / 2.1
-				market.borrow_enabled = true
 				markets.push(market)
 
 				const market2 = generateRandomMarket(otherDenom)
 				market2.available_liquidity = debtToRepay
-				market2.borrow_enabled = true
 				markets.push(market2)
 
 				const borrowActions = liquidationActionGenerator.produceBorrowActions(
