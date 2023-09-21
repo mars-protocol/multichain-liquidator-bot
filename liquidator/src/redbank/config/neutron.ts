@@ -16,8 +16,8 @@ export const getConfig = (
 				liquidatorMasterAddress: liquidatorMasterAddress,
 				logResults: false, // enable for debugging
 				neutralAssetDenom: 'ntrn',
-				oracleAddress: 'neutron1nx9txtmpmkt58gxka20z72wdkguw4n0606zkeqvelv7q7uc06zmsym3qgx',
-				redbankAddress: 'neutron15dld0kmz0zl89zt4yeks4gy8mhmawy3gp4x5rwkcgkj5krqvu9qs4q7wve',
+				oracleAddress: 'neutron1dwp6m7pdrz6rnhdyrx5ha0acsduydqcpzkylvfgspsz60pj2agxqaqrr7g',
+				redbankAddress: 'neutron1n97wnm7q6d2hrcna3rqlnyqw2we6k0l8uqvmyqq6gsml92epdu7quugyph',
 				redisEndpoint: process.env.REDIS_ENDPOINT!,
 				poolsRefreshWindow: 60000,
 		  }
