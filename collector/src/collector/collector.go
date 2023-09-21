@@ -74,6 +74,8 @@ func (service *Collector) Run() error {
 	// Set long running to run
 	atomic.StoreUint32(&service.continueRunning, 1)
 
+	errorCount := 0
+	maxErrors := 5
 	// When a new block becomes available the monitor service will hand out
 	// work items containing the parameters for querying the contract state
 	for atomic.LoadUint32(&service.continueRunning) == 1 {
@@ -83,7 +85,12 @@ func (service *Collector) Run() error {
 		// bocome available
 		item, err := service.queue.Fetch(service.collectorQueueName)
 		if err != nil {
-			return err
+			errorCount += 1
+			if errorCount > maxErrors {
+				return err
+			}
+			service.logger.Info("Retrying")
+			continue
 		}
 
 		if item == nil {
@@ -99,7 +106,12 @@ func (service *Collector) Run() error {
 		err = json.Unmarshal(item, &workItem)
 		if err != nil {
 			service.logger.Error(err)
-			return err
+			errorCount += 1
+			if errorCount > maxErrors {
+				return err
+			}
+			service.logger.Info("Retrying")
+			continue
 		}
 
 		// Once we receive a piece of work to execute we need to query the
@@ -107,7 +119,12 @@ func (service *Collector) Run() error {
 		// given prefix
 		healthCheckItems, scanned, err := service.fetchContractItems(workItem)
 		if err != nil {
-			return err
+			errorCount += 1
+			if errorCount > maxErrors {
+				return err
+			}
+			service.logger.Info("Retrying")
+			continue
 		}
 
 		// Enrich the packet sent to the health check service
@@ -121,6 +138,8 @@ func (service *Collector) Run() error {
 			"total":      len(healthCheckItems),
 			"elapsed_ms": time.Since(start).Milliseconds(),
 		}).Info("Pushed addresses to Redis")
+
+		errorCount = 0
 	}
 
 	return nil
@@ -138,7 +157,7 @@ func (service *Collector) fetchContractItems(
 
 	// Blocks are usually less than 6 seconds, we give ourselves an absolute
 	// maximum of 5 seconds to get the information. Ideally, it should be faster
-	client, err := lens.NewRPCClient(workItem.RPCEndpoint, time.Second*5)
+	client, err := lens.NewRPCClient(workItem.RPCEndpoint, time.Second*30)
 	if err != nil {
 		return results, totalScanned, err
 	}

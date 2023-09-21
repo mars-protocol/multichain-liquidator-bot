@@ -309,8 +309,8 @@ func (service *Manager) Run() error {
 			service.logger.WithFields(logrus.Fields{
 				"offset": workItem.ContractPageOffset,
 				"limit":  workItem.ContractPageLimit,
-				"item":  string(item),
-				"queue": service.collectorQueueName,
+				"item":   string(item),
+				"queue":  service.collectorQueueName,
 			}).Info("Submitted work to collector queue")
 		}
 
@@ -356,15 +356,22 @@ func (service *Manager) monitorContractStorageSize(
 	rpcEndpoint string,
 	contractAddress string,
 ) error {
+	errorCount := 0
+	maxErrors := 5
 	for atomic.LoadUint32(&service.continueRunning) == 1 {
 
 		start := time.Now()
 
 		// Blocks are usually less than 6 seconds, we give ourselves an absolute
 		// maximum of 5 seconds to get the information. Ideally, it should be faster
-		client, err := lens.NewRPCClient(rpcEndpoint, time.Second*5)
+		client, err := lens.NewRPCClient(rpcEndpoint, time.Second*30)
 		if err != nil {
-			return err
+			errorCount += 1
+			if errorCount > maxErrors {
+				return err
+			}
+			service.logger.Info("Retrying")
+			continue
 		}
 
 		var stateRequest QueryAllContractStateRequest
@@ -379,7 +386,12 @@ func (service *Manager) monitorContractStorageSize(
 		// as protobuf encoded content
 		rpcRequest, err := proto.Marshal(&stateRequest)
 		if err != nil {
-			return err
+			errorCount += 1
+			if errorCount > maxErrors {
+				return err
+			}
+			service.logger.Info("Retrying")
+			continue
 		}
 
 		rpcResponse, err := client.ABCIQuery(
@@ -389,7 +401,13 @@ func (service *Manager) monitorContractStorageSize(
 			rpcRequest,
 		)
 		if err != nil {
-			return err
+			errorCount += 1
+			if errorCount > maxErrors {
+				return err
+			}
+			service.logger.Info("Retrying")
+			continue
+
 		}
 
 		// The value in the response also contains the contract state in
@@ -397,7 +415,12 @@ func (service *Manager) monitorContractStorageSize(
 		var stateResponse QueryAllContractStateResponse
 		err = proto.Unmarshal(rpcResponse.Response.GetValue(), &stateResponse)
 		if err != nil {
-			return err
+			errorCount += 1
+			if errorCount > maxErrors {
+				return err
+			}
+			service.logger.Info("Retrying")
+			continue
 		}
 
 		service.logger.WithFields(logrus.Fields{
