@@ -33,6 +33,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 						result.poolType = PoolType.XYK
 						result.token0 = result.poolAssets[0].token.denom
 						result.token1 = result.poolAssets[1].token.denom
+						result.swapFee = data.pool_params.swap_fee
 						pools.push(result)
 					} else if (data['@type'] === '/osmosis.gamm.poolmodels.stableswap.v1beta1.Pool') {
 						const result = camelCaseKeys(data) as StableswapPool
