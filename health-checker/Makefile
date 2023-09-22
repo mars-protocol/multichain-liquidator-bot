@@ -4,7 +4,11 @@
 
 .PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean
 
-IMAGE_NAME := "<your-container-repo>/multichain-health-checker:latest"
+
+GIT_COMMIT := $(shell git rev-list -1 HEAD)
+BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD)
+BASE_IMAGE_NAME := $(ECR_REPO)/multichain-health-checker
+IMAGE_NAME := $(BASE_IMAGE_NAME):$(BRANCH_NAME)-$(GIT_COMMIT)
 REDBANK_ADDRESS := "osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv"
 CHAIN_ID := "liq_test"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
