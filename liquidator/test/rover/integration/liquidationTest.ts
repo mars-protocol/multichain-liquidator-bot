@@ -75,6 +75,7 @@ const runTests = async (testConfig: TestConfig) => {
 	const config: RoverExecutorConfig = {
 		redbankAddress: testConfig.redbankAddress,
 		oracleAddress: testConfig.oracleAddress,
+		chainName: "osmosis",
 		swapperAddress: testConfig.swapperAddress,
 		accountNftAddress: testConfig.accountNFTAddress,
 		gasDenom: testConfig.gasDenom,
