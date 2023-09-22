@@ -8,6 +8,7 @@ export const getConfig = (
 	if (network === Network.MAINNET) {
 		return {
 			gasDenom: 'uosmo',
+			chainName: "osmosis",
 			hiveEndpoint: process.env.HIVE_ENDPOINT!,
 			lcdEndpoint: process.env.LCD_ENDPOINT!,
 			neutralAssetDenom: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858', 
@@ -29,6 +30,7 @@ export const getConfig = (
 	// Not mainnet
 	return {
 		gasDenom: 'uosmo',
+		chainName : "osmosis",
 		hiveEndpoint: process.env.HIVE_ENDPOINT!,
 		lcdEndpoint: process.env.LCD_ENDPOINT!,
 		neutralAssetDenom: 'uosmo', // no usdc pools on testnet so we use osmo
