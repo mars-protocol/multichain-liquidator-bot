@@ -1,3 +1,4 @@
+
 export interface TestConfig {
 	seed: string
 	atomDenom: string
@@ -10,10 +11,12 @@ export interface TestConfig {
 	liquidationFiltererAddress: string
 	redbankAddress: string
 	oracleAddress: string
+	marsParamsAddress: string
 	rpcEndpoint: string
 	prefix: string
 	hiveEndpoint: string
 	lcdEndpoint: string
+
 	tests: {
 		liquidateSingle: boolean
 		liquidateMany: boolean
@@ -33,6 +36,7 @@ export const testnetConfig: TestConfig = {
 	liquidationFiltererAddress: 'abc',
 	redbankAddress: 'osmo1t0dl6r27phqetfu0geaxrng0u9zn8qgrdwztapt5xr32adtwptaq6vwg36',
 	oracleAddress: 'osmo1dqz2u3c8rs5e7w5fnchsr2mpzzsxew69wtdy0aq4jsd76w7upmsstqe0s8',
+	marsParamsAddress : 'osmo10qt8wg0n7z740ssvf3urmvgtjhxpyp74hxqvqt7z226gykuus7eqxj2v4d',
 	rpcEndpoint: 'https://osmosis-delphi-testnet-1.simply-vc.com.mt/XF32UOOU55CX/osmosis-rpc/',
 	prefix: 'osmo',
 	hiveEndpoint:
@@ -44,7 +48,7 @@ export const testnetConfig: TestConfig = {
 		liquidateSingle: true,
 		liquidateMany: true,
 		liquidateBeatenFilterer: true,
-	},
+	}
 }
 
 export const localnetConfig: TestConfig = {
@@ -54,11 +58,12 @@ export const localnetConfig: TestConfig = {
 	osmoAtomPoolId: 1,
 	osmoUsdcPoolId: 2,
 	atomDenom: 'uatom',
-	usdcDenom: 'usdc',
+	usdcDenom: 'uusd',
 	gasDenom: 'uosmo',
 	liquidationFiltererAddress: 'osmo1vguuxez2h5ekltfj9gjd62fs5k4rl2zy5hfrncasykzw08rezpfsec2tjm',
 	redbankAddress: 'osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv',
 	oracleAddress: 'osmo1ghd753shjuwexxywmgs4xz7x2q732vcnkm6h2pyv9s6ah3hylvrqgj4mrx',
+	marsParamsAddress: 'osmo10qt8wg0n7z740ssvf3urmvgtjhxpyp74hxqvqt7z226gykuus7eqxj2v4d',
 	rpcEndpoint: 'http://127.0.0.1:26657',
 	prefix: 'osmo',
 	hiveEndpoint: 'http://127.0.0.1:8085/graphql',

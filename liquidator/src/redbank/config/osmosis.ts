@@ -17,6 +17,7 @@ export const getConfig = (
 				logResults: false, // enable for debugging
 				neutralAssetDenom: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858',
 				oracleAddress: 'osmo1mhznfr60vjdp2gejhyv2gax9nvyyzhd3z0qcwseyetkfustjauzqycsy2g',
+				marsParamsAddress: '', // update when neutron update is deployed
 				redbankAddress: 'osmo1c3ljch9dfw5kf52nfwpxd2zmj2ese7agnx0p9tenkrryasrle5sqf3ftpg',
 				redisEndpoint: process.env.REDIS_ENDPOINT!,
 				poolsRefreshWindow: 60000,
@@ -33,6 +34,7 @@ export const getConfig = (
 				logResults: false, // enable for debugging
 				neutralAssetDenom: 'uosmo', // no usdc pools on testnet
 				oracleAddress: 'osmo1dqz2u3c8rs5e7w5fnchsr2mpzzsxew69wtdy0aq4jsd76w7upmsstqe0s8',
+				marsParamsAddress: '',
 				redbankAddress: 'osmo1t0dl6r27phqetfu0geaxrng0u9zn8qgrdwztapt5xr32adtwptaq6vwg36',
 				redisEndpoint: '',
 				poolsRefreshWindow: 60000,
