@@ -28,7 +28,7 @@ import {
 
 import { MsgSwapExactAmountIn } from 'osmojs/types/codegen/osmosis/poolmanager/v1beta1/tx'
 
-import { AminoTypes, GasPrice, MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
+import { AminoTypes, GasPrice, MsgSendEncodeObject, SigningStargateClient, StdFee } from '@cosmjs/stargate'
 import { camelCase } from 'lodash'
 import { HdPath } from '@cosmjs/crypto'
 import { Pool } from './types/Pool'
@@ -158,30 +158,44 @@ export const seedAddresses = async (
 	sender: string,
 	accounts: readonly AccountData[],
 	coins: Coin[],
+	fee?: StdFee
 ): Promise<string[]> => {
 	const seededAddresses: string[] = []
 	const sendTokenMsgs: EncodeObject[] = []
+
+	
 
 	console.log(`seeding children for ${sender}`)
 	accounts.forEach((account) => {
 		if (account.address === sender) return
 
 		const addressToSeed = account.address
+		console.log(`seeding ${addressToSeed}`)
 
-		const msg = {
+		// todo - optimise this into one msg
+		const gasMsg = {
+			typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+			value: {
+				fromAddress: sender,
+				toAddress: addressToSeed,
+				amount: [{ denom: 'uosmo', amount: '1000000' }],
+			},
+		}
+		
+		sendTokenMsgs.push(gasMsg)
+		sendTokenMsgs.push({
 			typeUrl: '/cosmos.bank.v1beta1.MsgSend',
 			value: {
 				fromAddress: sender,
 				toAddress: addressToSeed,
 				amount: coins,
 			},
-		}
+		})
 
-		sendTokenMsgs.push(msg)
 		seededAddresses.push(addressToSeed)
 	})
 
-	await client.signAndBroadcast(sender, sendTokenMsgs, 'auto')
+	await client.signAndBroadcast(sender, sendTokenMsgs, fee? fee : 'auto')
 
 	return seededAddresses
 }
