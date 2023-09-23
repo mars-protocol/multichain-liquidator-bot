@@ -271,7 +271,6 @@ export class RedbankExecutor extends BaseExecutor {
 				const debtPrice = this.prices.get(debtDenom)
 				const collateralPrice = this.prices.get(largestCollateralDenom)
 
-
 				if (!debtParams || !debtPrice || !collateralPrice || !collateralParams) continue 
 				const lbStart = Number(collateralParams.liquidation_bonus.starting_lb)
 				const lbSlope = Number(collateralParams.liquidation_bonus.slope)
@@ -280,7 +279,6 @@ export class RedbankExecutor extends BaseExecutor {
 				const protocolLiquidationFee = Number(debtParams.protocol_liquidation_fee)
 
 				const ltHealthFactor = getLiquidationThresholdHealthFactor(
-
 					position.collaterals,
 					position.debts,
 					this.prices,
@@ -327,7 +325,7 @@ export class RedbankExecutor extends BaseExecutor {
 				const amountToRepay = remainingNeutral.isGreaterThan(maxRepayableValue)
 					? maxRepayableAmount
 					: remainingNeutral.dividedBy(debtPrice)
-
+				
 				// If our debt is the same as our neutral, we skip this step
 				const buyDebtRoute = this.config.neutralAssetDenom === debtDenom 
 					? [] 
@@ -343,7 +341,7 @@ export class RedbankExecutor extends BaseExecutor {
 				)
 
 				const valueToRepay = amountToRepay.multipliedBy(debtPrice)
-
+				
 				// calculate how much collateral we get back
 				const collateralValueToBeWon = (new BigNumber(valueToRepay).multipliedBy(
 					1 + liquidationBonus)).multipliedBy(1-protocolLiquidationFee)
@@ -360,10 +358,12 @@ export class RedbankExecutor extends BaseExecutor {
 					collateralToNeutralRoute
 				)
 
-				const amountWon = neutralWon.minus(valueToRepay)
+				const neutralAssetRepaid = neutralToSell.gt(0) ? neutralToSell : amountToRepay
+				const amountWon = neutralWon.minus(neutralAssetRepaid)
 
 				// This is displayed as a fraction, not a percentage - for instance 3% will be 0.03
-				const winningPercentage = amountWon.dividedBy(neutralToSell)
+				const winningPercentage = amountWon.dividedBy(valueToRepay)
+
 				if (winningPercentage.isGreaterThan(this.config.liquidationProfitMarginPercent)) { 
 					// profitable to liquidate this position
 					const liquidateTx = {
@@ -564,7 +564,14 @@ export class RedbankExecutor extends BaseExecutor {
 			console.log(' - No items for liquidation yet')
 			return
 		}
+		const collateralsBefore: Collateral[] = await this.queryClient?.queryContractSmart(
+			this.config.redbankAddress,
+			{ user_collaterals: { user: liquidatorAddress } },
+		)
 
+		console.log({
+			collateralsBefore: JSON.stringify(collateralsBefore)
+		})
 		// Fetch position data
 		const positionData: DataResponse[] = await fetchRedbankBatch(
 			positions,
@@ -575,7 +582,6 @@ export class RedbankExecutor extends BaseExecutor {
 		console.log(`- found ${positionData.length} positions queued for liquidation.`)
 
 		const { txs, debtsToRepay } = this.produceLiquidationTxs(positionData)
-
 		const debtCoins: Coin[] = []
 		debtsToRepay.forEach((amount, denom) => debtCoins.push({ denom, amount: amount.toFixed(0) }))
 
@@ -587,6 +593,8 @@ export class RedbankExecutor extends BaseExecutor {
 			firstMsgBatch,
 			new BigNumber(this.balances.get(this.config.neutralAssetDenom)!),
 		)
+
+
 
 		// Preferably, we liquidate via redbank directly. This is so that if the liquidation fails,
 		// the entire transaction fails and we do not swap.
@@ -608,6 +616,7 @@ export class RedbankExecutor extends BaseExecutor {
 			await this.getFee(firstMsgBatch, this.config.liquidatorMasterAddress),
 		)
 
+		console.log(`Liquidation hash: ${result.transactionHash}`)
 		this.redis.incrementBy('executor.liquidations.executed', txs.length)
 
 		console.log(`- Successfully liquidated ${txs.length} positions`)
@@ -616,6 +625,10 @@ export class RedbankExecutor extends BaseExecutor {
 			this.config.redbankAddress,
 			{ user_collaterals: { user: liquidatorAddress } },
 		)
+
+		console.log({
+			collaterals: JSON.stringify(collaterals)
+		})
 
 		// second block of transactions
 		let secondBatch: EncodeObject[] = []

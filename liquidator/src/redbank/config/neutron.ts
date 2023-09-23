@@ -16,9 +16,11 @@ export const getConfig = (
 				liquidatorMasterAddress: liquidatorMasterAddress,
 				logResults: false, // enable for debugging
 				neutralAssetDenom: 'ntrn',
+				marsParamsAddress: 'todo',
 				oracleAddress: 'neutron1nx9txtmpmkt58gxka20z72wdkguw4n0606zkeqvelv7q7uc06zmsym3qgx',
 				redbankAddress: 'neutron15dld0kmz0zl89zt4yeks4gy8mhmawy3gp4x5rwkcgkj5krqvu9qs4q7wve',
 				redisEndpoint: process.env.REDIS_ENDPOINT!,
+				liquidationProfitMarginPercent: 0.001,
 				poolsRefreshWindow: 60000,
 		  }
 		: {
@@ -32,8 +34,10 @@ export const getConfig = (
 			logResults: false, // enable for debugging
 			neutralAssetDenom: 'ibc/EFB00E728F98F0C4BBE8CA362123ACAB466EDA2826DC6837E49F4C1902F21BBA',
 			oracleAddress: 'neutron1nx9txtmpmkt58gxka20z72wdkguw4n0606zkeqvelv7q7uc06zmsym3qgx',
+			marsParamsAddress: 'todo',
 			redbankAddress: 'neutron15dld0kmz0zl89zt4yeks4gy8mhmawy3gp4x5rwkcgkj5krqvu9qs4q7wve',
 			redisEndpoint: process.env.REDIS_ENDPOINT!,
+			liquidationProfitMarginPercent: 0.001,
 			poolsRefreshWindow: 60000,
 	  }
 }

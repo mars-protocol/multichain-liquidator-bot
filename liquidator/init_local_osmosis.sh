@@ -5,9 +5,9 @@
 CHAIN_ID="liq_test"
 # This should be the same address as the owner of redbank. Use the same mnemonic as is in the redbank deplpoy scripts config
 ADDRESS1="osmo1cyyzpxplxdzkeea7kwsydadg87357qnahakaks"
-COIN_AMOUNT1="1000000000000000uosmo,1000000000000uusd,1000000000000000uion,1000000000000000uatom"
+COIN_AMOUNT1="100000000000000000uosmo,10000000000000000000000uusd,100000000000000000uion,100000000000000000uatom,1000000000000000000umars"
 ADDRESS2="osmo1h9twyldz0z0crzgqmafa9m30nll7xljzzge6fg"
-COIN_AMOUNT2="100000000usdc,1000000000uosmo,1000000000uatom"
+COIN_AMOUNT2="100000000uusd,1000000000uosmo,1000000000uatom"
 GENTX_AMOUNT="10000000uosmo"
 GENESIS_JSON_PATH="$HOME/.osmosisd/config/genesis.json"
 CONFIG_FILE="$HOME/.osmosisd/config/config.toml"

@@ -81,6 +81,7 @@ const runTests = async (testConfig: TestConfig) => {
 		hiveEndpoint: testConfig.hiveEndpoint,
 		lcdEndpoint: testConfig.lcdEndpoint,
 		liquidatorMasterAddress: masterAddress,
+		marsParamsAddress: testConfig.marsParamsAddress,
 		creditManagerAddress: testConfig.creditManagerAddress,
 		minGasTokens: 100000,
 		logResults: true,

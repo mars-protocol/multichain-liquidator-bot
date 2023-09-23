@@ -10,6 +10,7 @@ export interface TestConfig {
 	vaults: string[]
 	accountNFTAddress: string
 	creditManagerAddress: string
+	marsParamsAddress: string
 	redbankAddress: string
 	oracleAddress: string
 	swapperAddress: string
@@ -45,6 +46,7 @@ export const testnetConfig: TestConfig = {
 	accountNFTAddress: 'osmo1gec60kd5hkn9tct4ww2p576caafy4jghgywv4gxj6y0k4vmvugsqm9at50',
 	creditManagerAddress: 'osmo12lf593ekns80tyv9v5qqr2yhu070zrgwkkd8hqrn0eg9nl9yp27qv7djff',
 	redbankAddress: 'osmo1t0dl6r27phqetfu0geaxrng0u9zn8qgrdwztapt5xr32adtwptaq6vwg36',
+	marsParamsAddress: '',
 	oracleAddress: 'osmo1dqz2u3c8rs5e7w5fnchsr2mpzzsxew69wtdy0aq4jsd76w7upmsstqe0s8',
 	swapperAddress: 'osmo1fqnwlxk3a4rhp04srxu2tnujcq9w052t8dkmvzgv6n8rz2flcm4sdtlzjg',
 	rpcEndpoint: 'https://osmosis-delphi-testnet-1.simply-vc.com.mt/XF32UOOU55CX/osmosis-rpc/',
@@ -82,6 +84,7 @@ export const localnetConfig: TestConfig = {
 	accountNFTAddress: 'osmo1cljmlh9ctfv00ug9m3ndrsyyyfqlxnx4welnw8upgu6ylhd6hk4qchm9rt',
 	creditManagerAddress: 'osmo1jyxsvevhu5dq6sqnrv446484jstmdcaahqldc29ukeknf6kk37uq6nvhlc',
 	redbankAddress: 'osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv',
+	marsParamsAddress: '', // todo
 	oracleAddress: 'osmo1ghd753shjuwexxywmgs4xz7x2q732vcnkm6h2pyv9s6ah3hylvrqgj4mrx',
 	swapperAddress: 'osmo1a3pduqrv9unw9tpq49ytw0kmy37p7575czlawzyyg8xjd5kljy6sd8kkvg',
 	rpcEndpoint: 'http://127.0.0.1:26657',

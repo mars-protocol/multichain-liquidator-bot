@@ -88,7 +88,6 @@ export class LiquidationActionGenerator {
 				: new BigNumber(0)
 		if (
 			!marketInfo ||
-			!marketInfo.borrow_enabled ||
 			!whitelistedAssets.find((denom) => denom === debt.denom) ||
 			remainingCreditLine.dividedBy(2).isLessThan(debtAmount) ||
 			marketInfo.available_liquidity / debtAmount < 0.5
@@ -129,7 +128,6 @@ export class LiquidationActionGenerator {
 		const bestMarket = markets
 			.filter(
 				(market) =>
-					market.borrow_enabled &&
 					market.denom !== debtdenom &&
 					whitelistedAssets.find((denom) => market.denom === denom),
 			)

@@ -86,3 +86,6 @@ typings/
 /lib
 bin/
 coverage.*
+
+/liquidator/pool.json
+/liquidator/results.csv
