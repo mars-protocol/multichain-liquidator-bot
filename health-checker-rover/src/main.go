@@ -26,7 +26,7 @@ type Config struct {
 	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
 	LiquidatorQueueName  string `envconfig:"LIQUIDATOR_QUEUE_NAME" required:"true"`
 	HiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
-	RedbankAddress       string `envconfig:"REDBANK_ADDRESS" required:"true"`
+	HealthAddress        string `envconfig:"HEALTH_ADDRESS" required:"true"`
 	AddressesPerJob      int    `envconfig:"ADDRESS_PER_JOB" required:"true"`
 	JobsPerWoker         int    `envconfig:"JOBS_PER_WORKER" required:"true"`
 	BatchSize            int    `envconfig:"BATCH_SIZE" required:"true"`
@@ -100,7 +100,7 @@ func main() {
 		config.JobsPerWoker,
 		config.BatchSize,
 		config.AddressesPerJob,
-		config.RedbankAddress,
+		config.HealthAddress,
 		logger,
 	)
 
