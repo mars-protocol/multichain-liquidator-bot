@@ -88,7 +88,8 @@ export class LiquidationActionGenerator {
 				: new BigNumber(0)
 		if (
 			!marketInfo ||
-			!whitelistedAssets.find((denom) => denom === debt.denom) ||
+			// TODO - check if asset is whitelisted
+			// !whitelistedAssets.find((denom) => denom === debt.denom) ||
 			remainingCreditLine.dividedBy(2).isLessThan(debtAmount) ||
 			marketInfo.available_liquidity / debtAmount < 0.5
 		) {
@@ -215,14 +216,14 @@ export class LiquidationActionGenerator {
 		return actions
 	}
 	
-	private getAvailablePools = (): string[] => {
-		const pools : string[] = []
+	private getAvailablePools = (): number[] => {
+		const pools : number[] = []
 		
 		this.swapperRoutes.forEach((route) => {
 			route.route.forEach((hop) => {
 				// Check if we have already pushed that pool
 				if (pools.find((pool)=> pool === hop.pool_id) === undefined) {
-					pools.push(hop.pool_id)
+					pools.push(hop.pool_id as number)
 				}
 			})
 		})
@@ -264,8 +265,9 @@ export class LiquidationActionGenerator {
 	): Action[] => {
 		const bnOut = new BigNumber(outAmount)
 
-		const swapperPools = this.getAvailablePools()
-		const usablePools = this.router.getPools().filter((pool)=> swapperPools.indexOf(pool.id.toString()) !== -1)
+		const swapperPools : number[] = this.getAvailablePools() 
+		const usablePools = this.router.getPools().filter((pool)=> swapperPools.indexOf(Number(pool.id)) !== -1)
+
 		this.router.setPools(usablePools)
 
 		const routes: RouteHop[][] = this.router.getRoutes(assetInDenom, assetOutDenom)
@@ -293,11 +295,11 @@ export class LiquidationActionGenerator {
 		requestCoinDenom: string,
 		vaultPositionType?: VaultPositionType,
 	): Action => {
-		return positionType === PositionType.COIN
-			? this.produceLiquidateCoin(debtCoin, liquidateeAccountId, requestCoinDenom)
-			: this.produceLiquidateVault(debtCoin, liquidateeAccountId, vaultPositionType!, {
-					address: requestCoinDenom,
-			  })
+		return positionType === PositionType.VAULT
+			? this.produceLiquidateVault(debtCoin, liquidateeAccountId, vaultPositionType!, {
+				address: requestCoinDenom,
+			})
+			: this.produceLiquidateCoin(debtCoin, liquidateeAccountId, requestCoinDenom, positionType === PositionType.DEPOSIT)
 	}
 
 	produceVaultToDebtActions = (vault: VaultInfo, borrowDenom: string): Action[] => {
@@ -340,6 +342,7 @@ export class LiquidationActionGenerator {
 					amount: 'account_balance',
 					denom: lpTokenDenom,
 				},
+				slippage: '0.005',
 			},
 		}
 	}
@@ -392,13 +395,14 @@ export class LiquidationActionGenerator {
 		debtCoin: Coin,
 		liquidateeAccountId: string,
 		requestCoinDenom: string,
+		isDeposit : boolean
 	): Action => {
 		return {
-			liquidate_coin: {
+			liquidate:{
 				debt_coin: debtCoin,
-				liquidatee_account_id: liquidateeAccountId,
-				request_coin_denom: requestCoinDenom,
-			},
+				liquidatee_account_id: liquidateeAccountId,	
+				request: isDeposit ? { deposit: requestCoinDenom } : { lend : requestCoinDenom }
+			}
 		}
 	}
 
@@ -409,11 +413,15 @@ export class LiquidationActionGenerator {
 		requestVault: VaultBaseForString,
 	): Action => {
 		return {
-			liquidate_vault: {
+			liquidate: {
 				debt_coin: debtCoin,
 				liquidatee_account_id: liquidateeAccountId,
-				position_type: vaultPositionType,
-				request_vault: requestVault,
+				request: {
+					vault: {
+						position_type: vaultPositionType,
+						request_vault: requestVault
+					}
+				}
 			},
 		}
 	}
@@ -421,8 +429,11 @@ export class LiquidationActionGenerator {
 	private produceRepayAction = (denom: string): Action => {
 		return {
 			repay: {
-				amount: 'account_balance',
-				denom: denom,
+
+				coin: {
+					amount: 'account_balance',
+					denom: denom,
+				}
 			},
 		}
 	}

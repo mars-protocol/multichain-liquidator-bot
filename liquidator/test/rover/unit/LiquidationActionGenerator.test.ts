@@ -63,7 +63,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 				const collateralAmount = 500
 
 				const collateral: Collateral = {
-					type: PositionType.COIN,
+					type: PositionType.DEPOSIT,
 					amount: collateralAmount,
 					closeFactor: 0.5,
 					denom: collateralDenom,
@@ -104,7 +104,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 				const collateralAmount = 500
 
 				const collateral: Collateral = {
-					type: PositionType.COIN,
+					type: PositionType.DEPOSIT,
 					amount: collateralAmount,
 					closeFactor: 0.5,
 					denom: collateralDenom,
@@ -145,7 +145,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 				const collateralDenom = Math.random().toString()
 				const collateralAmount = 150
 				const collateral: Collateral = {
-					type: PositionType.COIN,
+					type: PositionType.DEPOSIT,
 					amount: collateralAmount,
 					closeFactor: 0.5,
 					denom: collateralDenom,
@@ -186,7 +186,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 				const collateralAmount = 500
 
 				const collateral: Collateral = {
-					type: PositionType.COIN,
+					type: PositionType.DEPOSIT,
 					amount: collateralAmount,
 					closeFactor: 0.5,
 					denom: collateralDenom,
@@ -240,7 +240,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 				const collateralDenom = Math.random().toString()
 				const collateralAmount = 500
 				const collateral: Collateral = {
-					type: PositionType.COIN,
+					type: PositionType.DEPOSIT,
 					amount: collateralAmount,
 					closeFactor: 0.5,
 					denom: collateralDenom,
@@ -283,7 +283,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 				const collateralAmount = 500
 
 				const collateral: Collateral = {
-					type: PositionType.COIN,
+					type: PositionType.DEPOSIT,
 					amount: collateralAmount,
 					closeFactor: 0.5,
 					denom: 'does not exist',
