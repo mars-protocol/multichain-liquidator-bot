@@ -65,7 +65,12 @@ func (hive *RoverHive) FetchBatch(
 		batchQuery := BatchQuery{
 			Query: fmt.Sprintf(`query($contractAddress: String! $accountId: String!) {
                         account_%s:wasm {
-							contractQuery(contractAddress: $contractAddress, query: { health : { account_id: $accountId } })
+							contractQuery(contractAddress: $contractAddress, query: {  
+								health_values: {
+									account_id: $accountId,
+									kind:"default",
+									action:"liquidation"
+							  }} )
 						}
                     }`, position.Identifier),
 			Variables: map[string]interface{}{
@@ -98,10 +103,8 @@ func (hive *RoverHive) FetchBatch(
 	if err != nil {
 		return userResults, err
 	}
-
 	for _, event := range batchEvents {
 		// event.Data is now the address[contractQuery] map
-
 		for accountId, data := range event.Data {
 			userResults = append(userResults, UserResult{
 				AccountId:     accountId,
