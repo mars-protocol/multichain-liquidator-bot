@@ -4,8 +4,10 @@
 
 .PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean .start_redis
 
-IMAGE_NAME := "multichain-manager:latest"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
+BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD)
+BASE_IMAGE_NAME := $(ECR_REPO)/multichain-manager
+IMAGE_NAME := $(BASE_IMAGE_NAME):$(BRANCH_NAME)-$(GIT_COMMIT)
 REDBANK_ADDRESS := "osmo1cljmlh9ctfv00ug9m3ndrsyyyfqlxnx4welnw8upgu6ylhd6hk4qchm9rt"
 AWS_ACCESS_KEY := "123456"
 AWS_ACCESS_KEY_SECRET := "abcd"

@@ -4,8 +4,10 @@
 
 .PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean .start_redis
 
-IMAGE_NAME := "<your-cointainer-repo>/multichain-collector:latest"
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
+BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD)
+BASE_IMAGE_NAME := $(ECR_REPO)/multichain-collector
+IMAGE_NAME := $(BASE_IMAGE_NAME):$(BRANCH_NAME)-$(GIT_COMMIT)
 
 # This makes the APP_NAME be the name of the current directory
 # Ex. in path /home/dev/app/my-app the APP_NAME will be set to my-app

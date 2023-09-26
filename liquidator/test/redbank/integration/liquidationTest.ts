@@ -171,6 +171,7 @@ const runTest = async (
 
 	const config = {
 		gasDenom: 'uosmo',
+		chainName: "osmosis",
 		hiveEndpoint: testConfig.hiveEndpoint,
 		lcdEndpoint: testConfig.lcdEndpoint,
 		liquidatableAssets: ['uosmo', 'uatom', 'uusd'],

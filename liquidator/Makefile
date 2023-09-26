@@ -4,8 +4,11 @@
 
 .PHONY: default build fmt lint run run_race test clean vet docker_build docker_run docker_clean
 # Add your image name here. For instance, if you are pushing to ECR, use <your-ecr>/multichain-liquidator:latest
-IMAGE_NAME := "multichain-liquidator:latest"
+
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
+BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD)
+BASE_IMAGE_NAME := $(ECR_REPO)/multichain-liquidator
+IMAGE_NAME := $(BASE_IMAGE_NAME):$(BRANCH_NAME)-$(GIT_COMMIT)
 
 # Required contract addresses. Refer to mars github documentation for mainnet addresses
 REDBANK_ADDRESS := "osmo1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s0p34vn"
@@ -31,7 +34,7 @@ run_node: build ## Run the service with race condition checking enabled
 	node build/src/main.js
 
 docker_build: build ## Build the service Docker container
-	docker build -t ${IMAGE_NAME} .
+	docker build --platform=linux/amd64 -t ${IMAGE_NAME} .
 
 docker_run: ## Run the Docker container in interactive mode
 	docker run -it --rm --network="host" \

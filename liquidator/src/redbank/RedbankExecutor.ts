@@ -88,6 +88,10 @@ export class RedbankExecutor extends BaseExecutor {
 		setInterval(this.updateOraclePrices, 1 * this.MINUTE )
 		setInterval(this.fetchTargetHealthFactor, 10 * this.MINUTE)
 
+		if (this.config.chainName === "neutron") {
+			await this.initiateAstroportPoolProvider()
+		}
+		
 		// run
 		while (true) {
 			try {
