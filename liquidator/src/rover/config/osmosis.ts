@@ -16,7 +16,7 @@ export const getConfig = (
 			redbankAddress: 'osmo1c3ljch9dfw5kf52nfwpxd2zmj2ese7agnx0p9tenkrryasrle5sqf3ftpg',
 			accountNftAddress: 'osmo1450hrg6dv2l58c0rvdwx8ec2a0r6dd50hn4frk370tpvqjhy8khqw7sw09',
 			// todo once deployed
-			marsParamsAddress: '',
+			marsParamsAddress: 'osmo1ajxun4vu7xg856teh2cnh28yllx3vgv8n2qzl9rny2ul2zyltpfqywsa8w',
 			creditManagerAddress: 'osmo1f2m24wktq0sw3c0lexlg7fv4kngwyttvzws3a3r3al9ld2s2pvds87jqvf',
 			liquidatorMasterAddress: liquidatorMasterAddress,
 			minGasTokens: 10000000,

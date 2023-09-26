@@ -19,7 +19,7 @@ export const produceCoreRoverDataQuery = (
         ),
         prices: contractQuery(
             contractAddress: "${oracleAddress}"
-            query: { prices: {} }
+            query: { prices: { limit: 50 } }
         ),
         creditLines: contractQuery(
           contractAddress: "${redbankAddress}"

@@ -5,9 +5,6 @@ import { fetchBalances, fetchRoverData, fetchRoverPosition } from '../query/hive
 import { LiquidationActionGenerator } from './LiquidationActionGenerator'
 import {
 	Coin,
-	QueryMsg,
-	VaultBaseForAddr,
-	VaultInfoResponse,
 	VaultPosition,
 	VaultPositionType,
 	VaultUnlockingPosition,
@@ -25,6 +22,7 @@ import {
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface'
+import { QueryMsg, VaultConfigBaseForString } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types'
 
 
 interface CreateCreditAccountResponse {
@@ -98,11 +96,11 @@ export class RoverExecutor extends BaseExecutor {
 		// We set up 3 separate tasks to run in parallel
 		//
 		// Refresh the data such as pool data, vaults,
-		setInterval(this.refreshData, 30*1000)
+		setTimeout(this.refreshData, 30*1000)
 		// Ensure our liquidator wallets have more than enough funds to operate
-		setInterval(this.updateLiquidatorBalances, 20*1000)
+		setTimeout(this.updateLiquidatorBalances, 20*1000)
 		// check for and dispatch liquidations
-		setInterval(this.run, 200)
+		setTimeout(this.run, 200)
 	}
 
 	
@@ -118,13 +116,12 @@ export class RoverExecutor extends BaseExecutor {
 		
 		const amountToSend = this.config.minGasTokens * 2
 
-		for (const balanceKey of Array.from(balances.keys())) {
-
-			const osmoBalance = Number(balances.get(balanceKey)?.find((coin : Coin) => coin.denom === this.config.gasDenom)?.amount || 0)
+		for (const address of Array.from(balances.keys())) {
+			const osmoBalance = Number(balances.get(address)?.find((coin : Coin) => coin.denom === this.config.gasDenom)?.amount || 0)
 
 			if (osmoBalance === undefined || osmoBalance < this.config.minGasTokens) {
 				// send message to send gas tokens to our liquidator
-				sendMsgs.push(produceSendMessage(this.config.liquidatorMasterAddress,balanceKey, [{denom: this.config.gasDenom, amount : amountToSend.toFixed(0)}]))
+				sendMsgs.push(produceSendMessage(this.config.liquidatorMasterAddress,address, [{denom: this.config.gasDenom, amount : amountToSend.toFixed(0)}]))
 			}
 		}
 
@@ -137,18 +134,18 @@ export class RoverExecutor extends BaseExecutor {
 	fetchVaults = async () => {
 		let foundAll = false
 		const limit = 5
-		let vaults: VaultInfoResponse[] = []
-		let startAfter: VaultBaseForAddr | undefined = undefined
+		let vaults: VaultConfigBaseForString[] = []
+		let startAfter: string | undefined = undefined
 		while (!foundAll) {
 			const vaultQuery: QueryMsg = {
-				vaults_info: {
-					limit,
+				all_vault_configs: {
+					limit, 
 					start_after: startAfter,
 				},
 			}
 
-			const results: VaultInfoResponse[] = await this.queryClient.queryContractSmart(
-				this.config.creditManagerAddress,
+			const results: VaultConfigBaseForString[] = await this.queryClient.queryContractSmart(
+				this.config.marsParamsAddress,
 				vaultQuery,
 			)
 
@@ -158,7 +155,7 @@ export class RoverExecutor extends BaseExecutor {
 				foundAll = true
 			}
 
-			startAfter = results.pop()?.vault
+			startAfter = results.pop()?.addr
 		}
 
 		return vaults
@@ -168,8 +165,8 @@ export class RoverExecutor extends BaseExecutor {
 		// Periodically refresh the vaults we have
 		const currentTimeMs = Date.now()
 		if (this.lastFetchedVaultTime + this.VAULT_RELOAD_WINDOW < currentTimeMs) {
-			const vaultsData: VaultInfoResponse[] = await this.fetchVaults()
-			this.vaults = vaultsData.map((vaultData) => vaultData.vault.address)
+			const vaultsData: VaultConfigBaseForString[] = await this.fetchVaults()
+			this.vaults = vaultsData.map((vaultData) => vaultData.addr)
 			this.lastFetchedVaultTime = currentTimeMs
 		}
 
@@ -216,7 +213,7 @@ export class RoverExecutor extends BaseExecutor {
 					produceExecuteContractMessage(
 						liquidatorAddress,
 						this.config.creditManagerAddress,
-						toUtf8(`{ "create_credit_account": {} }`),
+						toUtf8(`{ "create_credit_account": "default" }`),
 					),
 				],
 				'auto',
@@ -247,6 +244,7 @@ export class RoverExecutor extends BaseExecutor {
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
 		const targetAccounts : string[] = await this.redis.popUnhealthyPositions<string>(this.config.maxLiquidators)
 
+
 		// Sleep to avoid spamming redis db when empty.
 		if (targetAccounts.length == 0) {
 			await sleep(200)
@@ -267,7 +265,6 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
-		console.log(`liquidating ${accountId}`)
 		const roverPosition = await fetchRoverPosition(
 			accountId,
 			this.config.creditManagerAddress,
@@ -277,6 +274,7 @@ export class RoverExecutor extends BaseExecutor {
 		// find best collateral / debt
 		const bestCollateral: Collateral = this.findBestCollateral(
 			roverPosition.deposits,
+			roverPosition.lends,
 			roverPosition.vaults,
 		)
 
@@ -375,12 +373,22 @@ export class RoverExecutor extends BaseExecutor {
 		}
 	}
 
-	findBestCollateral = (collaterals: Coin[], vaultPositions: VaultPosition[]): Collateral => {
+	findBestCollateral = (deposits: Coin[], lends: Coin[], vaultPositions: VaultPosition[]): Collateral => {
 
-		const largestCollateralCoin = collaterals
+		const largestDeposit = deposits
 			.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
 			.pop()
-			
+
+		const largestLend = lends
+			.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
+			.pop()
+		
+		const largestCollateralCoin = this.calculateCoinValue(largestDeposit) > this.calculateCoinValue(largestLend) 
+			? largestDeposit
+			: largestLend
+		
+		console.log({largestCollateralCoin})
+
 		const largestCollateralVault = vaultPositions
 			.sort(
 				(vaultA, vaultB) =>
@@ -414,20 +422,21 @@ export class RoverExecutor extends BaseExecutor {
 		const amount = Number((bestCollateral as Coin).amount)
 		const value = amount * (this.prices.get((bestCollateral as Coin).denom) || 0)
 
+
 		return {
 			amount,
 			value,
 			denom: (bestCollateral as Coin).denom,
 			closeFactor: 0.5, // todo
 			price: this.prices.get((bestCollateral as Coin).denom) || 0,
-			type: PositionType.COIN,
+			type: largestDeposit === largestCollateralCoin ? PositionType.DEPOSIT : PositionType.LEND,
 		}
 	}
 
 	calculateCoinValue = (coin: Coin | undefined): number => {
 		if (!coin) return 0
 
-		const amountBn = new BigNumber(coin?.amount)
+		const amountBn = new BigNumber(coin.amount)
 		const price = new BigNumber(this.prices.get(coin.denom) || 0)
 		return amountBn.multipliedBy(price).toNumber()
 	}

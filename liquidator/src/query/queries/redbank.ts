@@ -45,7 +45,7 @@ export const produceRedbankGeneralQuery = (
             ),
             prices: contractQuery(
                 contractAddress: "${oracleAddress}"
-                query: { prices: {} }
+                query: { prices: { limit: 50 } }
             )
           }
         }`
