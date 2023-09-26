@@ -7,7 +7,8 @@ export interface RoverPosition {
 }
 
 export enum PositionType {
-	COIN,
+	LEND,
+	DEPOSIT,
 	VAULT,
 }
 

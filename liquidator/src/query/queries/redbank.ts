@@ -43,12 +43,12 @@ export const produceRedbankGeneralQuery = (
                 contractAddress: "${redbankAddress}"
                 query: { markets: {} }
             ),
-            prices: contractQuery(
-                contractAddress: "${oracleAddress}"
-                query: { prices: {} }
-            )
-          }
-        }`
+        prices: contractQuery(
+            contractAddress: "${oracleAddress}"
+            query: { prices: { limit: 50 } }
+        )
+      }
+    }`
 }
 
 const producePositionQuerySection = (

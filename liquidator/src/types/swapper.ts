@@ -5,6 +5,6 @@ export interface SwapperRoute {
 }
 
 export interface SwapperRouteHop {
-	pool_id: string
+	pool_id: number | string
 	token_out_denom: string
 }
