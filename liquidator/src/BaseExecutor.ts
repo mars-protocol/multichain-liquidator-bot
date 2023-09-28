@@ -61,17 +61,18 @@ export class BaseExecutor {
 		private poolProvider: PoolDataProviderInterface,
 		public redis : RedisInterface = new RedisInterface(),
 		public ammRouter : AMMRouter = new AMMRouter()
-	) {}
+	) {
+		console.log({config})
+	}
 
 	async initiateRedis(): Promise<void> {
 		await this.redis.connect(this.config.redisEndpoint)
 	}
 
 	async initiateAstroportPoolProvider(): Promise<void> {
-		const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
-
-		if (astroportPoolProvider) {
-  			await astroportPoolProvider.initiate();
+		if (this.config.chainName === "neutron") {
+			const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
+			await astroportPoolProvider.initiate()
 		}
 	}
 

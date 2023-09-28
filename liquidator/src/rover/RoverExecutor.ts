@@ -96,9 +96,9 @@ export class RoverExecutor extends BaseExecutor {
 		// We set up 3 separate tasks to run in parallel
 		//
 		// Refresh the data such as pool data, vaults,
-		setTimeout(this.refreshData, 30*1000)
+		setInterval(this.refreshData, 30*1000)
 		// Ensure our liquidator wallets have more than enough funds to operate
-		setTimeout(this.updateLiquidatorBalances, 20*1000)
+		setInterval(this.updateLiquidatorBalances, 20*1000)
 		// check for and dispatch liquidations
 		setTimeout(this.run, 200)
 	}
