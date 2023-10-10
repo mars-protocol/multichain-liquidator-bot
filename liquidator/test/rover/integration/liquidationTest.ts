@@ -29,6 +29,7 @@ import BigNumber from 'bignumber.js'
 import { AMMRouter } from '../../../src/AmmRouter'
 import { RedisInterface } from '../../../src/redis'
 import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
+import { AssetParamsBaseForAddr, AssetParamsUpdate } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types'
 
 const runTests = async (testConfig: TestConfig) => {
 	// Test results
@@ -61,7 +62,6 @@ const runTests = async (testConfig: TestConfig) => {
 	)
 
 	const masterAddress = (await wallet.getAccounts())[0].address
-	const exec = new MarsCreditManagerClient(cwClient, masterAddress, testConfig.creditManagerAddress)
 
 	console.log('Master account setup complete')
 
@@ -108,7 +108,6 @@ const runTests = async (testConfig: TestConfig) => {
 			executorLiquidator,
 			masterAddress,
 			config,
-			exec,
 		)
 	}
 
@@ -120,7 +119,6 @@ const runTests = async (testConfig: TestConfig) => {
 			executorLiquidator,
 			masterAddress,
 			config,
-			exec,
 		)
 	}
 
@@ -183,7 +181,6 @@ const runTests = async (testConfig: TestConfig) => {
 			executorLiquidator,
 			masterAddress,
 			config,
-			exec,
 		)
 	}
 
@@ -372,21 +369,23 @@ const runLockedVaultTest = async (
 	executor: RoverExecutor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
-	exec: MarsCreditManagerClient,
 ): Promise<boolean> => {
 	try {
 		console.log('Testing locked vault')
 		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: [
-					'uosmo',
-					testConfig.usdcDenom,
-					testConfig.atomDenom,
-					testConfig.osmoAtomPoolDenom,
-				],
-			},
-		})
+
+        await updateCoinsWhitelist(
+            masterAddress,
+            testConfig.marsParamsAddress,
+            cwClient,
+            [
+                'uosmo',
+                testConfig.usdcDenom,
+                testConfig.atomDenom,
+                testConfig.osmoAtomPoolDenom,
+            ],
+            true
+        )
 
 		const depositAmount = '10000'
 		// // Set up our liquidatee
@@ -491,20 +490,21 @@ const lpCoinLiquidate = async (
 	executor: RoverExecutor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
-	exec: MarsCreditManagerClient,
 ): Promise<boolean> => {
 	try {
 		console.log('Starting lpCoin test')
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: [
-					'uosmo',
-					testConfig.usdcDenom,
-					testConfig.atomDenom,
-					testConfig.osmoAtomPoolDenom,
-				],
-			},
-		})
+        await updateCoinsWhitelist(
+            masterAddress,
+            testConfig.marsParamsAddress,
+            cwClient,
+            [
+                'uosmo',
+                testConfig.usdcDenom,
+                testConfig.atomDenom,
+                testConfig.osmoAtomPoolDenom
+            ],
+            true
+        )
 
 		// Set up our liquidatee.
 		const { mnemonic } = await DirectSecp256k1HdWallet.generate(24)
@@ -585,7 +585,7 @@ const lpCoinLiquidate = async (
 			provide_liquidity: {
 				coins_in: liquidityCoins,
 				lp_token_out: testConfig.osmoAtomPoolDenom,
-				minimum_receive: '1',
+				slippage: '0.01',
 			},
 		}
 
@@ -627,11 +627,13 @@ const lpCoinLiquidate = async (
 			testConfig.osmoAtomPoolId,
 			client,
 		)
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
+        await updateCoinsWhitelist(
+            masterAddress,
+            testConfig.marsParamsAddress,
+            cwClient,
+            ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
+            true
+        )
 	}
 	return true
 }
@@ -931,7 +933,6 @@ const nonWhitelistedCoinTest = async (
 	executor: RoverExecutor,
 	masterAddress: string,
 	config: RoverExecutorConfig,
-	exec: MarsCreditManagerClient,
 ): Promise<boolean> => {
 	try {
 		console.log('Starting non whitelisted coin test')
@@ -961,11 +962,13 @@ const nonWhitelistedCoinTest = async (
 		)
 
 		// remove coin from whitelist
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom],
-			},
-		})
+        await updateCoinsWhitelist(
+            masterAddress,
+            testConfig.marsParamsAddress,
+            cwClient,
+            [testConfig.atomDenom],
+            false
+        )
 
 		// refresh market data
 		await executor.refreshData()
@@ -982,11 +985,13 @@ const nonWhitelistedCoinTest = async (
 			testConfig.osmoAtomPoolId,
 			client,
 		)
-		await exec.updateConfig({
-			updates: {
-				allowed_coins: ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
-			},
-		})
+        await updateCoinsWhitelist(
+            masterAddress,
+            testConfig.marsParamsAddress,
+            cwClient,
+            ['uosmo', testConfig.usdcDenom, testConfig.atomDenom],
+            true
+        )
 	}
 	return true
 }
@@ -1182,7 +1187,7 @@ const createVictimVaultPosition = async (
 			provide_liquidity: {
 				coins_in: liquidityCoins,
 				lp_token_out: testConfig.osmoAtomPoolDenom,
-				minimum_receive: '1',
+				slippage: '0.01',
 			},
 		},
 		{
@@ -1246,7 +1251,7 @@ const createVictimCoinPosition = async (
 				borrow: borrowCoin,
 			},
 			{
-				withdraw: borrowCoin,
+				withdraw: borrowCoin as ActionCoin,
 			},
 		],
 		victimAccountId,
@@ -1262,3 +1267,60 @@ const main = async () => {
 }
 
 main().then(() => process.exit())
+
+
+const updateCoinsWhitelist = async(
+    deployerAddress: string,
+    marsParamsAddress : string,
+    cosmWasmClient: SigningCosmWasmClient, 
+    denoms: Array<string>,
+    whitelisted: boolean) => {
+
+    // Build all our msgs
+    let msgPromises = await Promise.all(denoms.map((denom) => createUpdateCMCoinStateMsg(
+        deployerAddress,
+        marsParamsAddress,
+        cosmWasmClient,
+        denom,
+        whitelisted
+    )))
+
+    // dispatch all our msgs
+    await Promise.all(msgPromises)
+}
+
+const createUpdateCMCoinStateMsg = async(
+    deployerAddress: string,
+    marsParamsAddress : string,
+    cosmWasmClient: SigningCosmWasmClient, 
+    denom: string,
+    enabled: boolean
+) => {
+
+    // query the asset params with the config.
+    let state : AssetParamsBaseForAddr = await cosmWasmClient.queryContractSmart(
+        marsParamsAddress, 
+        {
+            asset_params : {
+                denom
+            }
+        })
+
+    state.credit_manager.whitelisted = enabled
+
+    let updateMsg : AssetParamsUpdate = {
+        add_or_update: {
+            params: state
+        }
+    }
+
+    return produceExecuteContractMessage(
+        deployerAddress,
+        marsParamsAddress,
+        toUtf8(JSON.stringify(
+            {
+                update_asset_params : updateMsg
+            }
+        ))
+    )
+}
