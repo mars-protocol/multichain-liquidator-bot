@@ -100,7 +100,10 @@ export class RoverExecutor extends BaseExecutor {
 		// Ensure our liquidator wallets have more than enough funds to operate
 		setInterval(this.updateLiquidatorBalances, 20*1000)
 		// check for and dispatch liquidations
-		setTimeout(this.run, 200)
+		while (true) {
+			await sleep(200)
+			await this.run()
+		}
 	}
 
 	
@@ -110,25 +113,30 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	topUpWallets = async(addresses: string[]) => {
-		const balances = await fetchBalances(this.config.hiveEndpoint, addresses)
-		this.liquidatorBalances= balances
-		const sendMsgs : MsgSendEncodeObject[] = []
-		
-		const amountToSend = this.config.minGasTokens * 2
-
-		for (const address of Array.from(balances.keys())) {
-			const osmoBalance = Number(balances.get(address)?.find((coin : Coin) => coin.denom === this.config.gasDenom)?.amount || 0)
-
-			if (osmoBalance === undefined || osmoBalance < this.config.minGasTokens) {
-				// send message to send gas tokens to our liquidator
-				sendMsgs.push(produceSendMessage(this.config.liquidatorMasterAddress,address, [{denom: this.config.gasDenom, amount : amountToSend.toFixed(0)}]))
+		try {
+			const balances = await fetchBalances(this.config.hiveEndpoint, addresses)
+			this.liquidatorBalances= balances
+			const sendMsgs : MsgSendEncodeObject[] = []
+			
+			const amountToSend = this.config.minGasTokens * 2
+	
+			for (const address of Array.from(balances.keys())) {
+				const osmoBalance = Number(balances.get(address)?.find((coin : Coin) => coin.denom === this.config.gasDenom)?.amount || 0)
+	
+				if (osmoBalance === undefined || osmoBalance < this.config.minGasTokens) {
+					// send message to send gas tokens to our liquidator
+					sendMsgs.push(produceSendMessage(this.config.liquidatorMasterAddress,address, [{denom: this.config.gasDenom, amount : amountToSend.toFixed(0)}]))
+				}
 			}
+	
+			if (sendMsgs.length > 0) {
+				await this.client.signAndBroadcast(this.config.liquidatorMasterAddress, sendMsgs, 'auto')
+				console.log(`topped up ${sendMsgs.length} wallets`)
+			}
+		} catch(ex) {
+			console.error(JSON.stringify(ex))
 		}
-
-		if (sendMsgs.length > 0) {
-			await this.client.signAndBroadcast(this.config.liquidatorMasterAddress, sendMsgs, 'auto')
-			console.log(`topped up ${sendMsgs.length} wallets`)
-		}
+		
 	}
 
 	fetchVaults = async () => {
@@ -162,40 +170,45 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	refreshData = async () => {
-		// Periodically refresh the vaults we have
-		const currentTimeMs = Date.now()
-		if (this.lastFetchedVaultTime + this.VAULT_RELOAD_WINDOW < currentTimeMs) {
-			const vaultsData: VaultConfigBaseForString[] = await this.fetchVaults()
-			this.vaults = vaultsData.map((vaultData) => vaultData.addr)
-			this.lastFetchedVaultTime = currentTimeMs
+		try {
+			// Periodically refresh the vaults we have
+			const currentTimeMs = Date.now()
+			if (this.lastFetchedVaultTime + this.VAULT_RELOAD_WINDOW < currentTimeMs) {
+				const vaultsData: VaultConfigBaseForString[] = await this.fetchVaults()
+				this.vaults = vaultsData.map((vaultData) => vaultData.addr)
+				this.lastFetchedVaultTime = currentTimeMs
+			}
+
+			// dispatch hive request and parse it
+			const roverData = await fetchRoverData(
+				this.config.hiveEndpoint,
+				this.config.liquidatorMasterAddress,
+				this.config.redbankAddress,
+				this.config.oracleAddress,
+				this.config.creditManagerAddress,
+				this.config.swapperAddress,
+				this.vaults,
+			)
+
+			await this.refreshMarketData()
+
+			roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
+			roverData.prices.forEach((price: PriceResponse) =>
+				this.prices.set(price.denom, Number(price.price)),
+			)
+			this.whitelistedCoins = roverData.whitelistedAssets! as string[]
+
+			this.vaultDetails = roverData.vaultInfo
+			this.creditLines = roverData.creditLines
+			this.creditLineCaps = roverData.creditLineCaps
+
+			this.liquidationActionGenerator.setSwapperRoutes(roverData.routes)
+
+			await this.refreshPoolData()
+		} catch(ex) {
+			console.error(JSON.stringify(ex))
 		}
-
-		// dispatch hive request and parse it
-		const roverData = await fetchRoverData(
-			this.config.hiveEndpoint,
-			this.config.liquidatorMasterAddress,
-			this.config.redbankAddress,
-			this.config.oracleAddress,
-			this.config.creditManagerAddress,
-			this.config.swapperAddress,
-			this.vaults,
-		)
-
-		await this.refreshMarketData()
 		
-		roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
-		roverData.prices.forEach((price: PriceResponse) =>
-			this.prices.set(price.denom, Number(price.price)),
-		)
-		this.whitelistedCoins = roverData.whitelistedAssets! as string[]
-
-		this.vaultDetails = roverData.vaultInfo
-		this.creditLines = roverData.creditLines
-		this.creditLineCaps = roverData.creditLineCaps
-
-		this.liquidationActionGenerator.setSwapperRoutes(roverData.routes)
-
-		await this.refreshPoolData()
 	}
 
 	createCreditAccount = async (
@@ -242,7 +255,7 @@ export class RoverExecutor extends BaseExecutor {
 	run = async () => {
 
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-		const targetAccounts : string[] = await this.redis.popUnhealthyPositions<string>(this.config.maxLiquidators)
+		const targetAccounts : string[] = await this.redis.popUnhealthyPositions<string>(this.config.maxLiquidators-1)
 
 
 		// Sleep to avoid spamming redis db when empty.
@@ -386,8 +399,7 @@ export class RoverExecutor extends BaseExecutor {
 		const largestCollateralCoin = this.calculateCoinValue(largestDeposit) > this.calculateCoinValue(largestLend) 
 			? largestDeposit
 			: largestLend
-		
-		console.log({largestCollateralCoin})
+
 
 		const largestCollateralVault = vaultPositions
 			.sort(

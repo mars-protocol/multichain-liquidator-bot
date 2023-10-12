@@ -79,13 +79,17 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 	}
 
 	private fetchDepths = async(url : string) : Promise<LiquidityDepth[]> => {
-		const responseJson = await this.sendRequest(url);
-		if (responseJson.liquidity_depths) {
-			return responseJson.liquidity_depths.map((depth: any) => camelCaseKeys(depth)) as LiquidityDepth[]
-		}
-
-		return []
+		try {
+			const responseJson = await this.sendRequest(url);
 		
+			if (responseJson.liquidity_depths) {
+				return responseJson.liquidity_depths.map((depth: any) => camelCaseKeys(depth)) as LiquidityDepth[]
+			}
+		} catch (ex) {
+			console.error(JSON.stringify(ex))
+		}
+		
+		return []
 	}
 
 	private sendRequest = async (url: string) : Promise<any> => {
