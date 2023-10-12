@@ -17,14 +17,14 @@ export const getConfig = (
 			redbankAddress: process.env.REDBANK_ADDRESS || 'osmo1c3ljch9dfw5kf52nfwpxd2zmj2ese7agnx0p9tenkrryasrle5sqf3ftpg',
 			accountNftAddress: process.env.ACCOUNT_NFT_ADDRESS || 'osmo1450hrg6dv2l58c0rvdwx8ec2a0r6dd50hn4frk370tpvqjhy8khqw7sw09',
 			// todo once deployed
-			marsParamsAddress: process.env.MARS_PARAMS_ADDRESS || 'osmo1ajxun4vu7xg856teh2cnh28yllx3vgv8n2qzl9rny2ul2zyltpfqywsa8w',
+			marsParamsAddress: process.env.MARS_PARAMS_ADDRESS || 'osmo1nlmdxt9ctql2jr47qd4fpgzg84cjswxyw6q99u4y4u4q6c2f5ksq7ysent',
 			creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS || 'osmo1f2m24wktq0sw3c0lexlg7fv4kngwyttvzws3a3r3al9ld2s2pvds87jqvf',
 			liquidatorMasterAddress: liquidatorMasterAddress,
-			minGasTokens: 10000000,
+			minGasTokens: 100000,
 			logResults: false,
 			redisEndpoint: process.env.REDIS_ENDPOINT || '', // recommend using local
 			poolsRefreshWindow: 60000,
-			maxLiquidators: 100,
+			maxLiquidators: 2,
 			stableBalanceThreshold: 5000000
 		}
 	}

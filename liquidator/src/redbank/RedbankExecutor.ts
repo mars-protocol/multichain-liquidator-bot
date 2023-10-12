@@ -321,6 +321,11 @@ export class RedbankExecutor extends BaseExecutor {
 					.multipliedBy(1-liquidationBonus)
 					.multipliedBy(collateralPrice)
 
+				if (
+					!largestCollateralValue || 
+					largestCollateralValue.isLessThanOrEqualTo(10000) || 
+					largestCollateralValue.isNaN()) continue
+
 				// todo Make sure that the max repayable is less than the debt
 				const maxRepayableValue = maxDebtRepayableValue.isGreaterThan(largestCollateralValue) ? largestCollateralValue : maxDebtRepayableValue
 				const maxRepayableAmount = maxRepayableValue.dividedBy(this.prices.get(debtDenom) || 0)
@@ -560,7 +565,7 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.refreshData()
 
 		console.log('Checking for liquidations')
-		const positions: Position[] = await this.redis.popUnhealthyPositions<Position>(25)
+		const positions: Position[] = await this.redis.popUnhealthyPositions<Position>(Number(process.env.POSITION_BATCH_SIZE) || 1)
 
 		if (positions.length == 0) {
 			//sleep to avoid spamming redis db when empty

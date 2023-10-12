@@ -50,6 +50,7 @@ func TestScaleUp(t *testing.T) {
 		10, // low
 		20, // high
 		0,  // minimum service count
+		10, // maximum service count
 		logrus.WithFields(logrus.Fields{}),
 	)
 	if err != nil {
@@ -79,6 +80,7 @@ func TestScaleDownWithoutMinimum(t *testing.T) {
 		10, // low
 		20, // high
 		0,  // minimum service count
+		10, // maximum service count
 		logrus.WithFields(logrus.Fields{}),
 	)
 	if err != nil {
@@ -113,6 +115,7 @@ func TestScaleDownWithMinimum(t *testing.T) {
 		10, // low
 		20, // high
 		1,  // minimum service count
+		10, // maximum service count
 		logrus.WithFields(logrus.Fields{}),
 	)
 	if err != nil {
@@ -147,6 +150,7 @@ func TestScaleAutomaticWithMinimum(t *testing.T) {
 		10, // low
 		20, // high
 		1,  // minimum service count
+		10, // maximum service count
 		logrus.WithFields(logrus.Fields{}),
 	)
 	if err != nil {
@@ -184,6 +188,7 @@ func TestScaleAutomaticWithoutMinimumNoScaling(t *testing.T) {
 		0,  // low
 		20, // high
 		0,  // minimum service count
+		10, // maximum service count
 		logrus.WithFields(logrus.Fields{}),
 	)
 	if err != nil {
