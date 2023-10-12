@@ -26,6 +26,7 @@ type QueueWatermark struct {
 	lowWaterMark                        int
 	highWaterMark                       int
 	minimumServiceCount                 int
+	maximumServiceCount                 int
 	consecutiveBlocksCompletedThreshold int
 	logger                              *logrus.Entry
 }
@@ -44,6 +45,7 @@ func NewQueueWatermark(
 	lowWaterMark int,
 	highWaterMark int,
 	minimumServiceCount int,
+	maximumServiceCount int,
 	logger *logrus.Entry,
 ) (*QueueWatermark, error) {
 
@@ -63,6 +65,10 @@ func NewQueueWatermark(
 		return nil, errors.New("high watermarks must be larger than zero")
 	}
 
+	if maximumServiceCount < minimumServiceCount {
+		return nil, errors.New("maximumServiceCount must be larger than minimumServiceCount")
+	}
+
 	return &QueueWatermark{
 		queue:                       queue,
 		queueName:                   queueName,
@@ -73,6 +79,7 @@ func NewQueueWatermark(
 		lowWaterMark:                lowWaterMark,
 		highWaterMark:               highWaterMark,
 		minimumServiceCount:         minimumServiceCount,
+		maximumServiceCount:         maximumServiceCount,
 		logger: logger.WithFields(logrus.Fields{
 			"subservice": "scaler",
 			"type":       "queuewatermark",
@@ -164,6 +171,21 @@ func (qwm *QueueWatermark) ScaleAutomatic() (string, bool, error) {
 
 // ScaleUp scales the service up by one instance
 func (qwm *QueueWatermark) ScaleUp() error {
+	currentServiceCount, err := qwm.deployer.Count()
+	if err != nil {
+		return err
+	}
+
+	proposedServiceCount := currentServiceCount + 1
+
+	if proposedServiceCount > qwm.maximumServiceCount {
+		qwm.logger.WithFields(logrus.Fields{
+			"proposedServiceCount": proposedServiceCount,
+			"maximumServiceCount":  qwm.maximumServiceCount,
+		}).Debug("Scale up failed as proposed service count was higher than maximum count")
+		return nil
+	}
+
 	return qwm.deployer.Increase()
 }
 
