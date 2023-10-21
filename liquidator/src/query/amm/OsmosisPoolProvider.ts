@@ -1,8 +1,8 @@
-import { Int } from "@keplr-wallet/unit";
+import { Dec, Int } from "@keplr-wallet/unit";
 import { camelCaseKeys } from "../../helpers";
 import { ConcentratedLiquidityPool, Pool, PoolType, StableswapPool as StableswapPool, XYKPool } from "../../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
-import { LiquidityDepth } from "../../amm/osmosis/math/concentrated/types";
+import { BigDec, LiquidityDepth, estimateInitialTickBound, } from "@osmosis-labs/math";
 
 export class OsmosisPoolProvider implements PoolDataProviderInterface {
 
@@ -36,7 +36,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 						result.swapFee = data.pool_params.swap_fee
 						pools.push(result)
 					} else if (data['@type'] === '/osmosis.gamm.poolmodels.stableswap.v1beta1.Pool') {
-						const result = camelCaseKeys(data) as StableswapPool
+						const result = JSON.parse(JSON.stringify(camelCaseKeys(data))) as StableswapPool
 						result.poolType = PoolType.STABLESWAP
 						result.token0 = result.poolLiquidity[0].denom
 						result.token1 = result.poolLiquidity[1].denom
@@ -57,39 +57,79 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 					.map(pool => this.fetchTickData(pool as ConcentratedLiquidityPool))
 				)
 
-		return pools
-	}
+		return pools.filter(pool => (
+			pool.poolType !== PoolType.CONCENTRATED_LIQUIDITY) || 
+			((pool as ConcentratedLiquidityPool).liquidityDepths?.zeroToOne.length > 0 &&
+			(pool as ConcentratedLiquidityPool).liquidityDepths?.oneToZero.length > 0)
+		)}
 
 	private fetchTickData = async(pool : ConcentratedLiquidityPool) : Promise<ConcentratedLiquidityPool> => {
-		const minTick = new Int(-162000000);
-		const maxTick = new Int(342000000);
-		// need to fetch token in and token out
-		const zeroToOneTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token0}&use_cur_tick=true&bound_tick=${minTick.toString()}`
-		const oneToZeroTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token1}&use_cur_tick=true&bound_tick=${maxTick.toString()}`
 
-		const zeroToOneTicks = await this.fetchDepths(zeroToOneTicksUrl)
-		const oneToZeroTicks = await this.fetchDepths(oneToZeroTicksUrl)
+		try {
+			// get initial tick
+			const initialMinTick = estimateInitialTickBound({
+				specifiedToken: {
+					denom: pool.token0,
+					amount: new Int("1000")
+				},
+				isOutGivenIn: true,
+				token0Denom: pool.token0,
+				token1Denom: pool.token1,
+				currentSqrtPrice: new BigDec(pool.currentSqrtPrice),
+				currentTickLiquidity: new Dec(pool.currentTickLiquidity)
+				}).boundTickIndex
+	
+			const initialMaxTick = estimateInitialTickBound({
+				specifiedToken: {
+					denom: pool.token1,
+					amount: new Int("1000")
+				},
+				isOutGivenIn: true,
+				token0Denom: pool.token0,
+				token1Denom: pool.token1,
+				currentSqrtPrice: new BigDec(pool.currentSqrtPrice),
+				currentTickLiquidity: new Dec(pool.currentTickLiquidity)
+				}).boundTickIndex
+	
+			// need to fetch token in and token out
+			const zeroToOneTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token0}&use_cur_tick=true&bound_tick=${initialMinTick.valueOf().toString()}`
+			const oneToZeroTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token1}&use_cur_tick=true&bound_tick=${initialMaxTick.valueOf().toString()}`
+			const { depths: zeroToOneTicks } = await this.fetchDepths(zeroToOneTicksUrl)
 
-		pool.liquidityDepths = {
-			zeroToOne: zeroToOneTicks,
-			oneToZero: oneToZeroTicks
+			const {depths: oneToZeroTicks } = await this.fetchDepths(oneToZeroTicksUrl)
+
+			pool.liquidityDepths = {
+				zeroToOne: zeroToOneTicks,
+				oneToZero: oneToZeroTicks
+			}
+		} catch(ex) {
+			console.error('Error fetching tick data')
 		}
-
+		
 		return pool
 	}
 
-	private fetchDepths = async(url : string) : Promise<LiquidityDepth[]> => {
+	private fetchDepths = async(url : string) : Promise<{depths: LiquidityDepth[], currentTick: Int}> => {
 		try {
 			const responseJson = await this.sendRequest(url);
-		
-			if (responseJson.liquidity_depths) {
-				return responseJson.liquidity_depths.map((depth: any) => camelCaseKeys(depth)) as LiquidityDepth[]
+			const depths = responseJson.liquidity_depths.map((depth: any) => {
+				return {
+					tickIndex: new Int(depth.tick_index),
+					netLiquidity: new Dec(depth.liquidity_net),
+				}
+			})
+
+			const currentTick = new Int(responseJson.current_tick);
+			return {
+				depths,
+				currentTick
 			}
+
 		} catch (ex) {
-			console.error(JSON.stringify(ex))
+			console.error(ex)
 		}
 		
-		return []
+		return {depths: [], currentTick: new Int(0)}
 	}
 
 	private sendRequest = async (url: string) : Promise<any> => {
