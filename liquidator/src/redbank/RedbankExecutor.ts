@@ -7,7 +7,6 @@ import { coins, EncodeObject } from '@cosmjs/proto-signing'
 
 import { produceExecuteContractMessage, produceWithdrawMessage, sleep } from '../helpers'
 import { cosmwasm } from 'osmojs'
-
 import 'dotenv/config.js'
 import { fetchRedbankBatch } from '../query/hive'
 
@@ -335,6 +334,7 @@ export class RedbankExecutor extends BaseExecutor {
 					? maxRepayableAmount
 					: remainingNeutral.dividedBy(debtPrice)
 				
+
 				// If our debt is the same as our neutral, we skip this step
 				const buyDebtRoute = this.config.neutralAssetDenom === debtDenom 
 					? [] 
@@ -343,6 +343,21 @@ export class RedbankExecutor extends BaseExecutor {
 							debtDenom,
 						amountToRepay,
 					)
+
+				console.log({
+					amountToRepay: JSON.stringify(amountToRepay),
+					buyDebtRoute : JSON.stringify(buyDebtRoute),
+					maxDebtRepayableValue: JSON.stringify(maxDebtRepayableValue),
+					maxRepayableAmount: JSON.stringify(maxRepayableAmount),
+					maxRepayableValue : JSON.stringify(maxRepayableValue),
+					remainingNeutral : JSON.stringify(remainingNeutral),
+					neutralAssetDenom: this.config.neutralAssetDenom,
+					debtDenom: debtDenom,
+					debtPrice: debtPrice,
+					collateralPrice: collateralPrice,
+					liquidationBonus: liquidationBonus,
+					protocolLiquidationFee: protocolLiquidationFee,
+				})
 
 				const neutralToSell = this.ammRouter.getRequiredInput(
 					amountToRepay,
@@ -373,7 +388,10 @@ export class RedbankExecutor extends BaseExecutor {
 				// This is displayed as a fraction, not a percentage - for instance 3% will be 0.03
 				const winningPercentage = amountWon.dividedBy(valueToRepay)
 
-				if (winningPercentage.isGreaterThan(this.config.liquidationProfitMarginPercent)) { 
+				console.log({
+					winningPercentage: JSON.stringify(winningPercentage), 
+					neutralWon : JSON.stringify(neutralWon)})
+				// if (winningPercentage.isGreaterThan(this.config.liquidationProfitMarginPercent)) { 
 					// profitable to liquidate this position
 					const liquidateTx = {
 						collateral_denom: largestCollateralDenom,
@@ -395,7 +413,7 @@ export class RedbankExecutor extends BaseExecutor {
 						new BigNumber(amountToRepay).plus(existingDebt),
 					)
 					totalDebtValue = newTotalDebt
-				}
+				// }
 			}
 		}
 
@@ -411,6 +429,7 @@ export class RedbankExecutor extends BaseExecutor {
 		// for each asset, create a withdraw message
 		collateralsWon.forEach((collateral) => {
 			const denom = collateral.denom
+
 			msgs.push(
 				executeContract(
 					produceWithdrawMessage(liquidatorAddress, denom, this.config.redbankAddress)
@@ -446,8 +465,10 @@ export class RedbankExecutor extends BaseExecutor {
 						.sort((routeA, routeB) => {
 							const routeAReturns = this.ammRouter.getOutput(collateralAmount, routeA)
 							const routeBReturns = this.ammRouter.getOutput(collateralAmount, routeB)
-							return routeAReturns.minus(routeBReturns).toNumber()
+							const result = routeAReturns.minus(routeBReturns).toNumber()
+							return result
 						})
+						.filter((route) => this.ammRouter.getOutput(collateralAmount, route).isGreaterThan(0))
 						.pop()
 
 					if (bestRoute) {
@@ -496,22 +517,20 @@ export class RedbankExecutor extends BaseExecutor {
 				const totalDebt = cappedAmount.plus(expectedDebtAssetsPostSwap.get(debt.denom) || 0)
 				expectedDebtAssetsPostSwap.set(debt.denom, totalDebt)
 			} else {
-				const bestRoute = this.ammRouter.getBestRouteGivenOutput(
+				const debtValue = debtAmountRequiredFromSwap.multipliedBy(this.prices.get(debt.denom) || 0).multipliedBy(1.02)
+
+				const bestRoute = this.ammRouter.getBestRouteGivenInput(
 					this.config.neutralAssetDenom,
 					debt.denom,
-					debtAmountRequiredFromSwap,
+					debtValue
 				)
+
 				if (bestRoute) {
-					const amountToSwap = this.ammRouter.getRequiredInput(
-						// we add a little more to ensure we get enough to cover debt
-						debtAmountRequiredFromSwap.multipliedBy(1.02),
-						bestRoute,
-					)
 
 					msgs.push(
 						this.exchangeInterface.produceSwapMessage(
 							bestRoute,
-							{ denom: this.config.neutralAssetDenom, amount: amountToSwap.toFixed(0) },
+							{ denom: this.config.neutralAssetDenom, amount: debtValue.toFixed(0) },
 							debtAmountRequiredFromSwap.toFixed(0),
 							liquidatorAddress,
 						)
@@ -594,6 +613,7 @@ export class RedbankExecutor extends BaseExecutor {
 		const debtCoins: Coin[] = []
 		debtsToRepay.forEach((amount, denom) => debtCoins.push({ denom, amount: amount.toFixed(0) }))
 
+		console.log(`- ${txs.length} positions to be liquidated.`)
 		// deposit any neutral in our account before starting liquidations
 		const firstMsgBatch: EncodeObject[] = []
 		this.appendSwapToDebtMessages(
@@ -602,8 +622,6 @@ export class RedbankExecutor extends BaseExecutor {
 			firstMsgBatch,
 			new BigNumber(this.balances.get(this.config.neutralAssetDenom)!),
 		)
-
-
 
 		// Preferably, we liquidate via redbank directly. This is so that if the liquidation fails,
 		// the entire transaction fails and we do not swap.
@@ -634,10 +652,6 @@ export class RedbankExecutor extends BaseExecutor {
 			this.config.redbankAddress,
 			{ user_collaterals: { user: liquidatorAddress } },
 		)
-
-		console.log({
-			collaterals: JSON.stringify(collaterals)
-		})
 
 		// second block of transactions
 		let secondBatch: EncodeObject[] = []

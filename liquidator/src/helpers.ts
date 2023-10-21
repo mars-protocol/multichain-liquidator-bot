@@ -26,13 +26,13 @@ import {
 	osmosisProtoRegistry,
 } from 'osmojs'
 
-import { MsgSwapExactAmountIn } from 'osmojs/types/codegen/osmosis/poolmanager/v1beta1/tx'
+import { MsgSwapExactAmountIn } from 'osmojs/dist/codegen/osmosis/poolmanager/v1beta1/tx'
 
 import { AminoTypes, GasPrice, MsgSendEncodeObject, SigningStargateClient, StdFee } from '@cosmjs/stargate'
 import { camelCase } from 'lodash'
 import { HdPath } from '@cosmjs/crypto'
 import { Pool } from './types/Pool'
-import { SwapAmountInRoute } from 'osmojs/types/codegen/osmosis/poolmanager/v1beta1/swap_route'
+import { SwapAmountInRoute } from 'osmojs/dist/codegen/osmosis/poolmanager/v1beta1/swap_route'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn

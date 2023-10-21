@@ -1912,6 +1912,13 @@
   dependencies:
     regenerator-runtime "^0.13.10"
 
+"@babel/runtime@^7.21.0":
+  version "7.23.2"
+  resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.23.2.tgz#062b0ac103261d68a966c4c7baf2ae3e62ec3885"
+  integrity sha512-mM8eg4yl5D6i3lu2QKPuPH4FArvJ8KhTofbE7jwMUv9KX5mBvwPAqnV3MlyBNqdp9RyRKP6Yck8TrfYrPvX3bg==
+  dependencies:
+    regenerator-runtime "^0.14.0"
+
 "@babel/runtime@^7.8.4":
   version "7.20.13"
   resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.20.13.tgz#7055ab8a7cff2b8f6058bf6ae45ff84ad2aded4b"
@@ -2446,6 +2453,14 @@
     secrets.js-grempe "2.0.0"
     typescript "^4.7.4"
 
+"@cosmology/lcd@^0.12.0":
+  version "0.12.0"
+  resolved "https://registry.yarnpkg.com/@cosmology/lcd/-/lcd-0.12.0.tgz#a6594fc00a8c84c7341e90840627e62a7e63fd1b"
+  integrity sha512-f2mcySYO1xdislAhuWtNFmg4q/bzY3Aem2UkDzYzI0ZELVev5i2Pi0bQrYUNTeNg1isAo0Kyrdqj/4YPqEwjGA==
+  dependencies:
+    "@babel/runtime" "^7.21.0"
+    axios "0.27.2"
+
 "@cspotcode/source-map-support@^0.8.0":
   version "0.8.1"
   resolved "https://registry.npmjs.org/@cspotcode/source-map-support/-/source-map-support-0.8.1.tgz"
@@ -2809,10 +2824,10 @@
     "@jridgewell/resolve-uri" "3.1.0"
     "@jridgewell/sourcemap-codec" "1.4.14"
 
-"@keplr-wallet/types@0.10.24", "@keplr-wallet/types@^0.10.24":
-  version "0.10.24"
-  resolved "https://registry.yarnpkg.com/@keplr-wallet/types/-/types-0.10.24.tgz#b795f3f45ccad852803c726812625c61ff2b4a29"
-  integrity sha512-L90/1/w2/QS9QMB9T0rqqfduy6qn9Isqjfdmi6AHewhKjy2TfZJaXBFuMvyYmpYBbkhkei+pM9mLh4+f3eblww==
+"@keplr-wallet/types@0.10.24-ibc.go.v7.hot.fix":
+  version "0.10.24-ibc.go.v7.hot.fix"
+  resolved "https://registry.yarnpkg.com/@keplr-wallet/types/-/types-0.10.24-ibc.go.v7.hot.fix.tgz#8d153672bf5a56cde3fc6a66159df7a8d046f3e5"
+  integrity sha512-3KUjDMUCscYkvKnC+JsJh9+X0NHlsvBgAghP/uy2p5OGtiULqPBAjWiO+hnBbhis3ZEkzGcCROnnBOoccKd3CQ==
   dependencies:
     "@cosmjs/launchpad" "^0.24.0-alpha.25"
     "@cosmjs/proto-signing" "^0.24.0-alpha.25"
@@ -2829,12 +2844,14 @@
     long "^4.0.0"
     secretjs "0.17.7"
 
-"@keplr-wallet/types@0.12.16":
-  version "0.12.16"
-  resolved "https://registry.yarnpkg.com/@keplr-wallet/types/-/types-0.12.16.tgz#8d94260a3687ca8c0249eb521f71942624e53f7c"
-  integrity sha512-13V/6swfg0jBaMamkt4X2nJ83l1y0WM81l3MMhfsDutumrENYnVqflGMvdu9RNNtn2VR8IwiAYLr8iS6/a+Q4Q==
+"@keplr-wallet/unit@0.10.24-ibc.go.v7.hot.fix":
+  version "0.10.24-ibc.go.v7.hot.fix"
+  resolved "https://registry.yarnpkg.com/@keplr-wallet/unit/-/unit-0.10.24-ibc.go.v7.hot.fix.tgz#4310a43509fc721be7dc7a911c8a9a3b34a6e421"
+  integrity sha512-XiOGAQEiYtd6B11B5JHXZHc9HOA2BKE+wL8mNc7vPQ8h73WiKhMAU2CkoS8LHsXkDJJy/Sq18WnJbGlu225/Ag==
   dependencies:
-    long "^4.0.0"
+    "@keplr-wallet/types" "0.10.24-ibc.go.v7.hot.fix"
+    big-integer "^1.6.48"
+    utility-types "^3.10.0"
 
 "@keplr-wallet/unit@0.11.16":
   version "0.11.16"
@@ -2842,24 +2859,6 @@
   integrity sha512-RRVE3oLZq84P4CQONHXDRX+jdqsP9Zar0V9ROAkG4qzitG2glNY/KCVd9SeSOatbGOb/4X88/4pH273TkjtlRA==
   dependencies:
     "@keplr-wallet/types" "0.11.16"
-    big-integer "^1.6.48"
-    utility-types "^3.10.0"
-
-"@keplr-wallet/unit@^0.10.24":
-  version "0.10.24"
-  resolved "https://registry.yarnpkg.com/@keplr-wallet/unit/-/unit-0.10.24.tgz#770109a46743c0fe16f9aaca930ad4b455d7f07b"
-  integrity sha512-8wDLpBUc/yQ6pWJOotk8V4OlxjPqU8V1OJgzYSQDF4FD9/BjRGifXY1LkYp2QhaJ7c6vKhw8v773SgmBq5w5vg==
-  dependencies:
-    "@keplr-wallet/types" "0.10.24"
-    big-integer "^1.6.48"
-    utility-types "^3.10.0"
-
-"@keplr-wallet/unit@^0.12.16":
-  version "0.12.16"
-  resolved "https://registry.yarnpkg.com/@keplr-wallet/unit/-/unit-0.12.16.tgz#a37840dc348d830012f56b4e9053326f3973d921"
-  integrity sha512-DudDGE0LHAU988yowNTA0YIDGUpS8SUgtP9bKYxkG8v5xwGZHq1K1PJ4yxT22yEb0t1lOvjOp7j2HQmKzync7w==
-  dependencies:
-    "@keplr-wallet/types" "0.12.16"
     big-integer "^1.6.48"
     utility-types "^3.10.0"
 
@@ -2889,14 +2888,6 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@osmonauts/lcd@^0.10.0":
-  version "0.10.0"
-  resolved "https://registry.yarnpkg.com/@osmonauts/lcd/-/lcd-0.10.0.tgz#c982942dc13d7f6ab2a7873b289c7907e2169b14"
-  integrity sha512-PzmXk9x9MHyLn2fUztpAqWqvDmMiEJaQv/JcAoAOE8VdHrD9Hf/KWnE1RZtamuS2ngQRqvQPD0xotCGXW7eTxA==
-  dependencies:
-    "@babel/runtime" "^7.19.0"
-    axios "0.27.2"
-
 "@osmonauts/lcd@^0.8.0":
   version "0.8.0"
   resolved "https://registry.npmjs.org/@osmonauts/lcd/-/lcd-0.8.0.tgz"
@@ -2905,13 +2896,13 @@
     "@babel/runtime" "^7.19.0"
     axios "0.27.2"
 
-"@osmosis-labs/math@^4.0.0":
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/@osmosis-labs/math/-/math-4.0.0.tgz#58968c149033454fc6eade42ed5f8fdd300cd5a5"
-  integrity sha512-EGoE846M8yrYJTQSu0FYiE2fLuZfckM/PkstRWZHD5FanG6nXDfC2VTlw8PQagV5w9JVo/sjeQsChmuFb+wKHQ==
+"@osmosis-labs/math@^5.1.0":
+  version "5.1.0"
+  resolved "https://registry.yarnpkg.com/@osmosis-labs/math/-/math-5.1.0.tgz#f35adc3a4f279c9c44baa77fd5cd4f75771b60c9"
+  integrity sha512-vbsDB6aKzvz1V8CKbxPLQ7hSw8Q4yBMT74odd36or5m8M6JXlfvsAodTbV2sttk5n237dFBt2+7/gfirE5UYww==
   dependencies:
-    "@keplr-wallet/types" "^0.10.24"
-    "@keplr-wallet/unit" "^0.10.24"
+    "@keplr-wallet/types" "0.10.24-ibc.go.v7.hot.fix"
+    "@keplr-wallet/unit" "0.10.24-ibc.go.v7.hot.fix"
     big-integer "^1.6.48"
 
 "@protobufjs/aspromise@^1.1.1", "@protobufjs/aspromise@^1.1.2":
@@ -5624,19 +5615,16 @@ osmojs@0.36.0:
     long "^5.2.0"
     protobufjs "^6.11.3"
 
-osmojs@^15.2.1:
-  version "15.2.1"
-  resolved "https://registry.yarnpkg.com/osmojs/-/osmojs-15.2.1.tgz#d9556d47ea77f95b400656d68f7a4ec69912c15a"
-  integrity sha512-hA4QOlEhs2h0tQPYld5EqH+GhyHVTc9Fye3BAAOlfc9++GQB127pFZdProCGFNvw4kJwHHzhQQtuE98tk1EejA==
+osmojs@^16.5.1:
+  version "16.5.1"
+  resolved "https://registry.yarnpkg.com/osmojs/-/osmojs-16.5.1.tgz#38f2fe3cd65dbd4e4b415e9f22f387a24b634155"
+  integrity sha512-V2Q2yMt7Paax6i+S5Q1l29Km0As/waXKmSVRe8gtd9he42kcbkpwwk/QUCvgS98XsL7Qz+vas2Tca016uBQHTQ==
   dependencies:
-    "@babel/runtime" "^7.19.0"
     "@cosmjs/amino" "0.29.3"
     "@cosmjs/proto-signing" "0.29.3"
     "@cosmjs/stargate" "0.29.3"
     "@cosmjs/tendermint-rpc" "^0.29.3"
-    "@osmonauts/lcd" "^0.10.0"
-    long "^5.2.0"
-    protobufjs "^6.11.3"
+    "@cosmology/lcd" "^0.12.0"
 
 p-limit@^2.2.0:
   version "2.3.0"
@@ -5929,6 +5917,11 @@ regenerator-runtime@^0.13.11:
   version "0.13.11"
   resolved "https://registry.yarnpkg.com/regenerator-runtime/-/regenerator-runtime-0.13.11.tgz#f6dca3e7ceec20590d07ada785636a90cdca17f9"
   integrity sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==
+
+regenerator-runtime@^0.14.0:
+  version "0.14.0"
+  resolved "https://registry.yarnpkg.com/regenerator-runtime/-/regenerator-runtime-0.14.0.tgz#5e19d68eb12d486f797e15a3c6a918f7cec5eb45"
+  integrity sha512-srw17NI0TUWHuGa5CFGGmhfNIeja30WMBfbslPNhf6JrqQlLN5gcrvig1oqPxiVaXb0oW0XRKtH6Nngs5lKCIA==
 
 regenerator-transform@^0.15.1:
   version "0.15.1"

@@ -1,5 +1,5 @@
 import { Coin } from '@cosmjs/amino'
-import { LiquidityDepth } from '../amm/osmosis/math/concentrated/types'
+import { LiquidityDepth } from '@osmosis-labs/math/build/pool/concentrated/types'
 
 export interface PoolAsset {
 	token: Coin
