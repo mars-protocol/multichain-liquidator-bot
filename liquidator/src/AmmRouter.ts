@@ -1,12 +1,12 @@
 import BigNumber from 'bignumber.js'
 import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from './math'
 import { RouteHop } from './types/RouteHop'
-import { ConcentratedLiquidityPool, Pool, PoolType, StableswapPool, XYKPool } from './types/Pool'
-import { ConcentratedLiquidityMath } from "./amm/osmosis/math/concentrated"
+import { ConcentratedLiquidityPool, Pool, PoolType,  XYKPool } from './types/Pool'
+// import { ConcentratedLiquidityMath } from "./amm/osmosis/math/concentrated"
 
 import { Coin, Dec, Int } from '@keplr-wallet/unit'
-import { StableSwapMath, StableSwapToken } from '@osmosis-labs/math'
-const { calcOutGivenIn, calcInGivenOut } = ConcentratedLiquidityMath
+import { ConcentratedLiquidityMath, BigDec } from '@osmosis-labs/math'
+// const { calcOutGivenIn, calcInGivenOut } = ConcentratedLiquidityMath
 
 export interface AMMRouterInterface {
 	getRoutes(tokenInDenom: string, tokenOutDenom: string): RouteHop[][]
@@ -48,95 +48,113 @@ export class AMMRouter implements AMMRouterInterface {
 			return amountAfterFees
 		}
 
-		// for each hop
-		route.forEach((routeHop) => {
+		try {
+			// for each hop
+			route.forEach((routeHop) => {
 
-			const pool = routeHop.pool
+				const pool = routeHop.pool
 
-			switch (pool.poolType) {
-				case PoolType.XYK:
-					const xykPool= pool as XYKPool
-					const x1 = new BigNumber(
-						xykPool.poolAssets.find(
-							(poolAsset) => poolAsset.token.denom === routeHop.tokenInDenom,
-						)?.token.amount!,
-					)
+				switch (pool.poolType) {
+					case PoolType.XYK:
+			
+						const xykPool= pool as XYKPool
+						const x1 = new BigNumber(
+							xykPool.poolAssets.find(
+								(poolAsset) => poolAsset.token.denom === routeHop.tokenInDenom,
+							)?.token.amount!,
+						)
 
-					const y1 = new BigNumber(
-						xykPool.poolAssets.find(
-							(poolAsset) => poolAsset.token.denom === routeHop.tokenOutDenom,
-						)?.token.amount!,
-					)
+						const y1 = new BigNumber(
+							xykPool.poolAssets.find(
+								(poolAsset) => poolAsset.token.denom === routeHop.tokenOutDenom,
+							)?.token.amount!,
+						)
 
-					const amountBeforeFees = calculateOutputXYKPool(
-						x1,
-						y1,
-						new BigNumber(tokenInAmount),
-					)
-					amountAfterFees = amountBeforeFees.minus(amountBeforeFees.multipliedBy(routeHop.pool.swapFee))
-					tokenInAmount = amountAfterFees
-					break
-				case PoolType.CONCENTRATED_LIQUIDITY:
-
-					const clPool = pool as ConcentratedLiquidityPool
-
-					const tokenIn : Coin = {
-						denom: routeHop.tokenInDenom,
-						amount: new Int(tokenInAmount.toFixed(0))
-					}
-
-					const tokenDenom0 = clPool.token0
-					const poolLiquidity = new Dec(clPool.currentTickLiquidity)
-					const inittedTicks = tokenIn.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
-					const curSqrtPrice = new Dec(clPool.currentSqrtPrice)
-					const swapFee = new Dec(clPool.swapFee)
-
-					const result = calcOutGivenIn({
-						tokenIn,
-						tokenDenom0,
-						poolLiquidity,
-						inittedTicks,
-						curSqrtPrice,
-						swapFee,
-					  });
-
-					if (result === "no-more-ticks") {
-						tokenInAmount = new BigNumber(0)
-						break
-					}
-
-					const { amountOut } = result
-					tokenInAmount = new BigNumber(amountOut.toString())
-					break
-				case PoolType.STABLESWAP:
-
-					const ssPool = pool as StableswapPool
-
-					// Produce scaling tokens
-					// @ts-expect-error - osmosis types are out of date
-					const tokens : StableSwapToken[] = ssPool.poolLiquidity.map((poolLiquidity, index) => {
-						return {
-							amount: new Dec(poolLiquidity.amount),
-							denom: poolLiquidity.denom,
-							scalingFactor : new BigNumber(ssPool.scalingFactors[index])
+						if (tokenInAmount.dividedBy(x1).isGreaterThan(0.005)) {
+							throw new Error(`Pool with id : ${pool.id} is too illiquid. X1: ${x1.toString()} tokenInAmount: ${tokenInAmount.toString()}`)
 						}
-					})
 
-					const ssOutGivenInIncludingFees = StableSwapMath.calcOutGivenIn(
-						tokens,
-						{
-							// @ts-expect-error - osmosis types are out of date
-							amount: new Int(tokenInAmount.toString()),
+						const amountBeforeFees = calculateOutputXYKPool(
+							x1,
+							y1,
+							tokenInAmount,
+						)
+
+						if (amountBeforeFees.isLessThanOrEqualTo(0)) {
+							throw new Error('amount in before fees is less than 0')
+						}
+
+						amountAfterFees = amountBeforeFees.minus(amountBeforeFees.multipliedBy(routeHop.pool.swapFee))
+						tokenInAmount = amountAfterFees
+						break
+					case PoolType.CONCENTRATED_LIQUIDITY:
+
+						const clPool = pool as ConcentratedLiquidityPool
+
+						const tokenIn : Coin = {
 							denom: routeHop.tokenInDenom,
-						},
-						routeHop.tokenOutDenom,
-						new Dec(ssPool.poolParams.swapFee),
-					)
+							amount: new Int(tokenInAmount.toFixed(0))
+						}
 
-					tokenInAmount = new BigNumber(ssOutGivenInIncludingFees.toString())
-					break
-			}
-		})
+						const tokenDenom0 = clPool.token0
+						const poolLiquidity = new Dec(clPool.currentTickLiquidity)
+						const inittedTicks = tokenIn.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
+						const curSqrtPrice = new BigDec(clPool.currentSqrtPrice)
+						const swapFee = new Dec(clPool.swapFee)
+						 
+						const result = ConcentratedLiquidityMath.calcOutGivenIn({
+							tokenIn,
+							tokenDenom0,
+							poolLiquidity,
+							inittedTicks,
+							curSqrtPrice,
+							swapFee
+						});
+
+						if (result === "no-more-ticks") {
+							tokenInAmount = new BigNumber(0)
+							break
+						}
+
+						const { amountOut } = result
+						amountAfterFees = new BigNumber(amountOut.toString())						
+						if (amountAfterFees.isLessThanOrEqualTo(0)) {
+							throw new Error('amount in after fees is less than 0')
+						}
+						tokenInAmount = amountAfterFees
+						break
+					case PoolType.STABLESWAP:
+
+						// const ssPool = pool as StableswapPool
+
+						// // Produce scaling tokens
+						// // @ts-expect-error - osmosis types are out of date
+						// const tokens : StableSwapToken[] = ssPool.poolLiquidity.map((poolLiquidity, index) => {
+						// 	return {
+						// 		amount: new Dec(poolLiquidity.amount),
+						// 		denom: poolLiquidity.denom,
+						// 		scalingFactor : new BigNumber(ssPool.scalingFactors[index])
+						// 	}
+						// })
+
+						// const ssOutGivenInIncludingFees = StableSwapMath.calcOutGivenIn(
+						// 	tokens,
+						// 	{
+						// 		amount: new Int(tokenInAmount.toFixed(0)),
+						// 		denom: routeHop.tokenInDenom,
+						// 	},
+						// 	routeHop.tokenOutDenom,
+						// 	new Dec(ssPool.poolParams.swapFee),
+						// )
+
+						// tokenInAmount = new BigNumber(ssOutGivenInIncludingFees.toString())
+						// tokenInAmount = new BigNumber(0)
+						throw new Error("stable swap not supported")
+				}
+			})
+		} catch(ex) {
+			return new BigNumber(0)
+		}
 
 		return amountAfterFees
 	}
@@ -148,97 +166,124 @@ export class AMMRouter implements AMMRouterInterface {
 			console.log('ERROR - cannot use token out amount of 0')
 			return amountAfterFees
 		}
+		try {
+			route.forEach((routeHop) => {
+				const pool = routeHop.pool
+				switch (routeHop.pool.poolType) {
+					case PoolType.XYK:
+						const xykPool=  pool as XYKPool
+						const x1 = new BigNumber(
+							xykPool.poolAssets.find(
+								(poolAsset) => poolAsset.token.denom === routeHop.tokenInDenom,
+							)?.token.amount!,
+						)
 
-		// for each hop
-		route.forEach((routeHop) => {
-			const pool = routeHop.pool
-			switch (routeHop.pool.poolType) {
-				case PoolType.XYK:
-					const xykPool=  pool as XYKPool
-					const x1 = new BigNumber(
-						xykPool.poolAssets.find(
-							(poolAsset) => poolAsset.token.denom === routeHop.tokenInDenom,
-						)?.token.amount!,
-					)
+						const y1 = new BigNumber(
+							xykPool.poolAssets.find(
+								(poolAsset) => poolAsset.token.denom === routeHop.tokenOutDenom,
+							)?.token.amount!,
+						)
 
-					const y1 = new BigNumber(
-						xykPool.poolAssets.find(
-							(poolAsset) => poolAsset.token.denom === routeHop.tokenOutDenom,
-						)?.token.amount!,
-					)
+						if (tokenOutRequired.dividedBy(y1).isGreaterThan(0.005)) {
+							throw new Error(`Pool with id : ${pool.id} is too illiquid. X1: ${x1.toString()} tokenInAmount: ${tokenOutRequired.toString()}`)
+						}
 
-					const amountInBeforeFees = calculateRequiredInputXYKPool(
-						new BigNumber(x1),
-						new BigNumber(y1),
-						new BigNumber(tokenOutRequired),
-					)
-					amountAfterFees = amountInBeforeFees.plus(tokenOutRequired.multipliedBy(routeHop.pool.swapFee))
-					tokenOutRequired = amountAfterFees
-					break
-				case PoolType.CONCENTRATED_LIQUIDITY:
 
-					const clPool = pool as ConcentratedLiquidityPool
+						const amountInBeforeFees = calculateRequiredInputXYKPool(
+							new BigNumber(x1),
+							new BigNumber(y1),
+							new BigNumber(tokenOutRequired),
+						)
 
-					const tokenOut : Coin = {
-						denom: routeHop.tokenOutDenom,
-						amount: new Int(tokenOutRequired.toFixed(0))
-					}
+						if (amountInBeforeFees.isLessThanOrEqualTo(0)) {
+							throw new Error('amount in before fees is less than 0')
+						}
 
-					const tokenDenom0 = clPool.token0
-					const poolLiquidity = new Dec(clPool.currentTickLiquidity)
-					const inittedTicks = tokenOut.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
-					const curSqrtPrice = new Dec(clPool.currentSqrtPrice)
-					const swapFee = new Dec(clPool.swapFee)
-
-					const result = calcInGivenOut({
-						tokenOut,
-						tokenDenom0,
-						poolLiquidity,
-						inittedTicks,
-						curSqrtPrice,
-						swapFee,
-					  })
-
-					if (result === "no-more-ticks") {
-						tokenOutRequired = new BigNumber(0)
+						amountAfterFees = amountInBeforeFees.plus(tokenOutRequired.multipliedBy(routeHop.pool.swapFee))
+						tokenOutRequired = amountAfterFees
 						break
-					} 
+					case PoolType.CONCENTRATED_LIQUIDITY:
 
-					const { amountIn } = result
-					amountAfterFees = new BigNumber(amountIn.toString())
-					tokenOutRequired = amountAfterFees
-					break
+						const clPool = pool as ConcentratedLiquidityPool
+
+						const tokenOut : Coin = {
+							denom: routeHop.tokenOutDenom,
+							amount: new Int(tokenOutRequired.toFixed(0))
+						}
+
+						const tokenDenom0 = clPool.token0
+						const poolLiquidity = new Dec(clPool.currentTickLiquidity)
+						const inittedTicks = tokenOut.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
+						const curSqrtPrice = new BigDec(clPool.currentSqrtPrice)
+						const swapFee = new Dec(clPool.swapFee)
+
+						
+						if (inittedTicks.length === 0) {
+							tokenOutRequired = new BigNumber(0)
+							break
+						}
+					
+						const result = ConcentratedLiquidityMath.calcInGivenOut({
+							tokenOut,
+							tokenDenom0,
+							poolLiquidity,
+							inittedTicks,
+							curSqrtPrice,
+							swapFee,
+						})
+
+
+						if (result === "no-more-ticks") {
+							console.log('no more ticks')
+							tokenOutRequired = new BigNumber(0)
+							break
+						} 
+
+
+						const { amountIn } = result
+
+
+						amountAfterFees = new BigNumber(amountIn.toString())
+						if (amountAfterFees.isLessThanOrEqualTo(0)) {
+							throw new Error('amount in after fees is less than 0')
+						}
+						tokenOutRequired = amountAfterFees
+						break
 
 					case PoolType.STABLESWAP:
 
-					const ssPool = pool as StableswapPool
+						// const ssPool = pool as StableswapPool
 
-					// Produce scaling tokens
-					//@ts-expect-error - osmosis type import is behind
-					const tokens : StableSwapToken[] = ssPool.poolLiquidity.map((poolLiquidity, index) => {
-						return {
-							amount: new Dec(poolLiquidity.amount),
-							denom: poolLiquidity.denom,
-							scalingFactor : new BigNumber(ssPool.scalingFactors[index])
-						}
-					})
+						// // Produce scaling tokens
+						// //@ts-expect-error - osmosis type import is behind
+						// const tokens : StableSwapToken[] = ssPool.poolLiquidity.map((poolLiquidity, index) => {
+						// 	return {
+						// 		amount: new Dec(poolLiquidity.amount),
+						// 		denom: poolLiquidity.denom,
+						// 		scalingFactor : new BigNumber(ssPool.scalingFactors[index])
+						// 	}
 
-					const ssInGivenOutIncludingFees = StableSwapMath.calcInGivenOut(
-						tokens,
-						{
-							//@ts-expect-error - osmosis type import is behind
-							amount: new Int(tokenOutRequired.toString()),
-							denom: routeHop.tokenOutDenom,
-						},
-						routeHop.tokenOutDenom,
-						new Dec(ssPool.poolParams.swapFee),
-					)
+						// })
 
-					tokenOutRequired = new BigNumber(ssInGivenOutIncludingFees.toString())
-					break
-					
-			}
-		})
+						// const ssInGivenOutIncludingFees = StableSwapMath.calcInGivenOut(
+						// 	tokens,
+						// 	{
+						// 		amount: new Int(tokenOutRequired.toFixed(0)),
+						// 		denom: routeHop.tokenOutDenom,
+						// 	},
+						// 	routeHop.tokenOutDenom,
+						// 	new Dec(ssPool.poolParams.swapFee),
+						// )
+
+						// tokenOutRequired = new BigNumber(ssInGivenOutIncludingFees.toString())
+						throw new Error('stableswap not implemented')
+						
+				}
+			})
+		} catch (ex) {
+			return new BigNumber(100000000000000000000)
+		}
+		
 
 		return amountAfterFees
 	}
@@ -248,6 +293,7 @@ export class AMMRouter implements AMMRouterInterface {
 		tokenOutDenom: string,
 		amountIn: BigNumber,
 	): RouteHop[] {
+
 		const routeOptions = this.getRoutes(tokenInDenom, tokenOutDenom)
 
 		return this.getRouteWithHighestOutput(amountIn, routeOptions)
@@ -255,27 +301,28 @@ export class AMMRouter implements AMMRouterInterface {
 
 	getRouteWithHighestOutput(amountIn: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
+			.filter(route => this.getOutput(amountIn, route).isGreaterThan(0))
 			.sort((routeA, routeB) => {
 				const routeAReturns = this.getOutput(amountIn, routeA)
 				const routeBReturns = this.getOutput(amountIn, routeB)
-				return routeAReturns.minus(routeBReturns).toNumber()
+				return routeBReturns.minus(routeAReturns).toNumber()
 			})
 			.pop()
-
 		return bestRoute || []
 	}
 
 	getRouteWithLowestInput(amountOut: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
+			.filter(route => {
+				return this.getRequiredInput(amountOut, route).isGreaterThan(0)
+			})
 			.sort((routeA, routeB) => {
 				const routeAReturns = this.getRequiredInput(amountOut, routeA)
 				const routeBReturns = this.getRequiredInput(amountOut, routeB)
-
-				// route a is a better route if it returns
+				// route a is a better route if it returns a higher value
 				return routeAReturns.minus(routeBReturns).toNumber()
 			})
 			.pop()
-
 		return bestRoute || []
 	}
 
@@ -289,7 +336,7 @@ export class AMMRouter implements AMMRouterInterface {
 	}
 
 	getRoutes(tokenInDenom: string, tokenOutDenom: string): RouteHop[][] {
-		return this.buildRoutesForTrade(tokenInDenom, tokenOutDenom, this.pools, [], [])
+		return this.buildRoutesForTrade(tokenInDenom, tokenOutDenom, this.pools)
 	}
 
 	// We want to list all assets in the route except our last denom (tokenOutDenom)
@@ -301,78 +348,89 @@ export class AMMRouter implements AMMRouterInterface {
 		tokenInDenom: string,
 		targetTokenOutDenom: string,
 		pools: Pool[],
-		route: RouteHop[],
-		routes: RouteHop[][],
 	): RouteHop[][] {
-		// we don't want to search through the same pools again and loop, so we delete filter pools that
-		// exist in the route
-		const usedPools = this.findUsedPools(route)
+		
+		const completeRoutes : RouteHop[][]= []
+		let routesInProgress : RouteHop[][] = []
+		let maxRoutteLength = 2
 
-		// all pairs that have our sell asset, and are not previously in our route
-		const possibleStartingPairs = pools.filter((pool) => {
-			return (
-				(pool.token0 === tokenInDenom ||
-					pool.token1 === tokenInDenom) &&
-				// ensure we don't use the same pools
-				usedPools.find((poolId) => pool.id === poolId) === undefined
-			)
+		// all pairs that have our sell asset
+		const startingPairs = pools.filter((pool) => 
+			pool.token0 === tokenInDenom || pool.token1 === tokenInDenom)
+
+		// create routes for each possible starting pair
+		startingPairs.forEach((pair) => {
+			const hop: RouteHop = {
+				poolId: pair.id,
+				tokenInDenom: tokenInDenom,
+				tokenOutDenom: tokenInDenom === pair.token0 ? pair.token1 : pair.token0,
+				pool: pair,
+			}
+
+			const route = []
+			route.push(hop)
+
+			if (hop.tokenOutDenom === targetTokenOutDenom) {
+				completeRoutes.push(route)
+			} else {
+				routesInProgress.push(route)
+			}
 		})
 
-		// no more possible pools then we exit
-		if (possibleStartingPairs.length === 0) {
-			return routes
+		while (routesInProgress.length > 0) {
+			let updatedRoutes : RouteHop[][] = []
+			routesInProgress.forEach((route) => {
+				// Ids of pools we have previously used in this route
+				let usedPoolIds = this.findUsedPools(route)
+				let usedDenoms = route.map((hop) => hop.tokenInDenom)
+
+				// the current end denom in the route
+				let lastDenom = route[route.length - 1].tokenOutDenom
+
+				pools.forEach((pool) => {
+					if ((pool.token0 === lastDenom ||
+						pool.token1 === lastDenom) &&
+						(usedDenoms.indexOf(pool.token0) === -1 &&
+						usedDenoms.indexOf(pool.token1) === -1) &&
+						// ensure we don't use the same pools
+						usedPoolIds.indexOf(pool.id) === -1
+					) {
+						// Add a route for each pool that has the last denom as an asset
+						const hop: RouteHop = {
+							poolId: pool.id,
+							tokenInDenom: lastDenom,
+							tokenOutDenom: lastDenom === pool.token0 ? pool.token1 : pool.token0,
+							pool: pool,
+						}
+
+						// deep copy the array
+						const routeClone: RouteHop[] = this.cloneRoute(route)
+						routeClone.push(hop)
+
+						// if we have reached the target token, add to complete routes, otherwise add to next routes
+						if (hop.tokenOutDenom === targetTokenOutDenom) {
+							completeRoutes.push(routeClone)
+						} else if (routeClone.length < maxRoutteLength){
+							updatedRoutes.push(routeClone)
+						}
+					}
+				})
+			})
+			routesInProgress = updatedRoutes
 		}
 
-		// if we find an ending par(s), we have found the end of our route
-		const endingPairs = possibleStartingPairs.filter(
-			(pool) =>
-				pool.token0 === targetTokenOutDenom ||
-				pool.token1 === targetTokenOutDenom,
-		)
+	
+		return completeRoutes
+	}
 
-		if (endingPairs.length > 0 && tokenInDenom !== targetTokenOutDenom) {
-			endingPairs.forEach((pool) => {
-				const hop: RouteHop = {
-					poolId: pool.id,
-					tokenInDenom: tokenInDenom,
-					tokenOutDenom: targetTokenOutDenom,
-					pool: pool,
-				}
-
-				// deep copy the array
-				const routeClone: RouteHop[] = JSON.parse(JSON.stringify(route))
-				routeClone.push(hop)
-				routes.push(routeClone)
-			})
-
-			// return routes
-		} else {
-			// Else, we have not found the route. Iterate recursively through the pools building valid routes.
-			possibleStartingPairs.forEach((pool) => {
-				// We have no garauntee that index [0] will be the token in so we need to calculate that ourselves
-				const tokenOut = tokenInDenom === pool.token0 ? pool.token1 : pool.token0
-
-				const nextHop: RouteHop = {
-					poolId: pool.id,
-					tokenInDenom,
-					tokenOutDenom: tokenOut,
-					pool: pool,
-				}
-
-				// deep copy so we don't mess up other links in the search
-				const newRoute: RouteHop[] = JSON.parse(JSON.stringify(route))
-
-				newRoute.push(nextHop)
-
-				this.buildRoutesForTrade(
-					tokenOut,
-					targetTokenOutDenom,
-					pools,
-					newRoute,
-					routes,
-				)
-			})
-		}
-		return routes
+	cloneRoute(route: RouteHop[]) {
+		return route.map((hop: RouteHop) => {
+			return {
+				poolId: hop.poolId,
+				tokenInDenom: hop.tokenInDenom,
+				tokenOutDenom: hop.tokenOutDenom,
+				pool: hop.pool,
+			}
+		})
 	}
 }

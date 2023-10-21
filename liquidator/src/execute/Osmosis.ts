@@ -3,17 +3,17 @@ import { Coin } from "marsjs-types/creditmanager/generated/mars-credit-manager/M
 import { RouteHop } from "../types/RouteHop";
 import { ExchangeInterface } from "./ExchangeInterface";
 import { osmosis } from "osmojs";
-import { Long } from 'osmojs/types/codegen/helpers.js'
 
-const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
+const {swapExactAmountIn} = osmosis.poolmanager.v1beta1.MessageComposer.withTypeUrl
 
 
 export class Osmosis implements ExchangeInterface {
     produceSwapMessage(route: RouteHop[], tokenIn: Coin, minimumRecieve: string, sender: string): EncodeObject {
+
         return swapExactAmountIn({
             sender,
-            routes: route?.map((route) => {
-                return { poolId: route.poolId as Long, tokenOutDenom: route.tokenOutDenom }
+            routes: route.map((hop) => {
+                return { poolId: BigInt(hop.poolId.toString()), tokenOutDenom: hop.tokenOutDenom }
             }),
             tokenIn,
             tokenOutMinAmount: minimumRecieve,
