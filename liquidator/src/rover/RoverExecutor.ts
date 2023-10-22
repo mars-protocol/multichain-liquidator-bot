@@ -257,7 +257,6 @@ export class RoverExecutor extends BaseExecutor {
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
 		const targetAccounts : string[] = await this.redis.popUnhealthyPositions<string>(this.config.maxLiquidators-1)
 
-
 		// Sleep to avoid spamming redis db when empty.
 		if (targetAccounts.length == 0) {
 			await sleep(200)
@@ -308,7 +307,10 @@ export class RoverExecutor extends BaseExecutor {
 			this.creditLineCaps,
 		)
 
+		// variables
 		const { borrow } = borrowActions[0] as { borrow: Coin }
+		const swapWinnings = (bestDebt.amount * this.prices.get(bestDebt.denom)!) > 100000
+		const slippage =  process.env.SLIPPAGE ||  '0.005'
 
 		const liquidateMessage = this.liquidationActionGenerator.produceLiquidationAction(
 			bestCollateral.type,
@@ -324,6 +326,7 @@ export class RoverExecutor extends BaseExecutor {
 			bestCollateral.denom,
 			borrow,
 			vault,
+			slippage
 		)
 
 		const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
@@ -332,11 +335,12 @@ export class RoverExecutor extends BaseExecutor {
 		// note : the actual msg does not use the amount passed here - it just swaps everything in the credit account
 		// note 2 : The asset here will be the coin we borrowed, not collateral - as we swap all the collateral to debt asset above
 		const swapToStableMsg =
-			borrow.denom !== this.config.neutralAssetDenom
+			borrow.denom !== this.config.neutralAssetDenom && swapWinnings
 				? this.liquidationActionGenerator.generateSwapActions(
 						borrow.denom,
 						this.config.neutralAssetDenom,
 						'100',
+						slippage
 				  )
 				: []
 		const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
