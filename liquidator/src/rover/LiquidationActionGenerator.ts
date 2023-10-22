@@ -262,6 +262,7 @@ export class LiquidationActionGenerator {
 		assetInDenom: string,
 		assetOutDenom: string,
 		outAmount: string,
+		slippage: string
 	): Action[] => {
 		const bnOut = new BigNumber(outAmount)
 
@@ -277,8 +278,11 @@ export class LiquidationActionGenerator {
 
 		if (route.length === 0) throw new Error(NO_ROUTE_FOR_SWAP)
 
+
+		
+
 		return route.map((hop: RouteHop) =>
-			this.produceSwapAction(hop.tokenInDenom, hop.tokenOutDenom, process.env.SLIPPAGE_LIMIT),
+			this.produceSwapAction(hop.tokenInDenom, hop.tokenOutDenom, slippage),
 		)
 	}
 
@@ -302,7 +306,7 @@ export class LiquidationActionGenerator {
 			: this.produceLiquidateCoin(debtCoin, liquidateeAccountId, requestCoinDenom, positionType === PositionType.DEPOSIT)
 	}
 
-	produceVaultToDebtActions = (vault: VaultInfo, borrowDenom: string): Action[] => {
+	produceVaultToDebtActions = (vault: VaultInfo, borrowDenom: string, slippage: string): Action[] => {
 		let vaultActions: Action[] = []
 		if (!vault) throw new Error(UNSUPPORTED_VAULT)
 
@@ -329,7 +333,7 @@ export class LiquidationActionGenerator {
 			.forEach(
 				(poolAsset) =>
 					(vaultActions = vaultActions.concat(
-						this.generateSwapActions(poolAsset.token.denom, borrowDenom, '1'),
+						this.generateSwapActions(poolAsset.token.denom, borrowDenom, '1', slippage),
 					)),
 			)
 		return vaultActions
@@ -342,7 +346,7 @@ export class LiquidationActionGenerator {
 					amount: 'account_balance',
 					denom: lpTokenDenom,
 				},
-				slippage: '0.005',
+				slippage: '0.01',
 			},
 		}
 	}
@@ -362,13 +366,14 @@ export class LiquidationActionGenerator {
 		collateralDenom: string,
 		borrow: Coin,
 		vault: VaultInfo | undefined,
+		slippage: string
 	): Action[] => {
 		return vault !== undefined
-			? this.produceVaultToDebtActions(vault!, borrow.denom)
-			: this.swapCollateralCoinToBorrowActions(collateralDenom, borrow)
+			? this.produceVaultToDebtActions(vault!, borrow.denom, slippage)
+			: this.swapCollateralCoinToBorrowActions(collateralDenom, borrow, slippage)
 	}
 
-	swapCollateralCoinToBorrowActions = (collateralDenom: string, borrowed: Coin): Action[] => {
+	swapCollateralCoinToBorrowActions = (collateralDenom: string, borrowed: Coin, slippage: string): Action[] => {
 		let actions: Action[] = []
 		// if gamm token, we need to do a withdraw of the liquidity
 		if (collateralDenom.startsWith('gamm/')) {
@@ -379,12 +384,12 @@ export class LiquidationActionGenerator {
 			const underlyingDenoms = findUnderlying(collateralDenom, this.router.getPools())
 			underlyingDenoms?.forEach((denom) => {
 				if (denom !== borrowed.denom) {
-					actions = actions.concat(this.generateSwapActions(denom, borrowed.denom, borrowed.amount))
+					actions = actions.concat(this.generateSwapActions(denom, borrowed.denom, borrowed.amount, slippage))
 				}
 			})
 		} else {
 			actions = actions.concat(
-				this.generateSwapActions(collateralDenom, borrowed.denom, borrowed.amount),
+				this.generateSwapActions(collateralDenom, borrowed.denom, borrowed.amount, slippage),
 			)
 		}
 
