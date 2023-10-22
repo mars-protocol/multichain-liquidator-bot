@@ -20,7 +20,8 @@ type RoverHive struct {
 }
 
 type ContractQuery struct {
-	Liquidatable bool `json:"liquidatable"`
+	Liquidatable            bool    `json:"liquidatable"`
+	LiquidationHealthFactor float64 `json:"liquidation_health_factor"`
 }
 type Wasm struct {
 	ContractQuery ContractQuery `json:"contractQuery"`

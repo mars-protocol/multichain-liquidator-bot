@@ -25,10 +25,10 @@ type HealthChecker struct {
 	jobsPerWorker        int
 	addressesPerJob      int
 	redbankAddress       string
-
-	batchSize       int
-	logger          *logrus.Entry
-	continueRunning uint32
+	healthThreshold      float64
+	batchSize            int
+	logger               *logrus.Entry
+	continueRunning      uint32
 }
 
 var (
@@ -45,6 +45,7 @@ func New(
 	batchSize int,
 	addressesPerJob int,
 	redbankAddress string,
+	healthThreshold float64,
 	logger *logrus.Entry,
 ) (*HealthChecker, error) {
 
@@ -75,6 +76,7 @@ func New(
 		batchSize:            batchSize,
 		addressesPerJob:      addressesPerJob,
 		redbankAddress:       redbankAddress,
+		healthThreshold:      healthThreshold,
 		logger:               logger,
 		continueRunning:      0,
 	}, nil
@@ -157,7 +159,7 @@ func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte
 
 		if err != nil {
 			s.logger.Errorf("An Error Occurred decoding health status. %v", err)
-		} else if ltv < 1 {
+		} else if ltv < s.healthThreshold {
 			s.logger.Info("healthstatus : ", userResult)
 			positionDecoded, decodeError := json.Marshal(userResult)
 			if decodeError == nil {
