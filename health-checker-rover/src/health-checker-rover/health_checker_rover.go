@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
-	"strings"
 
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/interfaces"
 	"github.com/mars-protocol/multichain-liquidator-bot/runtime/types"
@@ -22,14 +22,15 @@ var (
 )
 
 type HealthCheckerRover struct {
-	queue                interfaces.Queuer
-	metricsCache         interfaces.Cacher
-	hive                 RoverHive
-	healthCheckQueueName string
-	liquidationQueueName string
-	jobsPerWorker        int
-	addressesPerJob      int
-	creditManagerAddress string
+	queue                  interfaces.Queuer
+	metricsCache           interfaces.Cacher
+	hive                   RoverHive
+	healthCheckQueueName   string
+	liquidationQueueName   string
+	jobsPerWorker          int
+	addressesPerJob        int
+	creditManagerAddress   string
+	healthCheckerThreshold float64
 
 	batchSize       int
 	logger          *logrus.Entry
@@ -46,6 +47,7 @@ func New(
 	batchSize int,
 	addressesPerJob int,
 	creditManagerAddress string,
+	healthCheckerThreshold float64,
 	logger *logrus.Entry,
 ) (*HealthCheckerRover, error) {
 
@@ -67,17 +69,18 @@ func New(
 	}
 
 	return &HealthCheckerRover{
-		queue:                queue,
-		metricsCache:         metricsCache,
-		hive:                 hive,
-		healthCheckQueueName: healthCheckQueueName,
-		liquidationQueueName: liquidationQueueName,
-		jobsPerWorker:        jobsPerWorker,
-		batchSize:            batchSize,
-		addressesPerJob:      addressesPerJob,
-		creditManagerAddress: creditManagerAddress,
-		logger:               logger,
-		continueRunning:      0,
+		queue:                  queue,
+		metricsCache:           metricsCache,
+		hive:                   hive,
+		healthCheckQueueName:   healthCheckQueueName,
+		liquidationQueueName:   liquidationQueueName,
+		jobsPerWorker:          jobsPerWorker,
+		batchSize:              batchSize,
+		addressesPerJob:        addressesPerJob,
+		creditManagerAddress:   creditManagerAddress,
+		healthCheckerThreshold: healthCheckerThreshold,
+		logger:                 logger,
+		continueRunning:        0,
 	}, nil
 }
 
@@ -140,8 +143,9 @@ func (s *HealthCheckerRover) generateJobs(positionList []types.RoverHealthCheckW
 func (s *HealthCheckerRover) produceUnhealthyPositions(results []UserResult) [][]byte {
 	var unhealthyPositions [][]byte
 	for _, userResult := range results {
+
 		liquidatable := userResult.ContractQuery.Liquidatable
-		if liquidatable {
+		if userResult.ContractQuery.LiquidationHealthFactor < s.healthCheckerThreshold && liquidatable {
 			s.logger.Infof("User %v is liquidatable", userResult.AccountId)
 			positionDecoded, decodeError := json.Marshal(strings.TrimPrefix(userResult.AccountId, "account_"))
 			if decodeError == nil {
@@ -243,7 +247,6 @@ func (s *HealthCheckerRover) Run() error {
 			}).Info("Found unhealthy positions")
 
 		}
-
 
 		// Log the total amount of unhealthy positions
 		s.metricsCache.IncrementBy("health_checker_rover.unhealthy.total", int64(len(unhealthyPositions)))
