@@ -30,7 +30,7 @@ type HealthCheckerRover struct {
 	jobsPerWorker          int
 	addressesPerJob        int
 	creditManagerAddress   string
-	healthCheckerThreshold float64
+	healthCheckerThreshold string
 
 	batchSize       int
 	logger          *logrus.Entry
@@ -47,7 +47,7 @@ func New(
 	batchSize int,
 	addressesPerJob int,
 	creditManagerAddress string,
-	healthCheckerThreshold float64,
+	healthCheckerThreshold string,
 	logger *logrus.Entry,
 ) (*HealthCheckerRover, error) {
 
@@ -142,10 +142,16 @@ func (s *HealthCheckerRover) generateJobs(positionList []types.RoverHealthCheckW
 // TODO handle different liquidation types (e.g redbank, rover). Currently we only store address
 func (s *HealthCheckerRover) produceUnhealthyPositions(results []UserResult) [][]byte {
 	var unhealthyPositions [][]byte
-	for _, userResult := range results {
+	liquidatableLtv, err := strconv.ParseFloat(s.healthCheckerThreshold, 32)
 
+	if err != nil {
+		s.logger.Errorf("An Error Occurred converting healthCheckerThreshold to float. %v", err)
+		return unhealthyPositions
+	}
+
+	for _, userResult := range results {
 		liquidatable := userResult.ContractQuery.Liquidatable
-		if userResult.ContractQuery.LiquidationHealthFactor < s.healthCheckerThreshold && liquidatable {
+		if userResult.ContractQuery.LiquidationHealthFactor < liquidatableLtv && liquidatable {
 			s.logger.Infof("User %v is liquidatable", userResult.AccountId)
 			positionDecoded, decodeError := json.Marshal(strings.TrimPrefix(userResult.AccountId, "account_"))
 			if decodeError == nil {

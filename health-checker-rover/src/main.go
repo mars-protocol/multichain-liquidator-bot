@@ -20,17 +20,17 @@ import (
 
 type Config struct {
 	runtime.BaseConfig
-	RedisEndpoint        string  `envconfig:"REDIS_ENDPOINT" required:"true"`
-	RedisDatabase        int     `envconfig:"REDIS_DATABASE" required:"true"`
-	RedisMetricsDatabase int     `envconfig:"REDIS_METRICS_DATABASE" required:"true"`
-	HealthCheckQueueName string  `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
-	LiquidatorQueueName  string  `envconfig:"LIQUIDATOR_QUEUE_NAME" required:"true"`
-	HiveEndpoint         string  `envconfig:"HIVE_ENDPOINT" required:"true"`
-	HealthAddress        string  `envconfig:"HEALTH_ADDRESS" required:"true"`
-	AddressesPerJob      int     `envconfig:"ADDRESS_PER_JOB" required:"true"`
-	HealthThreshold      float64 `envconfig:"HEALTH_THRESHOLD" required:"true"`
-	JobsPerWoker         int     `envconfig:"JOBS_PER_WORKER" required:"true"`
-	BatchSize            int     `envconfig:"BATCH_SIZE" required:"true"`
+	RedisEndpoint        string `envconfig:"REDIS_ENDPOINT" required:"true"`
+	RedisDatabase        int    `envconfig:"REDIS_DATABASE" required:"true"`
+	RedisMetricsDatabase int    `envconfig:"REDIS_METRICS_DATABASE" required:"true"`
+	HealthCheckQueueName string `envconfig:"HEALTH_CHECK_QUEUE_NAME" required:"true"`
+	LiquidatorQueueName  string `envconfig:"LIQUIDATOR_QUEUE_NAME" required:"true"`
+	HiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
+	HealthAddress        string `envconfig:"HEALTH_ADDRESS" required:"true"`
+	AddressesPerJob      int    `envconfig:"ADDRESS_PER_JOB" required:"true"`
+	HealthThreshold      string `envconfig:"HEALTH_THRESHOLD" required:"true"`
+	JobsPerWoker         int    `envconfig:"JOBS_PER_WORKER" required:"true"`
+	BatchSize            int    `envconfig:"BATCH_SIZE" required:"true"`
 }
 
 func main() {
