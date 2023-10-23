@@ -142,10 +142,9 @@ func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte
 
 	for _, userResult := range results {
 		collateralisedDebt, err := strconv.ParseInt(userResult.ContractQuery.TotalCollateralizedDebt, 8, 32)
-
 		// Uncollateralised positions still have debt, but will not return a health status.
 		// We filter them out here.
-		if collateralisedDebt == 0 {
+		if collateralisedDebt < 1000000 {
 			continue
 		}
 

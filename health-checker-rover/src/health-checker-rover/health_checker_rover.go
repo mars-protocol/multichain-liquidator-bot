@@ -151,7 +151,14 @@ func (s *HealthCheckerRover) produceUnhealthyPositions(results []UserResult) [][
 
 	for _, userResult := range results {
 		liquidatable := userResult.ContractQuery.Liquidatable
-		if userResult.ContractQuery.LiquidationHealthFactor < liquidatableLtv && liquidatable {
+		hf, err := strconv.ParseFloat(userResult.ContractQuery.LiquidationHealthFactor, 32)
+
+		if err != nil {
+			s.logger.Errorf("An Error Occurred converting LiquidationHealthFactor to float. %v", err)
+			continue
+		}
+
+		if hf < liquidatableLtv && liquidatable {
 			s.logger.Infof("User %v is liquidatable", userResult.AccountId)
 			positionDecoded, decodeError := json.Marshal(strings.TrimPrefix(userResult.AccountId, "account_"))
 			if decodeError == nil {
