@@ -25,7 +25,7 @@ type HealthChecker struct {
 	jobsPerWorker        int
 	addressesPerJob      int
 	redbankAddress       string
-	healthThreshold      float64
+	healthThreshold      string
 	batchSize            int
 	logger               *logrus.Entry
 	continueRunning      uint32
@@ -45,7 +45,7 @@ func New(
 	batchSize int,
 	addressesPerJob int,
 	redbankAddress string,
-	healthThreshold float64,
+	healthThreshold string,
 	logger *logrus.Entry,
 ) (*HealthChecker, error) {
 
@@ -156,10 +156,11 @@ func (s *HealthChecker) produceUnhealthyPositions(results []UserResult) [][]byte
 		json.Unmarshal(data, &healthStatus)
 
 		ltv, err := strconv.ParseFloat(healthStatus.Borrowing.LiquidationThresholdHf, 32)
+		liquidatableLtv, err := strconv.ParseFloat(s.healthThreshold, 32)
 
 		if err != nil {
 			s.logger.Errorf("An Error Occurred decoding health status. %v", err)
-		} else if ltv < s.healthThreshold {
+		} else if ltv < liquidatableLtv {
 			s.logger.Info("healthstatus : ", userResult)
 			positionDecoded, decodeError := json.Marshal(userResult)
 			if decodeError == nil {
@@ -232,7 +233,6 @@ func (s *HealthChecker) Run() error {
 		jobs := s.generateJobs(positions, s.addressesPerJob)
 		userResults, success := s.RunWorkerPool(jobs)
 		s.metricsCache.IncrementBy("health_checker.accounts.scanned", int64(len(userResults)))
-
 		// A warning incase we do not successfully load data for all positions.
 		// This will likely not occur but it it does is important we notice.
 		if len(userResults) < len(positions) {
