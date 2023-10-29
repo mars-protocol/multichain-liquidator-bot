@@ -335,6 +335,7 @@ export class LiquidationActionGenerator {
 
 	produceWithdrawLiquidityAction = (lpTokenDenom: string): Action => {
 		return {
+			//@ts-ignore
 			withdraw_liquidity: {
 				lp_token: {
 					amount: 'account_balance',
@@ -421,6 +422,7 @@ export class LiquidationActionGenerator {
 	private produceRepayAction = (denom: string): Action => {
 		return {
 			repay: {
+				// @ts-ignore
 				amount: 'account_balance',
 				denom: denom,
 			},

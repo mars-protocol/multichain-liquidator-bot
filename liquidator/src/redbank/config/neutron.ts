@@ -17,7 +17,7 @@ export const getConfig = (
 				hiveEndpoint: process.env.HIVE_ENDPOINT!,
 				liquidatorMasterAddress: liquidatorMasterAddress,
 				logResults: false, // enable for debugging
-				neutralAssetDenom: 'ibc/2FF082B65C88E4B6D5EF1DB243CDA1D331D002759E938A0F5CD3FFDC5D53B3E349',
+				neutralAssetDenom: 'ibc/F082B65C88E4B6D5EF1DB243CDA1D331D002759E938A0F5CD3FFDC5D53B3E349',
 				oracleAddress: 'neutron1dwp6m7pdrz6rnhdyrx5ha0acsduydqcpzkylvfgspsz60pj2agxqaqrr7g',
 				redbankAddress: 'neutron1n97wnm7q6d2hrcna3rqlnyqw2we6k0l8uqvmyqq6gsml92epdu7quugyph',
 				redisEndpoint: process.env.REDIS_ENDPOINT!,

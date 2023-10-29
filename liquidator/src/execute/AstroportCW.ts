@@ -7,17 +7,19 @@ import { produceExecuteContractMessage } from "../helpers";
 import { toUtf8 } from '@cosmjs/encoding'
 
 interface AstroSwap {
-    offerAssetInfo: AssetInfoCW | AssetInfoNative
-    askAssetInfo: AssetInfoCW | AssetInfoNative
+    offer_asset_info: AssetInfoCW | AssetInfoNative
+    ask_asset_info: AssetInfoCW | AssetInfoNative
 }
 
 interface SwapOperation {
-     astroSwap: AstroSwap
+    astro_swap: AstroSwap
 }
 
 interface SwapMsg {
-    executeSwapOperations : SwapOperation[]
-    minimumRecieve: string
+    execute_swap_operations : {
+        operations : SwapOperation[]
+        minimum_receive: string,
+    }
 }
 
 
@@ -36,10 +38,11 @@ export class AstroportCW implements ExchangeInterface {
     produceSwapMessage(route: RouteHop[], tokenIn: Coin, minimumRecieve: string, sender: string): EncodeObject {
         
         const executeSwapOperations = route.map((route) => this.produceSwapOperation(route))
-       
         const msg : SwapMsg = {
-            executeSwapOperations,
-            minimumRecieve
+            execute_swap_operations : {
+                operations : executeSwapOperations,
+                minimum_receive: minimumRecieve
+            },
         }
 
         return produceExecuteContractMessage(
@@ -52,10 +55,12 @@ export class AstroportCW implements ExchangeInterface {
 
     produceSwapOperation(routeHop : RouteHop) : SwapOperation {
         return {
-            astroSwap : {
-                offerAssetInfo : this.produceAssetInfo(routeHop.tokenInDenom),
-                askAssetInfo: this.produceAssetInfo(routeHop.tokenOutDenom)
-            }
+
+                astro_swap : {
+                    offer_asset_info : this.produceAssetInfo(routeHop.tokenInDenom),
+                    ask_asset_info: this.produceAssetInfo(routeHop.tokenOutDenom)
+                }
+
         }
     }
 
