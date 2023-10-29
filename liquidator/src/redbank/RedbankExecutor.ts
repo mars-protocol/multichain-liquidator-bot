@@ -46,15 +46,17 @@ export class RedbankExecutor extends BaseExecutor {
 		private exchangeInterface: ExchangeInterface
 	) {
 		super(config, client, queryClient, poolProvider)
+		console.log({config})
 		this.config = config
 	}
 
 	async start() {
 		await this.initiateRedis()
-
 		if (this.config.chainName === "neutron") {
 			await this.initiateAstroportPoolProvider()
 		}
+		await this.refreshData()
+		await this.refreshMarketData()
 		
 		// run
 		while (true) {
@@ -76,7 +78,7 @@ export class RedbankExecutor extends BaseExecutor {
 		let totalDebtValue = BigNumber(0)
 		const availableValue = new BigNumber(
 			this.balances.get(this.config.neutralAssetDenom) || 0,
-		).multipliedBy(this.prices.get(this.config.neutralAssetDenom) || 0)
+		)
 
 		// create a list of debts that need to be liquidated
 		positionData.forEach(async (positionResponse: DataResponse) => {
@@ -87,22 +89,18 @@ export class RedbankExecutor extends BaseExecutor {
 				const largestCollateralDenom = getLargestCollateral(position.collaterals, this.prices)
 				const largestDebt = getLargestDebt(position.debts, this.prices)
 
-				// total debt value is calculated in base denom (i.e uosmo).
+				// total debt value is calculated in base denom (i.e uosmo, usdc).
 				// We scale down to ensure we have space for slippage etc in the swap
 				// transactions that follow
-				const remainingAvailableSize = availableValue
-					.multipliedBy(1 - this.config.safetyMargin)
-					.minus(totalDebtValue)
-
-				if (remainingAvailableSize.isGreaterThan(1000)) {
+				if (availableValue.isGreaterThan(1000)) {
 					// we will always have a value here as we filter for the largest above
 					const debtPrice = this.prices.get(largestDebt.denom)!
 					const debtValue = new BigNumber(largestDebt.amount).multipliedBy(debtPrice)
 
 					// Note -amount here is the number of the asset, not the value.
-					const amountToLiquidate = remainingAvailableSize.isGreaterThan(debtValue)
+					const amountToLiquidate = availableValue.isGreaterThan(debtValue)
 						? new BigNumber(largestDebt.amount)
-						: remainingAvailableSize.dividedBy(debtPrice)
+						: availableValue.dividedBy(debtPrice).multipliedBy(0.95)
 
 					const liquidateTx = {
 						collateral_denom: largestCollateralDenom,
@@ -229,18 +227,21 @@ export class RedbankExecutor extends BaseExecutor {
 				const totalDebt = cappedAmount.plus(expectedDebtAssetsPostSwap.get(debt.denom) || 0)
 				expectedDebtAssetsPostSwap.set(debt.denom, totalDebt)
 			} else {
+				// console.log({debtDenom : de})
 				const bestRoute = this.ammRouter.getBestRouteGivenOutput(
 					this.config.neutralAssetDenom,
 					debt.denom,
 					debtAmountRequiredFromSwap,
 				)
 				if (bestRoute) {
-					const amountToSwap = this.ammRouter.getRequiredInput(
+					let amountToSwap = this.ammRouter.getRequiredInput(
 						// we add a little more to ensure we get enough to cover debt
 						debtAmountRequiredFromSwap.multipliedBy(1.02),
 						bestRoute,
 					)
 
+					
+					amountToSwap = amountToSwap.isGreaterThan(neutralAvailable) ? neutralAvailable : amountToSwap
 					msgs.push(
 						this.exchangeInterface.produceSwapMessage(
 							bestRoute,
@@ -298,7 +299,7 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.refreshData()
 
 		console.log('Checking for liquidations')
-		const positions: Position[] = await this.redis.popUnhealthyPositions<Position>(25)
+		const positions: Position[] = await this.redis.popUnhealthyPositions<Position>(1)
 
 		if (positions.length == 0) {
 			//sleep to avoid spamming redis db when empty
@@ -314,7 +315,8 @@ export class RedbankExecutor extends BaseExecutor {
 			this.config.hiveEndpoint,
 		)
 
-		console.log(`- found ${positionData.length} positions queued for liquidation.`)
+		console.log(`- found ${positionData.length} positions queued for liquidation. `)
+		positionData.forEach((position) => console.log(JSON.stringify(position.data)))
 
 		const { txs, debtsToRepay } = this.produceLiquidationTxs(positionData)
 
@@ -376,7 +378,6 @@ export class RedbankExecutor extends BaseExecutor {
 			await this.getFee(secondBatch, this.config.liquidatorMasterAddress),
 		)
 
-		await this.setBalances(liquidatorAddress)
 
 		if (this.config.logResults) {
 			txs.forEach((tx) => {
@@ -427,9 +428,10 @@ export class RedbankExecutor extends BaseExecutor {
 			throw new Error(
 				'Stargate Client is undefined, ensure you call initiate at before calling this method',
 			)
+
 		const gasEstimated = await this.client.simulate(address, msgs, '')
 		const fee = {
-			amount: coins(60000, 'uosmo'),
+			amount: coins(60000, this.config.gasDenom),
 			gas: Number(gasEstimated * 1.3).toFixed(0),
 		}
 

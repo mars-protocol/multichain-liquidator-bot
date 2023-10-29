@@ -210,12 +210,13 @@ export class AMMRouter implements AMMRouterInterface {
 
 	getRouteWithLowestInput(amountOut: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
+			.filter((route) => this.getRequiredInput(amountOut, route).isGreaterThan(0))
 			.sort((routeA, routeB) => {
 				const routeAReturns = this.getRequiredInput(amountOut, routeA)
 				const routeBReturns = this.getRequiredInput(amountOut, routeB)
 
 				// route a is a better route if it returns
-				return routeAReturns.minus(routeBReturns).toNumber()
+				return routeBReturns.minus(routeAReturns).toNumber()
 			})
 			.pop()
 
@@ -232,7 +233,7 @@ export class AMMRouter implements AMMRouterInterface {
 	}
 
 	getRoutes(tokenInDenom: string, tokenOutDenom: string): RouteHop[][] {
-		return this.buildRoutesForTrade(tokenInDenom, tokenOutDenom, this.pools, [], [])
+		return this.buildRoutesForTrade(tokenInDenom, tokenOutDenom, this.pools)
 	}
 
 	// We want to list all assets in the route except our last denom (tokenOutDenom)
@@ -243,80 +244,89 @@ export class AMMRouter implements AMMRouterInterface {
 	private buildRoutesForTrade(
 		tokenInDenom: string,
 		targetTokenOutDenom: string,
-		pools: Pool[],
-		route: RouteHop[],
-		routes: RouteHop[][],
+		pools: Pool[]
 	): RouteHop[][] {
-		// we don't want to search through the same pools again and loop, so we delete filter pools that
-		// exist in the route
-		const usedPools = this.findUsedPools(route)
+		const completeRoutes : RouteHop[][]= []
+		let routesInProgress : RouteHop[][] = []
+		let maxRoutteLength = 2
 
-		// all pairs that have our sell asset, and are not previously in our route
-		const possibleStartingPairs = pools.filter((pool) => {
-			return (
-				// todo  - support stableswap
-				(pool.token0 === tokenInDenom ||
-					pool.token1 === tokenInDenom) &&
-				// ensure we don't use the same pools
-				usedPools.find((poolId) => pool.id === poolId) === undefined
-			)
+		// all pairs that have our sell asset
+		const startingPairs = pools.filter((pool) => 
+			pool.token0 === tokenInDenom || pool.token1 === tokenInDenom)
+
+		// create routes for each possible starting pair
+		startingPairs.forEach((pair) => {
+			const hop: RouteHop = {
+				poolId: pair.id,
+				tokenInDenom: tokenInDenom,
+				tokenOutDenom: tokenInDenom === pair.token0 ? pair.token1 : pair.token0,
+				pool: pair,
+			}
+
+			const route = []
+			route.push(hop)
+
+			if (hop.tokenOutDenom === targetTokenOutDenom) {
+				completeRoutes.push(route)
+			} else {
+				routesInProgress.push(route)
+			}
 		})
 
-		// no more possible pools then we exit
-		if (possibleStartingPairs.length === 0) {
-			return routes
+		while (routesInProgress.length > 0) {
+			let updatedRoutes : RouteHop[][] = []
+			routesInProgress.forEach((route) => {
+				// Ids of pools we have previously used in this route
+				let usedPoolIds = this.findUsedPools(route)
+				let usedDenoms = route.map((hop) => hop.tokenInDenom)
+
+				// the current end denom in the route
+				let lastDenom = route[route.length - 1].tokenOutDenom
+
+				pools.forEach((pool) => {
+					if ((pool.token0 === lastDenom ||
+						pool.token1 === lastDenom) &&
+						(usedDenoms.indexOf(pool.token0) === -1 &&
+						usedDenoms.indexOf(pool.token1) === -1) &&
+						// ensure we don't use the same pools
+						usedPoolIds.indexOf(pool.id) === -1
+					) {
+						// Add a route for each pool that has the last denom as an asset
+						const hop: RouteHop = {
+							poolId: pool.id,
+							tokenInDenom: lastDenom,
+							tokenOutDenom: lastDenom === pool.token0 ? pool.token1 : pool.token0,
+							pool: pool,
+						}
+
+						// deep copy the array
+						const routeClone: RouteHop[] = this.cloneRoute(route)
+						routeClone.push(hop)
+
+						// if we have reached the target token, add to complete routes, otherwise add to next routes
+						if (hop.tokenOutDenom === targetTokenOutDenom) {
+							completeRoutes.push(routeClone)
+						} else if (routeClone.length < maxRoutteLength){
+							updatedRoutes.push(routeClone)
+						}
+					}
+				})
+			})
+			routesInProgress = updatedRoutes
 		}
 
-		// if we find an ending par(s), we have found the end of our route
-		const endingPairs = possibleStartingPairs.filter(
-			(pool) =>
-				pool.token0 === targetTokenOutDenom ||
-				pool.token1 === targetTokenOutDenom,
-		)
+	
+		return completeRoutes
+	}
 
-		if (endingPairs.length > 0 && tokenInDenom !== targetTokenOutDenom) {
-			endingPairs.forEach((pool) => {
-				const hop: RouteHop = {
-					poolId: pool.id,
-					tokenInDenom: tokenInDenom,
-					tokenOutDenom: targetTokenOutDenom,
-					pool: pool,
-				}
-
-				// deep copy the array
-				const routeClone: RouteHop[] = JSON.parse(JSON.stringify(route))
-				routeClone.push(hop)
-				routes.push(routeClone)
-			})
-
-			// return routes
-		} else {
-			// Else, we have not found the route. Iterate recursively through the pools building valid routes.
-			possibleStartingPairs.forEach((pool) => {
-				// We have no garauntee that index [0] will be the token in so we need to calculate that ourselves
-				const tokenOut = tokenInDenom === pool.token0 ? pool.token1 : pool.token0
-
-				const nextHop: RouteHop = {
-					poolId: pool.id,
-					tokenInDenom,
-					tokenOutDenom: tokenOut,
-					pool: pool,
-				}
-
-				// deep copy so we don't mess up other links in the search
-				const newRoute: RouteHop[] = JSON.parse(JSON.stringify(route))
-
-				newRoute.push(nextHop)
-
-				this.buildRoutesForTrade(
-					tokenOut,
-					targetTokenOutDenom,
-					pools,
-					newRoute,
-					routes,
-				)
-			})
-		}
-		return routes
+	cloneRoute(route: RouteHop[]) {
+		return route.map((hop: RouteHop) => {
+			return {
+				poolId: hop.poolId,
+				tokenInDenom: hop.tokenInDenom,
+				tokenOutDenom: hop.tokenOutDenom,
+				pool: hop.pool,
+			}
+		})
 	}
 }
