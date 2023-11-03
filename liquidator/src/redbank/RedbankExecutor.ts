@@ -332,7 +332,7 @@ export class RedbankExecutor extends BaseExecutor {
 				// Cap the repay amount by the remaining neutral asset we have
 				const amountToRepay = remainingNeutral.isGreaterThan(maxRepayableValue)
 					? maxRepayableAmount
-					: remainingNeutral.dividedBy(debtPrice)
+					: (remainingNeutral.multipliedBy(0.95)).dividedBy(debtPrice)
 				
 
 				// If our debt is the same as our neutral, we skip this step
@@ -363,6 +363,7 @@ export class RedbankExecutor extends BaseExecutor {
 					amountToRepay,
 					buyDebtRoute
 				)
+				
 
 				const valueToRepay = amountToRepay.multipliedBy(debtPrice)
 				
@@ -526,12 +527,12 @@ export class RedbankExecutor extends BaseExecutor {
 				)
 
 				if (bestRoute) {
-
+					
 					msgs.push(
 						this.exchangeInterface.produceSwapMessage(
 							bestRoute,
 							{ denom: this.config.neutralAssetDenom, amount: debtValue.toFixed(0) },
-							debtAmountRequiredFromSwap.toFixed(0),
+							debtAmountRequiredFromSwap.multipliedBy(0.95).toFixed(0),
 							liquidatorAddress,
 						)
 					)
@@ -723,7 +724,7 @@ export class RedbankExecutor extends BaseExecutor {
 			)
 		const gasEstimated = await this.client.simulate(address, msgs, '')
 		const fee = {
-			amount: coins(60000, 'uosmo'),
+			amount: coins(120000, 'uosmo'),
 			gas: Number(gasEstimated * 1.3).toFixed(0),
 		}
 
