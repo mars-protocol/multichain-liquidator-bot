@@ -322,12 +322,14 @@ export class RoverExecutor extends BaseExecutor {
 
 		const vault = this.vaultDetails.get(bestCollateral.denom)
 
-		const collateralToDebtActions = this.liquidationActionGenerator.convertCollateralToDebt(
-			bestCollateral.denom,
-			borrow,
-			vault,
-			slippage
-		)
+		const collateralToDebtActions = bestCollateral.denom !== borrow.denom 
+			? this.liquidationActionGenerator.convertCollateralToDebt(
+				bestCollateral.denom,
+				borrow,
+				vault,
+				slippage
+			) 
+			: []
 
 		const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
 
@@ -339,7 +341,7 @@ export class RoverExecutor extends BaseExecutor {
 				? this.liquidationActionGenerator.generateSwapActions(
 						borrow.denom,
 						this.config.neutralAssetDenom,
-						'100',
+						'10000000',
 						slippage
 				  )
 				: []

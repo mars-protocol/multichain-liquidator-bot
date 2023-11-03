@@ -51,7 +51,7 @@ export const createClient = async(wallet : DirectSecp256k1HdWallet) : Promise<Si
     const registry = new Registry(protoRegistry);
     const aminoTypes = new AminoTypes(aminoConverters);
     const clientOption: SigningCosmWasmClientOptions = {
-      gasPrice: GasPrice.fromString("0.1uosmo"),
+      gasPrice: GasPrice.fromString("0.01uosmo"),
       registry,
       aminoTypes
     }
@@ -78,7 +78,7 @@ const aminoConverters = {
 const registry = new Registry(protoRegistry);
 const aminoTypes = new AminoTypes(aminoConverters);
 const clientOption: SigningCosmWasmClientOptions = {
-  gasPrice: GasPrice.fromString("0.1uosmo"),
+  gasPrice: GasPrice.fromString("0.01uosmo"),
   registry,
   aminoTypes
 }
@@ -94,7 +94,7 @@ export const setAtomOraclePrice = async(price : string) => {
    const addresses = readAddresses(deployDetails)    
 
    const clientOption: SigningCosmWasmClientOptions = {
-       gasPrice: GasPrice.fromString("0.1uosmo")
+       gasPrice: GasPrice.fromString("0.01uosmo")
    }
 
    const client = await SigningCosmWasmClient.connectWithSigner(process.env.RPC_URL!, wallet, clientOption);
