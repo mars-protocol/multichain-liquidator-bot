@@ -55,6 +55,10 @@ type EnvironmentConfig struct {
 	HealthCheckServiceTitle string `envconfig:"HEALTHCHECK_SERVICE_TITLE" required:"true"`
 	ExecutorServiceTitle    string `envconfig:"EXECUTOR_SERVICE_TITLE" required:"true"`
 
+	MaxCollectorInstance   int `envconfig:"MAX_COLLECTOR_COUNT" required:"true"`
+	MaxHealthCheckInstance int `envconfig:"MAX_HEALTHCHECK_COUNT" required:"true"`
+	MaxExecutorInstance    int `envconfig:"MAX_EXECUTOR_COUNT" required:"true"`
+
 	ChainID              string `envconfig:"CHAIN_ID" required:"true"`
 	HiveEndpoint         string `envconfig:"HIVE_ENDPOINT" required:"true"`
 	RPCEndpoint          string `envconfig:"RPC_ENDPOINT" required:"true"`
@@ -291,7 +295,7 @@ func setUpManager(
 			0, // Scale down when we have no items in the queue
 			1, // Scale up when we have 1 or more items in the queue
 			1, // Minimum number of services
-			2, // Maximum number of services
+			environmentConfig.MaxCollectorInstance,
 			logger,
 		)
 		if err != nil {
@@ -306,7 +310,7 @@ func setUpManager(
 			0, // Scale down when we have no items in the queue
 			1, // Scale up when we have 1 or more items in the queue
 			1, // Minimum number of services
-			4, // Maximum number of services
+			environmentConfig.MaxHealthCheckInstance,
 			logger,
 		)
 		if err != nil {
@@ -321,7 +325,7 @@ func setUpManager(
 			0,     // Scale down when we have no items in the queue
 			10000, // We do not want to scale up the executor
 			1,     // Minimum number of services
-			1,     // Maximum number of services
+			environmentConfig.MaxExecutorInstance,
 			logger,
 		)
 		if err != nil {
