@@ -3,7 +3,7 @@ import { ConcentratedLiquidityPool, PoolAsset, PoolType, XYKPool } from '../src/
 import Long from 'long'
 import BigNumber from 'bignumber.js'
 import { Dec, Int } from '@keplr-wallet/unit'
-import { LiquidityDepth } from '../src/amm/osmosis/math/concentrated'
+import { LiquidityDepth } from '@osmosis-labs/math'
 
 const generateRandomPoolAsset = (
 	denom: string = Math.random().toString(),

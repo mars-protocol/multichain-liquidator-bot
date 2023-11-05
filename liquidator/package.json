@@ -24,6 +24,8 @@
 		"@cosmology/core": "^1.10.0",
 		"@types/lodash": "^4.14.191",
 		"big-integer": "^1.6.51",
+		"@keplr-wallet/unit": "0.10.24-ibc.go.v7.hot.fix",
+		"@osmosis-labs/math": "^5.1.0",
 		"bignumber": "^1.1.0",
 		"bignumber.js": "^9.1.0",
 		"camelcase-keys": "^8.0.2",

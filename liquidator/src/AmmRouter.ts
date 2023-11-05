@@ -2,9 +2,10 @@ import BigNumber from 'bignumber.js'
 import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from './math'
 import { RouteHop } from './types/RouteHop'
 import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from './types/Pool'
-import { ConcentratedLiquidityMath } from "./amm/osmosis/math/concentrated"
+import { BigDec, ConcentratedLiquidityMath } from '@osmosis-labs/math'
+
 import { Coin, Dec, Int } from '@keplr-wallet/unit'
-const { calcOutGivenIn, calcInGivenOut } = ConcentratedLiquidityMath
+// const { calcOutGivenIn, calcInGivenOut } = ConcentratedLiquidityMath
 
 export interface AMMRouterInterface {
 	getRoutes(tokenInDenom: string, tokenOutDenom: string): RouteHop[][]
@@ -86,10 +87,10 @@ export class AMMRouter implements AMMRouterInterface {
 					const tokenDenom0 = clPool.token0
 					const poolLiquidity = new Dec(clPool.currentTickLiquidity)
 					const inittedTicks = tokenIn.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
-					const curSqrtPrice = new Dec(clPool.currentSqrtPrice)
+					const curSqrtPrice = new BigDec(clPool.currentSqrtPrice)
 					const swapFee = new Dec(clPool.swapFee)
 
-					const result = calcOutGivenIn({
+					const result = ConcentratedLiquidityMath.calcOutGivenIn({
 						tokenIn,
 						tokenDenom0,
 						poolLiquidity,
@@ -158,10 +159,10 @@ export class AMMRouter implements AMMRouterInterface {
 					const tokenDenom0 = clPool.token0
 					const poolLiquidity = new Dec(clPool.currentTickLiquidity)
 					const inittedTicks = tokenOut.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
-					const curSqrtPrice = new Dec(clPool.currentSqrtPrice)
+					const curSqrtPrice = new BigDec(clPool.currentSqrtPrice)
 					const swapFee = new Dec(clPool.swapFee)
 
-					const result = calcInGivenOut({
+					const result = ConcentratedLiquidityMath.calcInGivenOut({
 						tokenOut,
 						tokenDenom0,
 						poolLiquidity,
