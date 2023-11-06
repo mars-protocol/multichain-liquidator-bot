@@ -78,7 +78,7 @@ export const getAddress = async (wallet: DirectSecp256k1HdWallet): Promise<strin
 export const produceSigningStargateClient = async (
 	rpcEndpoint: string,
 	liquidator: DirectSecp256k1HdWallet,
-	gasPrice: string = '0.0025uosmo',
+	gasPrice: string = '0.025uosmo',
 ): Promise<SigningStargateClient> => {
 	const protoRegistry: ReadonlyArray<[string, GeneratedType]> = [
 		...cosmosProtoRegistry,
@@ -116,7 +116,7 @@ export const produceReadOnlyCosmWasmClient = async (
 export const produceSigningCosmWasmClient = async (
 	rpcEndpoint: string,
 	liquidator: DirectSecp256k1HdWallet,
-	gasPrice: string = '0.0025uosmo',
+	gasPrice: string = '0.025uosmo',
 ): Promise<SigningCosmWasmClient> => {
 	return await SigningCosmWasmClient.connectWithSigner(rpcEndpoint, liquidator, {
 		gasPrice: GasPrice.fromString(gasPrice),

@@ -2,7 +2,7 @@ import { Int } from "@keplr-wallet/unit";
 import { camelCaseKeys } from "../../helpers";
 import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from "../../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
-import { LiquidityDepth } from "../../amm/osmosis/math/concentrated/types";
+import { LiquidityDepth } from "@osmosis-labs/math";
 
 export class OsmosisPoolProvider implements PoolDataProviderInterface {
 

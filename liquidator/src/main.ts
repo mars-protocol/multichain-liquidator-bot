@@ -1,11 +1,7 @@
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { HdPath } from '@cosmjs/crypto'
-import { DirectSecp256k1HdWallet, makeCosmoshubPath } from '@cosmjs/proto-signing'
-import { SigningStargateClient } from '@cosmjs/stargate'
+import { SigningStargateClient, makeCosmoshubPath } from '@cosmjs/stargate'
 import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from './helpers.js'
 import { RedbankExecutor, RedbankExecutorConfig } from './redbank/RedbankExecutor'
-import { getConfig as getRoverConfig } from './rover/config/osmosis'
-import { RoverExecutor } from './rover/RoverExecutor'
 import { getSecretManager } from './secretManager'
 import { Network } from './types/network'
 import { PoolDataProviderInterface } from './query/amm/PoolDataProviderInterface.js'
@@ -16,12 +12,14 @@ import { Osmosis } from './execute/Osmosis.js'
 import { getConfig } from './redbank/config/getConfig.js'
 import { BaseExecutorConfig } from './BaseExecutor.js'
 import { AstroportCW } from './execute/AstroportCW.js'
+import { HdPath } from '@cosmjs/crypto'
+import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
 
 export const main = async () => {
-
+	console.log("STARTED")
 	// Define if we are launching a rover executor or a redbank executor
 	const executorType = process.env.EXECUTOR_TYPE!
 
@@ -62,8 +60,7 @@ export const main = async () => {
 			await launchRedbank(client, queryClient, redbankConfig, poolProvider, exchangeInterface)
 			return
 		case ROVER:
-			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator, poolProvider)
-			return
+			throw new Error('Rover not supported by MarsV1')
 		default:
 			throw new Error(
 				`Invalid executor type. Executor type must be either ${REDBANK} or ${ROVER}, recieved ${executorType}`,
@@ -82,25 +79,6 @@ const getPoolProvider = (chainName: string, config: BaseExecutorConfig) : PoolDa
 			throw new Error(`Invalid chain name. Chain name must be either osmosis or neutron, recieved ${chainName}`)
 	}
 }
-
-const launchRover = async (
-	client: SigningStargateClient,
-	wasmClient: CosmWasmClient,
-	network: Network,
-	liquidatorMasterAddress: string,
-	liquidatorWallet: DirectSecp256k1HdWallet,
-	poolProvider : PoolDataProviderInterface
-
-) => {
-	await new RoverExecutor(
-		getRoverConfig(liquidatorMasterAddress, network),
-		client,
-		wasmClient,
-		liquidatorWallet,
-		poolProvider
-	).start()
-}
-
 const launchRedbank = async (
 	client: SigningStargateClient,
 	wasmClient: CosmWasmClient,
