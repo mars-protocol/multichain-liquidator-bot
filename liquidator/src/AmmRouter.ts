@@ -56,7 +56,7 @@ export class AMMRouter implements AMMRouterInterface {
 
 				switch (pool.poolType) {
 					case PoolType.XYK:
-			
+
 						const xykPool= pool as XYKPool
 						const x1 = new BigNumber(
 							xykPool.poolAssets.find(
@@ -349,10 +349,10 @@ export class AMMRouter implements AMMRouterInterface {
 		targetTokenOutDenom: string,
 		pools: Pool[],
 	): RouteHop[][] {
-		
+
 		const completeRoutes : RouteHop[][]= []
 		let routesInProgress : RouteHop[][] = []
-		let maxRoutteLength = 2
+		let maxRoutteLength = 3
 
 		// all pairs that have our sell asset
 		const startingPairs = pools.filter((pool) => 

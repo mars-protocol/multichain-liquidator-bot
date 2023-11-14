@@ -208,7 +208,6 @@ export class RoverExecutor extends BaseExecutor {
 		} catch(ex) {
 			console.error(JSON.stringify(ex))
 		}
-		
 	}
 
 	createCreditAccount = async (
@@ -257,10 +256,10 @@ export class RoverExecutor extends BaseExecutor {
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
 		const targetAccounts : string[] = await this.redis.popUnhealthyPositions<string>(this.config.maxLiquidators-1)
 
+
 		// Sleep to avoid spamming redis db when empty.
 		if (targetAccounts.length == 0) {
 			await sleep(200)
-			console.log(' - No items for liquidation yet')
 			return
 		}
 
@@ -309,7 +308,7 @@ export class RoverExecutor extends BaseExecutor {
 
 		// variables
 		const { borrow } = borrowActions[0] as { borrow: Coin }
-		const swapWinnings = (bestDebt.amount * this.prices.get(bestDebt.denom)!) > 100000
+		const swapWinnings = (bestDebt.amount * this.prices.get(bestDebt.denom)!) > 1000000
 		const slippage =  process.env.SLIPPAGE ||  '0.005'
 
 		const liquidateMessage = this.liquidationActionGenerator.produceLiquidationAction(
@@ -328,7 +327,7 @@ export class RoverExecutor extends BaseExecutor {
 				borrow,
 				vault,
 				slippage
-			) 
+			)
 			: []
 
 		const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
