@@ -35,7 +35,9 @@ export const produceCoreRoverDataQuery = (
         ),
         routes: contractQuery(
           contractAddress: "${swapperAddress}"
-          query: { routes: {} }
+          query: { routes: {
+            limit: 100
+          } }
         ),
       }
     }`
