@@ -73,7 +73,7 @@ export class RoverExecutor extends BaseExecutor {
 		await this.initiateRedis()
 		await this.initiateAstroportPoolProvider()
 		await this.refreshData()
-		
+
 		// set up accounts
 		const accounts = await this.wallet.getAccounts()
 
@@ -204,7 +204,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			this.liquidationActionGenerator.setSwapperRoutes(roverData.routes)
 
-			await this.refreshPoolData()
+			await this.refreshPoolData(this.prices, this.markets)
 		} catch(ex) {
 			console.error(JSON.stringify(ex))
 		}
@@ -321,7 +321,7 @@ export class RoverExecutor extends BaseExecutor {
 
 		const vault = this.vaultDetails.get(bestCollateral.denom)
 
-		const collateralToDebtActions = bestCollateral.denom !== borrow.denom 
+		const collateralToDebtActions = bestCollateral.denom !== borrow.denom
 			? this.liquidationActionGenerator.convertCollateralToDebt(
 				bestCollateral.denom,
 				borrow,
@@ -367,7 +367,7 @@ export class RoverExecutor extends BaseExecutor {
 				toUtf8(JSON.stringify(msg)),
 			),
 		]
-		
+
 		// add msg to send liquidators STABLE balance to master address. This will only send previously accrued 
 		// winnings, but not those from the current liquidation (if successfull)
 		const liquidatorBalances = this.liquidatorBalances.get(liquidatorAddress)
@@ -377,11 +377,12 @@ export class RoverExecutor extends BaseExecutor {
 			const sendMsg = produceSendMessage(liquidatorAddress, this.config.liquidatorMasterAddress, [stable])
 			msgs.push(sendMsg)
 		}
-		
+
+		const fee = this.config.chainName.toLowerCase() === "osmosis" ? await this.getOsmosisFee(msgs, liquidatorAddress) : 'auto'
 		const result = await this.client.signAndBroadcast(
 			liquidatorAddress,
 			msgs,
-			'auto',
+			fee,
 		)
 
 		if (result.code !== 0) {

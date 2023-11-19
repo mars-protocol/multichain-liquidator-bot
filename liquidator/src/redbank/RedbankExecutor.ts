@@ -162,7 +162,6 @@ export class RedbankExecutor extends BaseExecutor {
 						start_after,
 					},
 				})
-			
 				start_after = response[response.length - 1] ? response[response.length - 1].denom : ""
 				priceSources = priceSources.concat(response)
 				fetching = response.length === limit
@@ -274,7 +273,7 @@ export class RedbankExecutor extends BaseExecutor {
 				const debtPrice = this.prices.get(debtDenom)
 				const collateralPrice = this.prices.get(largestCollateralDenom)
 
-				if (!debtParams || !debtPrice || !collateralPrice || !collateralParams) continue 
+				if (!debtParams || !debtPrice || !collateralPrice || !collateralParams) continue
 				const lbStart = Number(collateralParams.liquidation_bonus.starting_lb)
 				const lbSlope = Number(collateralParams.liquidation_bonus.slope)
 				const lbMax = Number(collateralParams.liquidation_bonus.max_lb)
@@ -300,7 +299,6 @@ export class RedbankExecutor extends BaseExecutor {
 						this.prices
 					).toNumber()
 				)
-			
 				// Neutral available to us for this specific liquidation
 				const remainingNeutral = availableValue.minus(totalDebtValue)
 
@@ -319,7 +317,6 @@ export class RedbankExecutor extends BaseExecutor {
 				const largestCollateralValue = new BigNumber(largestCollateral.amount)
 					.multipliedBy(1-liquidationBonus)
 					.multipliedBy(collateralPrice)
-
 				if (
 					!largestCollateralValue || 
 					largestCollateralValue.isLessThanOrEqualTo(10000) || 
@@ -333,11 +330,11 @@ export class RedbankExecutor extends BaseExecutor {
 				const amountToRepay = remainingNeutral.isGreaterThan(maxRepayableValue)
 					? maxRepayableAmount
 					: (remainingNeutral.multipliedBy(0.95)).dividedBy(debtPrice)
-				
+
 
 				// If our debt is the same as our neutral, we skip this step
 				const buyDebtRoute = this.config.neutralAssetDenom === debtDenom 
-					? [] 
+					? []
 					: this.ammRouter.getBestRouteGivenOutput(
 							this.config.neutralAssetDenom,
 							debtDenom,
@@ -363,10 +360,9 @@ export class RedbankExecutor extends BaseExecutor {
 					amountToRepay,
 					buyDebtRoute
 				)
-				
 
 				const valueToRepay = amountToRepay.multipliedBy(debtPrice)
-				
+
 				// calculate how much collateral we get back
 				const collateralValueToBeWon = (new BigNumber(valueToRepay).multipliedBy(
 					1 + liquidationBonus)).multipliedBy(1-protocolLiquidationFee)
@@ -398,15 +394,15 @@ export class RedbankExecutor extends BaseExecutor {
 						collateral_denom: largestCollateralDenom,
 						debt_denom: largestDebt.denom,
 						user_address: positionAddress,
-						amount: amountToRepay.toFixed(0),
+						amount: amountToRepay.multipliedBy(0.98).toFixed(0),
 					}
-	
+
 					const newTotalDebt = totalDebtValue.plus(
 						new BigNumber(amountToRepay).multipliedBy(debtPrice),
 					)
 
 					txs.push(liquidateTx)
-	
+
 					// update debts + totals
 					const existingDebt = debtsToRepay.get(liquidateTx.debt_denom) || 0
 					debtsToRepay.set(
@@ -430,7 +426,6 @@ export class RedbankExecutor extends BaseExecutor {
 		// for each asset, create a withdraw message
 		collateralsWon.forEach((collateral) => {
 			const denom = collateral.denom
-
 			msgs.push(
 				executeContract(
 					produceWithdrawMessage(liquidatorAddress, denom, this.config.redbankAddress)
@@ -469,7 +464,7 @@ export class RedbankExecutor extends BaseExecutor {
 							const result = routeAReturns.minus(routeBReturns).toNumber()
 							return result
 						})
-						.filter((route) => this.ammRouter.getOutput(collateralAmount, route).isGreaterThan(0))
+						.filter((route) => this.ammRouter.getOutput(collateralAmount, route).isGreaterThan(100000))
 						.pop()
 
 					if (bestRoute) {
@@ -480,7 +475,7 @@ export class RedbankExecutor extends BaseExecutor {
 							.toFixed(0)
 
 						expectedNeutralCoins = expectedNeutralCoins.plus(minOutput)
-						
+
 						msgs.push(
 							this.exchangeInterface.produceSwapMessage(
 								bestRoute,
@@ -527,7 +522,7 @@ export class RedbankExecutor extends BaseExecutor {
 				)
 
 				if (bestRoute) {
-					
+
 					msgs.push(
 						this.exchangeInterface.produceSwapMessage(
 							bestRoute,
@@ -633,15 +628,16 @@ export class RedbankExecutor extends BaseExecutor {
 		const execute: MsgExecuteContractEncodeObject =
 			// index [0] is safe as we know the length is 1 from the conditional
 			txs.length == 1 ? this.executeViaRedbankMsg(txs[0]) : this.executeViaFilterer(txs, debtCoins)
-			
 		firstMsgBatch.push(execute)
 
 		if (!firstMsgBatch || firstMsgBatch.length === 0 || txs.length === 0) return
 
+		const firstFee = this.config.chainName.toLowerCase() === "osmosis" ? await this.getOsmosisFee(firstMsgBatch, this.config.liquidatorMasterAddress) : 'auto'
+
 		const result = await this.client.signAndBroadcast(
 			this.config.liquidatorMasterAddress,
 			firstMsgBatch,
-			await this.getFee(firstMsgBatch, this.config.liquidatorMasterAddress),
+			firstFee
 		)
 
 		console.log(`Liquidation hash: ${result.transactionHash}`)
@@ -664,11 +660,12 @@ export class RedbankExecutor extends BaseExecutor {
 		this.appendWithdrawMessages(collaterals, liquidatorAddress, secondBatch)
 
 		this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, secondBatch)
+		const secondFee = this.config.chainName.toLowerCase() === "osmosis" ? await this.getOsmosisFee(secondBatch, this.config.liquidatorMasterAddress) : 'auto'
 
 		await this.client.signAndBroadcast(
 			this.config.liquidatorMasterAddress,
 			secondBatch,
-			await this.getFee(secondBatch, this.config.liquidatorMasterAddress),
+			secondFee,
 		)
 
 		await this.setBalances(liquidatorAddress)
@@ -715,19 +712,5 @@ export class RedbankExecutor extends BaseExecutor {
 		const result: Coin[] = []
 		coinMap.forEach((coin) => result.push(coin))
 		return result
-	}
-
-	getFee = async (msgs: EncodeObject[], address: string) => {
-		if (!this.client)
-			throw new Error(
-				'Stargate Client is undefined, ensure you call initiate at before calling this method',
-			)
-		const gasEstimated = await this.client.simulate(address, msgs, '')
-		const fee = {
-			amount: coins(120000, 'uosmo'),
-			gas: Number(gasEstimated * 1.3).toFixed(0),
-		}
-
-		return fee
 	}
 }
