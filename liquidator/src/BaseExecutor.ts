@@ -217,7 +217,7 @@ export class BaseExecutor {
 		const gasEstimated = await this.client.simulate(address, msgs, '')
 		const gas = Number(gasEstimated * 1.3)
 		const gasPrice = Number(baseFee)
-		const amount = coins(gas * gasPrice, 'uosmo')
+		const amount = coins((gas * gasPrice).toFixed(0), this.config.gasDenom)
 		const fee = {
 			amount,
 			gas: gas.toFixed(0),
