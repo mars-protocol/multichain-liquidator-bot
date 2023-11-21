@@ -1,8 +1,9 @@
 import { SigningStargateClient } from '@cosmjs/stargate'
-import { Coin } from '@cosmjs/proto-signing'
+import { Coin, EncodeObject, coins } from '@cosmjs/proto-signing'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { RedisInterface } from './redis.js'
 import { AMMRouter } from './AmmRouter.js'
+import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from "./types/Pool"
 import 'dotenv/config.js'
 import { MarketInfo } from './rover/types/MarketInfo.js'
 import { CSVWriter, Row } from './CsvWriter.js'
@@ -122,9 +123,8 @@ export class BaseExecutor {
 
 		bank.balance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
 		wasm.prices.forEach((price: PriceResponse) => this.prices.set(price.denom, Number(price.price)))
-		
 		await this.refreshMarketData()
-		await this.refreshPoolData()
+		await this.refreshPoolData(this.prices, this.markets)
 	}
 
 	refreshMarketData = async() => {
@@ -135,9 +135,10 @@ export class BaseExecutor {
 			const response = await this.queryClient.queryContractSmart(this.config.redbankAddress, {
 				markets: {
 					start_after,
+					limit: 5
 				},
 			})
-		
+
 			start_after = response[response.length - 1] ? response[response.length - 1].denom : ""
 			markets = markets.concat(response)
 			fetching = response.length === 5
@@ -148,14 +149,80 @@ export class BaseExecutor {
 		)
 	}
 
-	refreshPoolData = async () => {
+	refreshPoolData = async (prices: Map<string, number>, markets: MarketInfo[]) => {
 		const currentTime = Date.now()
 
+		// 20000 USDC min liqudity denominated
 		if (this.poolsNextRefresh < currentTime) {
 
-			const pools = await this.poolProvider.loadPools()
+			let pools = await this.poolProvider.loadPools()
+			pools = this.validatePools(pools, markets, prices)
+
+			// pool.poolType === PoolType.CONCENTRATED_LIQUIDITY
 			this.ammRouter.setPools(pools)
 			this.poolsNextRefresh = Date.now() + this.config.poolsRefreshWindow
 		}
+	}
+
+	// Filter out pools that are invalid
+	validatePools = (pools : Pool[], markets: MarketInfo[], prices: Map<string, number>) => {
+		pools = pools.filter(pool => {
+			let liquid = true
+			if (pool.poolType === PoolType.CONCENTRATED_LIQUIDITY) {
+				// TODO check liquidity
+				liquid = (pool as ConcentratedLiquidityPool).liquidityDepths?.zeroToOne.length > 0 &&
+				(pool as ConcentratedLiquidityPool).liquidityDepths?.oneToZero.length > 0
+			} else if (pool.poolType === PoolType.XYK) {
+
+				// TODO make env variable
+				const minXykLiquidity = process.env.MIN_XYX_LIQUIDITY || 20000 * 1e6
+
+				// Check liquidity is valid
+				const tokenZero = markets.find(market => market.denom === pool.token0)
+				const tokenOne = markets.find(market => market.denom === pool.token1)
+				if (!tokenZero && !tokenOne) return false
+				if (tokenZero) {
+					liquid = new BigNumber(
+						(pool as XYKPool)
+						.poolAssets[0]
+						.token
+						.amount
+					).multipliedBy(prices.get(pool.token0) || 0)
+					.isGreaterThan(minXykLiquidity)
+				} else if (tokenOne) {
+					liquid = new BigNumber(
+						(pool as XYKPool)
+						.poolAssets[1]
+						.token
+						.amount
+					).multipliedBy(prices.get(pool.token1) || 0)
+					.isGreaterThan(minXykLiquidity)
+				}
+			}
+			return liquid
+		})
+
+		return pools
+	}
+
+	// Calculate the fee for a transaction on osmosis. Incorporates EIP1559 dynamic base fee
+	getOsmosisFee = async (msgs: EncodeObject[], address: string) => {
+		if (!this.client)
+			throw new Error(
+				'Stargate Client is undefined, ensure you call initiate at before calling this method',
+			)
+
+		const gasPriceRequest = await fetch("https://lcd.osmosis.zone/osmosis/txfees/v1beta1/cur_eip_base_fee")
+		const { base_fee: baseFee } = await gasPriceRequest.json()
+		const gasEstimated = await this.client.simulate(address, msgs, '')
+		const gas = Number(gasEstimated * 1.3)
+		const gasPrice = Number(baseFee)
+		const amount = coins((gas * gasPrice).toFixed(0), this.config.gasDenom)
+		const fee = {
+			amount,
+			gas: gas.toFixed(0),
+		}
+
+		return fee
 	}
 }

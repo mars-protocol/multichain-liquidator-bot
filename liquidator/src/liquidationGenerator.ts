@@ -16,7 +16,6 @@ const sortAssetArrayByAmount = (
 				.minus(b.amount)
 				.toNumber(),
 		)
-		.reverse()
 }
 
 export const getLargestCollateral = (
