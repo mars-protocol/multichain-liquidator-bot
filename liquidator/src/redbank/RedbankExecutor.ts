@@ -3,7 +3,7 @@ import { Position } from '../types/position'
 import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
-import { coins, EncodeObject } from '@cosmjs/proto-signing'
+import { EncodeObject } from '@cosmjs/proto-signing'
 
 import { produceExecuteContractMessage, produceWithdrawMessage, sleep } from '../helpers'
 import { cosmwasm } from 'osmojs'
@@ -82,6 +82,7 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.fetchAssetParams()
 		await this.fetchTargetHealthFactor()
 
+
 		setInterval(this.fetchAssetParams, 10 * this.MINUTE)
 		setInterval(this.updatePriceSources, 10 * this.MINUTE)
 		setInterval(this.updateOraclePrices, 1 * this.MINUTE )
@@ -102,9 +103,13 @@ export class RedbankExecutor extends BaseExecutor {
 	}
 
 	async fetchTargetHealthFactor() { 
-		this.targetHealthFactor = await this.queryClient.queryContractSmart(this.config.marsParamsAddress, {
-			target_health_factor: {}
-		})
+		try {
+			this.targetHealthFactor = await this.queryClient.queryContractSmart(this.config.marsParamsAddress, {
+				target_health_factor: {}
+			})
+		} catch (e) {
+			console.error(e)
+		}
 	}
 
 	async fetchAssetParams() {
@@ -123,7 +128,7 @@ export class RedbankExecutor extends BaseExecutor {
 						start_after: startAfter,
 					  },
 				})
-				
+
 				startAfter = response[response.length - 1] ? response[response.length - 1].denom : ""
 				response.forEach((assetParam : AssetParamsBaseForAddr) => {
 					this.assetParams.set(assetParam.denom, assetParam)
@@ -142,7 +147,6 @@ export class RedbankExecutor extends BaseExecutor {
 				}
 			}
 		}
-
 	}
 
 	updatePriceSources = async () => {
@@ -186,19 +190,22 @@ export class RedbankExecutor extends BaseExecutor {
 	}
 
 	updateOraclePrices = async () => {
+		try {
+			// settle all price sources
+			const priceResults : PromiseSettledResult<OraclePrice>[] = await Promise.allSettled(this.priceSources.map(async (priceSource) => await this.fetchOraclePrice(priceSource.denom)))
 
-		// settle all price sources
-		const priceResults : PromiseSettledResult<OraclePrice>[] = await Promise.allSettled(this.priceSources.map(async (priceSource) => await this.fetchOraclePrice(priceSource.denom)))
+			priceResults.forEach((oraclePriceResult) => {
+				const successfull = oraclePriceResult.status === 'fulfilled'
+				const oraclePrice = successfull ? oraclePriceResult.value : null
 
-		priceResults.forEach((oraclePriceResult) => {
-			const successfull = oraclePriceResult.status === 'fulfilled'
-			const oraclePrice = successfull ? oraclePriceResult.value : null
-	
-			// push successfull price results
-			if (successfull && oraclePrice) {
-				this.oraclePrices.set(oraclePrice.denom, oraclePrice.price)
-			}
-		})
+				// push successfull price results
+				if (successfull && oraclePrice) {
+					this.oraclePrices.set(oraclePrice.denom, oraclePrice.price)
+				}
+			})
+		} catch (e) {
+			console.error(e)
+		}
 	}
 
 	private fetchOraclePrice = async (denom: string) : Promise<OraclePrice> => {
@@ -288,14 +295,14 @@ export class RedbankExecutor extends BaseExecutor {
 				)
 
 				const liquidationBonus = calculateLiquidationBonus(
-					lbStart, 
-					lbSlope, 
-					ltHealthFactor, 
-					lbMax, 
-					lbMin, 
+					lbStart,
+					lbSlope,
+					ltHealthFactor,
+					lbMax,
+					lbMin,
 					calculateCollateralRatio(
-						position.debts, 
-						position.collaterals, 
+						position.debts,
+						position.collaterals,
 						this.prices
 					).toNumber()
 				)
@@ -312,14 +319,13 @@ export class RedbankExecutor extends BaseExecutor {
 					this.prices,
 					largestCollateralDenom
 				)
-
 				// Cap the repay amount by the collateral we are claiming. We need to factor in the liquidation bonus - as that comes out of the available collateral
 				const largestCollateralValue = new BigNumber(largestCollateral.amount)
 					.multipliedBy(1-liquidationBonus)
 					.multipliedBy(collateralPrice)
 				if (
-					!largestCollateralValue || 
-					largestCollateralValue.isLessThanOrEqualTo(10000) || 
+					!largestCollateralValue ||
+					largestCollateralValue.isLessThanOrEqualTo(10000) ||
 					largestCollateralValue.isNaN()) continue
 
 				// todo Make sure that the max repayable is less than the debt
@@ -467,6 +473,7 @@ export class RedbankExecutor extends BaseExecutor {
 						.filter((route) => this.ammRouter.getOutput(collateralAmount, route).isGreaterThan(100000))
 						.pop()
 
+
 					if (bestRoute) {
 						// allow for 2.5% slippage from what we estimated
 						const minOutput = this.ammRouter
@@ -578,9 +585,37 @@ export class RedbankExecutor extends BaseExecutor {
 			throw new Error("Instantiate your clients before calling 'run()'")
 
 		await this.refreshData()
-
+		const collateralsBefore: Collateral[] = await this.queryClient?.queryContractSmart(
+			this.config.redbankAddress,
+			{ user_collaterals: { user: liquidatorAddress } },
+		)
+		console.log(JSON.stringify(collateralsBefore))
+		if (collateralsBefore.length > 0) {
+			await this.liquidateCollaterals(
+				liquidatorAddress,
+				collateralsBefore
+			)
+		}
 		console.log('Checking for liquidations')
-		const positions: Position[] = await this.redis.popUnhealthyPositions<Position>(Number(process.env.POSITION_BATCH_SIZE) || 1)
+		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/redbank`
+		const response = await fetch(url);
+		let positionObjects: {
+			account_id: string,
+			health_factor: string,
+			total_debt: string
+		}[] = (await response.json())['positions']
+
+		let positions: Position[] = positionObjects
+			.filter(position =>
+					Number(position.health_factor) < 0.97 &&
+					Number(position.health_factor) > 0.3 &&
+					position.total_debt.length > 5)
+			.sort((a, b) => Number(a.total_debt) - Number(b.total_debt))
+			.map((positionObject) => {
+				return {
+					Identifier: positionObject.account_id,
+				}
+			})
 
 		if (positions.length == 0) {
 			//sleep to avoid spamming redis db when empty
@@ -588,14 +623,12 @@ export class RedbankExecutor extends BaseExecutor {
 			console.log(' - No items for liquidation yet')
 			return
 		}
-		const collateralsBefore: Collateral[] = await this.queryClient?.queryContractSmart(
-			this.config.redbankAddress,
-			{ user_collaterals: { user: liquidatorAddress } },
-		)
 
-		console.log({
-			collateralsBefore: JSON.stringify(collateralsBefore)
-		})
+		// TODO: support multiple liquidations like we do with rover
+		positions = [positions.pop()!]
+
+		console.log(JSON.stringify(positions))
+
 		// Fetch position data
 		const positionData: DataResponse[] = await fetchRedbankBatch(
 			positions,
@@ -608,8 +641,6 @@ export class RedbankExecutor extends BaseExecutor {
 		const { txs, debtsToRepay } = this.produceLiquidationTxs(positionData)
 		const debtCoins: Coin[] = []
 		debtsToRepay.forEach((amount, denom) => debtCoins.push({ denom, amount: amount.toFixed(0) }))
-
-		console.log(`- ${txs.length} positions to be liquidated.`)
 		// deposit any neutral in our account before starting liquidations
 		const firstMsgBatch: EncodeObject[] = []
 		this.appendSwapToDebtMessages(
@@ -650,22 +681,9 @@ export class RedbankExecutor extends BaseExecutor {
 			{ user_collaterals: { user: liquidatorAddress } },
 		)
 
-		// second block of transactions
-		let secondBatch: EncodeObject[] = []
-
-		const balances = await this.client?.getAllBalances(liquidatorAddress)
-
-		const combinedCoins = this.combineBalances(collaterals, balances!)
-
-		this.appendWithdrawMessages(collaterals, liquidatorAddress, secondBatch)
-
-		this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, secondBatch)
-		const secondFee = this.config.chainName.toLowerCase() === "osmosis" ? await this.getOsmosisFee(secondBatch, this.config.liquidatorMasterAddress) : 'auto'
-
-		await this.client.signAndBroadcast(
-			this.config.liquidatorMasterAddress,
-			secondBatch,
-			secondFee,
+		await this.liquidateCollaterals(
+			liquidatorAddress,
+			collaterals
 		)
 
 		await this.setBalances(liquidatorAddress)
@@ -688,6 +706,27 @@ export class RedbankExecutor extends BaseExecutor {
 		if (this.config.logResults) {
 			this.writeCsv()
 		}
+	}
+
+	async liquidateCollaterals(liquidatorAddress: string, collaterals: Collateral[]) {
+		let secondBatch: EncodeObject[] = []
+
+		const balances = await this.client?.getAllBalances(liquidatorAddress)
+
+		const combinedCoins = this.combineBalances(collaterals, balances!)
+
+		this.appendWithdrawMessages(collaterals, liquidatorAddress, secondBatch)
+
+		this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, secondBatch)
+		const secondFee = this.config.chainName.toLowerCase() === "osmosis" 
+			? await this.getOsmosisFee(secondBatch, this.config.liquidatorMasterAddress)
+			: 'auto'
+
+		await this.client.signAndBroadcast(
+			this.config.liquidatorMasterAddress,
+			secondBatch,
+			secondFee,
+		)
 	}
 
 	combineBalances(collaterals: Collateral[], balances: readonly Coin[]): Coin[] {
