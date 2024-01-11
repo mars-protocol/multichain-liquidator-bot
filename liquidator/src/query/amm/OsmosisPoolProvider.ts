@@ -19,7 +19,6 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 					`${this.lcdEndpoint}/osmosis/poolmanager/v1beta1/all-pools`,
 				)
 				const responseJson: any = await response.json()
-	
 				// clear any residual pools from errored attemps etc
 				pools = []
 
@@ -34,7 +33,13 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 						result.token0 = result.poolAssets[0].token.denom
 						result.token1 = result.poolAssets[1].token.denom
 						result.swapFee = data.pool_params.swap_fee
-						pools.push(result)
+
+						// Currently don't use xyk for redbank
+						if (process.env.EXECUTOR_TYPE?.toLowerCase() !== "redbank") {
+							// TODO: fix xyk for certain pools
+							pools.push(result)
+						}
+
 					} else if (data['@type'] === '/osmosis.gamm.poolmodels.stableswap.v1beta1.Pool') {
 						const result = JSON.parse(JSON.stringify(camelCaseKeys(data))) as StableswapPool
 						result.poolType = PoolType.STABLESWAP
@@ -43,12 +48,11 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 						pools.push(result)
 					}
 				  });
-	
 				fetched = true
 			} catch {
 				retryCount++
 				console.log('retrying fetch')
-			}		
+			}
 		}
 
 		// append tick data.
@@ -78,7 +82,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 				currentSqrtPrice: new BigDec(pool.currentSqrtPrice),
 				currentTickLiquidity: new Dec(pool.currentTickLiquidity)
 				}).boundTickIndex
-	
+
 			const initialMaxTick = estimateInitialTickBound({
 				specifiedToken: {
 					denom: pool.token1,
@@ -128,7 +132,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 		} catch (ex) {
 			console.error(ex)
 		}
-		
+
 		return {depths: [], currentTick: new Int(0)}
 	}
 
