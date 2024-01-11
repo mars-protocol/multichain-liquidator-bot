@@ -262,7 +262,6 @@ export class RoverExecutor extends BaseExecutor {
 			(account) =>
 				Number(account.health_factor) < 0.96 &&
 				Number(account.health_factor) > 0.3 &&
-				account.account_id === "9656" &&
 				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountA.total_debt) - Number(accountB.total_debt))
