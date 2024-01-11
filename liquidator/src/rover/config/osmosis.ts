@@ -20,12 +20,13 @@ export const getConfig = (
 			marsParamsAddress: process.env.MARS_PARAMS_ADDRESS || 'osmo1nlmdxt9ctql2jr47qd4fpgzg84cjswxyw6q99u4y4u4q6c2f5ksq7ysent',
 			creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS || 'osmo1f2m24wktq0sw3c0lexlg7fv4kngwyttvzws3a3r3al9ld2s2pvds87jqvf',
 			liquidatorMasterAddress: liquidatorMasterAddress,
-			minGasTokens: 100000,
+			minGasTokens: 1000000,
 			logResults: false,
 			redisEndpoint: process.env.REDIS_ENDPOINT || '', // recommend using local
 			poolsRefreshWindow: 60000,
-			maxLiquidators: 2,
-			stableBalanceThreshold: 5000000
+			maxLiquidators: 10,
+			stableBalanceThreshold: 5000000,
+			marsEndpoint: "https://api.marsprotocol.io"
 		}
 	}
 
