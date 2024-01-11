@@ -16,13 +16,14 @@ export const getConfig = (
 				hiveEndpoint: process.env.HIVE_ENDPOINT!,
 				liquidatorMasterAddress: liquidatorMasterAddress,
 				logResults: false, // enable for debugging
-				neutralAssetDenom: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858',
+				neutralAssetDenom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4',
 				oracleAddress: 'osmo1mhznfr60vjdp2gejhyv2gax9nvyyzhd3z0qcwseyetkfustjauzqycsy2g',
 				marsParamsAddress: process.env.MARS_PARAMS_ADDRESS || 'osmo1nlmdxt9ctql2jr47qd4fpgzg84cjswxyw6q99u4y4u4q6c2f5ksq7ysent',
 				redbankAddress: 'osmo1c3ljch9dfw5kf52nfwpxd2zmj2ese7agnx0p9tenkrryasrle5sqf3ftpg',
 				redisEndpoint: process.env.REDIS_ENDPOINT!,
 				poolsRefreshWindow: 60000,
-				liquidationProfitMarginPercent: 0.01
+				liquidationProfitMarginPercent: 0.01,
+				marsEndpoint: "https://api.marsprotocol.io"
 		  }
 		: {
 				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],

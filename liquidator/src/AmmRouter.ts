@@ -101,7 +101,6 @@ export class AMMRouter implements AMMRouterInterface {
 						const inittedTicks = tokenIn.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
 						const curSqrtPrice = new BigDec(clPool.currentSqrtPrice)
 						const swapFee = new Dec(clPool.swapFee)
-						 
 						const result = ConcentratedLiquidityMath.calcOutGivenIn({
 							tokenIn,
 							tokenDenom0,
@@ -112,12 +111,11 @@ export class AMMRouter implements AMMRouterInterface {
 						});
 
 						if (result === "no-more-ticks") {
-							tokenInAmount = new BigNumber(0)
-							break
+							throw new Error('no more ticks');
 						}
 
 						const { amountOut } = result
-						amountAfterFees = new BigNumber(amountOut.toString())						
+						amountAfterFees = new BigNumber(amountOut.toString())
 						if (amountAfterFees.isLessThanOrEqualTo(0)) {
 							throw new Error('amount in after fees is less than 0')
 						}
@@ -217,12 +215,10 @@ export class AMMRouter implements AMMRouterInterface {
 						const curSqrtPrice = new BigDec(clPool.currentSqrtPrice)
 						const swapFee = new Dec(clPool.swapFee)
 
-						
 						if (inittedTicks.length === 0) {
-							tokenOutRequired = new BigNumber(0)
+							tokenOutRequired = new BigNumber(10000000000000000)
 							break
 						}
-					
 						const result = ConcentratedLiquidityMath.calcInGivenOut({
 							tokenOut,
 							tokenDenom0,
@@ -235,9 +231,9 @@ export class AMMRouter implements AMMRouterInterface {
 
 						if (result === "no-more-ticks") {
 							console.log('no more ticks')
-							tokenOutRequired = new BigNumber(0)
+							tokenOutRequired = new BigNumber(10000000000000)
 							break
-						} 
+						}
 
 
 						const { amountIn } = result
@@ -277,13 +273,11 @@ export class AMMRouter implements AMMRouterInterface {
 
 						// tokenOutRequired = new BigNumber(ssInGivenOutIncludingFees.toString())
 						throw new Error('stableswap not implemented')
-						
 				}
 			})
 		} catch (ex) {
 			return new BigNumber(100000000000000000000)
 		}
-		
 
 		return amountAfterFees
 	}
@@ -301,12 +295,16 @@ export class AMMRouter implements AMMRouterInterface {
 
 	getRouteWithHighestOutput(amountIn: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
-			.filter(route => this.getOutput(amountIn, route).isGreaterThan(0))
+			.filter(route => this.getOutput(amountIn, route).isGreaterThan(0) && route.length <=1)
 			.sort((routeA, routeB) => {
+				if (routeA.length < routeB.length) {
+					return 1
+				}
 				const routeAReturns = this.getOutput(amountIn, routeA)
 				const routeBReturns = this.getOutput(amountIn, routeB)
 				return routeBReturns.minus(routeAReturns).toNumber()
 			})
+			.reverse()
 			.pop()
 		return bestRoute || []
 	}
@@ -352,7 +350,7 @@ export class AMMRouter implements AMMRouterInterface {
 
 		const completeRoutes : RouteHop[][]= []
 		let routesInProgress : RouteHop[][] = []
-		let maxRoutteLength = 3
+		let maxRoutteLength = 2
 
 		// all pairs that have our sell asset
 		const startingPairs = pools.filter((pool) => 

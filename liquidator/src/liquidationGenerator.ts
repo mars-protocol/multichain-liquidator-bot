@@ -13,9 +13,9 @@ const sortAssetArrayByAmount = (
 		.sort((a: AssetResponse, b: AssetResponse) =>
 			new BigNumber(a.amount)
 				.multipliedBy(prices.get(a.denom) || 0)
-				.minus(b.amount)
+				.minus(new BigNumber(b.amount).multipliedBy(prices.get(b.denom) || 0))
 				.toNumber(),
-		)
+		).reverse()
 }
 
 export const getLargestCollateral = (

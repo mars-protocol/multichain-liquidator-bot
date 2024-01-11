@@ -24,7 +24,6 @@ import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface'
 import { QueryMsg, VaultConfigBaseForString } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types'
 
-
 interface CreateCreditAccountResponse {
 	tokenId : number
 	liquidatorAddress : string
@@ -38,6 +37,7 @@ export interface RoverExecutorConfig extends BaseExecutorConfig {
 	maxLiquidators: number
 	stableBalanceThreshold : number
 }
+
 export class RoverExecutor extends BaseExecutor {
 	private VAULT_RELOAD_WINDOW = 1800000
 	public config: RoverExecutorConfig
@@ -76,7 +76,6 @@ export class RoverExecutor extends BaseExecutor {
 
 		// set up accounts
 		const accounts = await this.wallet.getAccounts()
-
 		// get liquidator addresses
 		const liquidatorAddresses: string[] = accounts
 			.slice(1, this.config.maxLiquidators + 1)
@@ -84,12 +83,12 @@ export class RoverExecutor extends BaseExecutor {
 
 		// initiate our wallets (in case they are not)
 		await this.topUpWallets(liquidatorAddresses)
-		
+		console.log('topped up wallets')
 		// Fetch or create our credit accounts for each address
 
 		const createCreditAccountpromises : Promise<CreateCreditAccountResponse>[] = []
 		liquidatorAddresses.map((address)=> createCreditAccountpromises.push(this.createCreditAccount(address)))
-		
+
 		const results : CreateCreditAccountResponse[] = await Promise.all(createCreditAccountpromises)
 		results.forEach((result)=>this.liquidatorAccounts.set(result.liquidatorAddress, result.tokenId))
 
@@ -105,8 +104,6 @@ export class RoverExecutor extends BaseExecutor {
 			await this.run()
 		}
 	}
-
-	
 	updateLiquidatorBalances = async () => {
 		const liquidatorAddresses = Array.from(this.liquidatorAccounts.keys())
 		await this.topUpWallets(liquidatorAddresses)
@@ -117,26 +114,24 @@ export class RoverExecutor extends BaseExecutor {
 			const balances = await fetchBalances(this.config.hiveEndpoint, addresses)
 			this.liquidatorBalances= balances
 			const sendMsgs : MsgSendEncodeObject[] = []
-			
 			const amountToSend = this.config.minGasTokens * 2
-	
 			for (const address of Array.from(balances.keys())) {
 				const osmoBalance = Number(balances.get(address)?.find((coin : Coin) => coin.denom === this.config.gasDenom)?.amount || 0)
-	
+
 				if (osmoBalance === undefined || osmoBalance < this.config.minGasTokens) {
 					// send message to send gas tokens to our liquidator
 					sendMsgs.push(produceSendMessage(this.config.liquidatorMasterAddress,address, [{denom: this.config.gasDenom, amount : amountToSend.toFixed(0)}]))
 				}
 			}
-	
+
 			if (sendMsgs.length > 0) {
-				await this.client.signAndBroadcast(this.config.liquidatorMasterAddress, sendMsgs, 'auto')
+				const fee = await this.getOsmosisFee(sendMsgs, this.config.liquidatorMasterAddress)
+				await this.client.signAndBroadcast(this.config.liquidatorMasterAddress, sendMsgs, fee)
 				console.log(`topped up ${sendMsgs.length} wallets`)
 			}
 		} catch(ex) {
 			console.error(JSON.stringify(ex))
 		}
-		
 	}
 
 	fetchVaults = async () => {
@@ -254,8 +249,24 @@ export class RoverExecutor extends BaseExecutor {
 	run = async () => {
 
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-		const targetAccounts : string[] = await this.redis.popUnhealthyPositions<string>(this.config.maxLiquidators-1)
+		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/creditmanager`
 
+		const response = await fetch(url);
+		let targetAccountObjects: {
+			account_id: string,
+			health_factor: string,
+			total_debt: string
+		}[] = (await response.json())['positions']
+
+		const  targetAccounts = targetAccountObjects.filter(
+			(account) =>
+				Number(account.health_factor) < 0.96 &&
+				Number(account.health_factor) > 0.3 &&
+				account.total_debt.length > 3
+			)
+			.sort((accountA, accountB)=> Number(accountA.total_debt) - Number(accountB.total_debt))
+			.map((account)=> account.account_id)
+			.slice(0, this.config.maxLiquidators)
 
 		// Sleep to avoid spamming redis db when empty.
 		if (targetAccounts.length == 0) {
@@ -263,7 +274,7 @@ export class RoverExecutor extends BaseExecutor {
 			return
 		}
 
-		// Dispatch our liquidations 
+		// Dispatch our liquidations
 		const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
 		const liquidationPromises : Promise<void>[] = []
 		for (const targetAccount of targetAccounts) {
@@ -276,6 +287,7 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
+		console.log('liquidating: ', accountId )
 		const roverPosition = await fetchRoverPosition(
 			accountId,
 			this.config.creditManagerAddress,
@@ -308,7 +320,7 @@ export class RoverExecutor extends BaseExecutor {
 
 		// variables
 		const { borrow } = borrowActions[0] as { borrow: Coin }
-		const swapWinnings = (bestDebt.amount * this.prices.get(bestDebt.denom)!) > 1000000
+		const swapWinnings = (bestDebt.amount * this.prices.get(bestDebt.denom)!) > 10000000
 		const slippage =  process.env.SLIPPAGE ||  '0.005'
 
 		const liquidateMessage = this.liquidationActionGenerator.produceLiquidationAction(
@@ -340,7 +352,7 @@ export class RoverExecutor extends BaseExecutor {
 				? this.liquidationActionGenerator.generateSwapActions(
 						borrow.denom,
 						this.config.neutralAssetDenom,
-						'10000000',
+						'1000000',
 						slippage
 				  )
 				: []
@@ -401,7 +413,7 @@ export class RoverExecutor extends BaseExecutor {
 		const largestLend = lends
 			.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
 			.pop()
-		
+
 		const largestCollateralCoin = this.calculateCoinValue(largestDeposit) > this.calculateCoinValue(largestLend) 
 			? largestDeposit
 			: largestLend
@@ -505,7 +517,7 @@ export class RoverExecutor extends BaseExecutor {
 		let vaultType: VaultPositionType = safeLocked.isGreaterThan(safeUnlocked)
 			? 'l_o_c_k_e_d'
 			: 'u_n_l_o_c_k_e_d'
-		
+
 		const largestVaultValue = this.calculateVaultSharesValue(vaultAmount, vault.vault.address)
 
 		const largestUnlockingValue = largestUnlocking

@@ -29,6 +29,7 @@ export interface BaseExecutorConfig {
 	poolsRefreshWindow: number
 	astroportFactory?: string
 	astroportRouter?: string
+	marsEndpoint?: string
 }
 
 /**
@@ -211,13 +212,13 @@ export class BaseExecutor {
 			throw new Error(
 				'Stargate Client is undefined, ensure you call initiate at before calling this method',
 			)
-
 		const gasPriceRequest = await fetch("https://lcd.osmosis.zone/osmosis/txfees/v1beta1/cur_eip_base_fee")
 		const { base_fee: baseFee } = await gasPriceRequest.json()
 		const gasEstimated = await this.client.simulate(address, msgs, '')
 		const gas = Number(gasEstimated * 1.3)
 		const gasPrice = Number(baseFee)
-		const amount = coins((gas * gasPrice).toFixed(0), this.config.gasDenom)
+		const safeGasPrice = gasPrice < 0.025 ? 0.05 : gasPrice
+		const amount = coins(((gas * safeGasPrice)+1).toFixed(0), this.config.gasDenom)
 		const fee = {
 			amount,
 			gas: gas.toFixed(0),
