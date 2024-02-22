@@ -60,8 +60,11 @@ export class LiquidationActionGenerator {
 		creditLines: UserDebtResponse[],
 		creditLineCaps: UncollateralizedLoanLimitResponse[],
 	): Action[] => {
+
+		if (false) console.log(creditLines, creditLineCaps)
+
 		// estimate our debt to repay - this depends on collateral amount and close factor
-		const maxRepayValue = collateral.value * collateral.closeFactor
+		const maxRepayValue = (collateral.value * collateral.closeFactor) / 2
 		const maxDebtValue = debt.amount * debt.price
 		const debtToRepayRatio = maxDebtValue <= maxRepayValue ? 1 : maxRepayValue / maxDebtValue
 
@@ -75,22 +78,22 @@ export class LiquidationActionGenerator {
 
 		// if asset is not enabled, or we have less than 50% the required liquidity, do alternative borrow
 		const marketInfo: MarketInfo | undefined = markets.find((market) => market.denom === debt.denom)
-		const creditLine: UserDebtResponse | undefined = creditLines.find(
-			(creditLine) => creditLine.uncollateralized && debt.denom === creditLine.denom,
-		)
-		const creditLineCap: UncollateralizedLoanLimitResponse | undefined = creditLineCaps.find(
-			(creditLineCap) => creditLineCap.denom == debt.denom,
-		)
+		// const creditLine: UserDebtResponse | undefined = creditLines.find(
+		// 	(creditLine) => creditLine.uncollateralized && debt.denom === creditLine.denom,
+		// )
+		// const creditLineCap: UncollateralizedLoanLimitResponse | undefined = creditLineCaps.find(
+		// 	(creditLineCap) => creditLineCap.denom == debt.denom,
+		// )
 
-		const remainingCreditLine =
-			creditLineCap && creditLine
-				? BigNumber(creditLineCap.limit).minus(creditLine.amount)
-				: new BigNumber(0)
+		// const remainingCreditLine =
+		// 	creditLineCap && creditLine
+		// 		? BigNumber(creditLineCap.limit).minus(creditLine.amount)
+		// 		: new BigNumber(0)
 		if (
 			!marketInfo ||
 			// TODO - check if asset is whitelisted
 			// !whitelistedAssets.find((denom) => denom === debt.denom) ||
-			remainingCreditLine.dividedBy(2).isLessThan(debtAmount) ||
+			// remainingCreditLine.dividedBy(2).isLessThan(debtAmount) ||
 			marketInfo.available_liquidity / debtAmount < 0.5
 		) {
 			return this.borrowWithoutLiquidity(debtCoin, markets, whitelistedAssets)
@@ -186,7 +189,7 @@ export class LiquidationActionGenerator {
 
 		const bestRoute = this.router.getBestRouteGivenOutput(bestMarket.denom, debtdenom, debtAmount)
 
-		if (bestRoute.length === 0) throw new Error(NO_ROUTE_FOR_SWAP)
+		if (bestRoute.length === 0) throw new Error(`${NO_ROUTE_FOR_SWAP}. ${bestMarket.denom} -> ${debtdenom}`)
 
 		const inputRequired = this.router.getRequiredInput(debtAmount, bestRoute)
 		// cap borrow to be under market liquidity
@@ -266,8 +269,9 @@ export class LiquidationActionGenerator {
 	): Action[] => {
 		const bnOut = new BigNumber(outAmount)
 
-		const swapperPools : number[] = this.getAvailablePools() 
-		const usablePools = this.router.getPools().filter((pool)=> swapperPools.indexOf(Number(pool.id)) !== -1)
+		const swapperPools : number[] = this.getAvailablePools()
+
+		const usablePools = this.router.getPools().filter((pool) => swapperPools.indexOf(Number(pool.id)) !== -1)
 
 		this.router.setPools(usablePools)
 
@@ -276,10 +280,7 @@ export class LiquidationActionGenerator {
 		const enabledRoutes = routes.filter((route) => this.isViableRoute(route))
 		const route = this.router.getRouteWithLowestInput(bnOut, enabledRoutes)
 
-		if (route.length === 0) throw new Error(NO_ROUTE_FOR_SWAP)
-
-
-		
+		if (route.length === 0) throw new Error(`${NO_ROUTE_FOR_SWAP}. ${assetInDenom} -> ${assetOutDenom}`)
 
 		return route.map((hop: RouteHop) =>
 			this.produceSwapAction(hop.tokenInDenom, hop.tokenOutDenom, slippage),

@@ -60,9 +60,8 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 					.filter(pool => pool.poolType === PoolType.CONCENTRATED_LIQUIDITY)
 					.map(pool => this.fetchTickData(pool as ConcentratedLiquidityPool))
 				)
-
 		return pools.filter(pool => (
-			pool.poolType !== PoolType.CONCENTRATED_LIQUIDITY) || 
+			pool.poolType !== PoolType.CONCENTRATED_LIQUIDITY) ||
 			((pool as ConcentratedLiquidityPool).liquidityDepths?.zeroToOne.length > 0 &&
 			(pool as ConcentratedLiquidityPool).liquidityDepths?.oneToZero.length > 0)
 		)}
@@ -74,7 +73,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 			const initialMinTick = estimateInitialTickBound({
 				specifiedToken: {
 					denom: pool.token0,
-					amount: new Int("1000")
+					amount: new Int("100")
 				},
 				isOutGivenIn: true,
 				token0Denom: pool.token0,
@@ -86,7 +85,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 			const initialMaxTick = estimateInitialTickBound({
 				specifiedToken: {
 					denom: pool.token1,
-					amount: new Int("1000")
+					amount: new Int("100")
 				},
 				isOutGivenIn: true,
 				token0Denom: pool.token0,

@@ -78,7 +78,7 @@ export class RoverExecutor extends BaseExecutor {
 		const accounts = await this.wallet.getAccounts()
 		// get liquidator addresses
 		const liquidatorAddresses: string[] = accounts
-			.slice(1, this.config.maxLiquidators + 1)
+			.slice(2, this.config.maxLiquidators + 2)
 			.map((account) => account.address)
 
 		// initiate our wallets (in case they are not)
@@ -256,15 +256,15 @@ export class RoverExecutor extends BaseExecutor {
 			account_id: string,
 			health_factor: string,
 			total_debt: string
-		}[] = (await response.json())['positions']
-
+		}[] = (await response.json())['data']
 		const  targetAccounts = targetAccountObjects.filter(
 			(account) =>
-				Number(account.health_factor) < 0.96 &&
+				Number(account.health_factor) < 0.97 &&
+				// account.account_id === "11510" &&
 				Number(account.health_factor) > 0.3 &&
-				account.total_debt.length > 3
+				account.total_debt.length > 4
 			)
-			.sort((accountA, accountB)=> Number(accountA.total_debt) - Number(accountB.total_debt))
+			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
 			.map((account)=> account.account_id)
 			.slice(0, this.config.maxLiquidators)
 
@@ -283,7 +283,7 @@ export class RoverExecutor extends BaseExecutor {
 			liquidationPromises.push(this.liquidate(targetAccount, liquidatorAddress))
 		}
 
-		await Promise.all(liquidationPromises)
+		await Promise.allSettled(liquidationPromises)
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
@@ -366,6 +366,8 @@ export class RoverExecutor extends BaseExecutor {
 			...swapToStableMsg,
 			refundAll,
 		]
+
+		// actions.forEach((action) => console.log(JSON.stringify(action)))
 
 		const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
 		const msg = {

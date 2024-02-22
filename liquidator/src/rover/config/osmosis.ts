@@ -11,6 +11,8 @@ export const getConfig = (
 			chainName: "osmosis",
 			hiveEndpoint: process.env.HIVE_ENDPOINT!,
 			lcdEndpoint: process.env.LCD_ENDPOINT!,
+			//neutralAssetDenom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4', 
+			
 			neutralAssetDenom: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858', 
 			swapperAddress: process.env.SWAPPER_ADDRESS || 'osmo1wee0z8c7tcawyl647eapqs4a88q8jpa7ddy6nn2nrs7t47p2zhxswetwla',
 			oracleAddress: process.env.ORACLE_ADDRESS || 'osmo1mhznfr60vjdp2gejhyv2gax9nvyyzhd3z0qcwseyetkfustjauzqycsy2g',
