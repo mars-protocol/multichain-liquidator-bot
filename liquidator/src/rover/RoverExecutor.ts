@@ -70,7 +70,6 @@ export class RoverExecutor extends BaseExecutor {
 
 	// Entry to rover executor
 	start = async () => {
-		await this.initiateRedis()
 		await this.initiateAstroportPoolProvider()
 		await this.refreshData()
 
@@ -260,7 +259,7 @@ export class RoverExecutor extends BaseExecutor {
 		const  targetAccounts = targetAccountObjects.filter(
 			(account) =>
 				Number(account.health_factor) < 0.97 &&
-				// account.account_id === "11510" &&
+				account.account_id === "8496" &&
 				Number(account.health_factor) > 0.3 &&
 				account.total_debt.length > 4
 			)
@@ -270,7 +269,7 @@ export class RoverExecutor extends BaseExecutor {
 
 		// Sleep to avoid spamming redis db when empty.
 		if (targetAccounts.length == 0) {
-			await sleep(200)
+			await sleep(2000)
 			return
 		}
 
@@ -283,7 +282,8 @@ export class RoverExecutor extends BaseExecutor {
 			liquidationPromises.push(this.liquidate(targetAccount, liquidatorAddress))
 		}
 
-		await Promise.allSettled(liquidationPromises)
+		await Promise.all(liquidationPromises)
+		await sleep(200000)
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
@@ -366,9 +366,7 @@ export class RoverExecutor extends BaseExecutor {
 			...swapToStableMsg,
 			refundAll,
 		]
-
-		// actions.forEach((action) => console.log(JSON.stringify(action)))
-
+		
 		const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
 		const msg = {
 			update_credit_account: { account_id: liquidatorAccountId, actions },

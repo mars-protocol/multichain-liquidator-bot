@@ -24,7 +24,6 @@ export const getConfig = (
 			liquidatorMasterAddress: liquidatorMasterAddress,
 			minGasTokens: 1000000,
 			logResults: false,
-			redisEndpoint: process.env.REDIS_ENDPOINT || '', // recommend using local
 			poolsRefreshWindow: 60000,
 			maxLiquidators: 10,
 			stableBalanceThreshold: 5000000,
@@ -48,7 +47,6 @@ export const getConfig = (
 		liquidatorMasterAddress: liquidatorMasterAddress,
 		minGasTokens: 10000000,
 		logResults: false,
-		redisEndpoint: process.env.REDIS_ENDPOINT || '', // recommend using local
 		poolsRefreshWindow: 60000,
 		maxLiquidators: 100,
 		stableBalanceThreshold : 5000000

@@ -1,7 +1,6 @@
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { Coin, EncodeObject, coins } from '@cosmjs/proto-signing'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { RedisInterface } from './redis.js'
 import { AMMRouter } from './AmmRouter.js'
 import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from "./types/Pool"
 import 'dotenv/config.js'
@@ -25,7 +24,6 @@ export interface BaseExecutorConfig {
 	gasDenom: string
 	neutralAssetDenom: string
 	logResults: boolean
-	redisEndpoint: string
 	poolsRefreshWindow: number
 	astroportFactory?: string
 	astroportRouter?: string
@@ -61,14 +59,9 @@ export class BaseExecutor {
 		public client: SigningStargateClient,
 		public queryClient: CosmWasmClient,
 		private poolProvider: PoolDataProviderInterface,
-		public redis : RedisInterface = new RedisInterface(),
 		public ammRouter : AMMRouter = new AMMRouter()
 	) {
 		console.log({config})
-	}
-
-	async initiateRedis(): Promise<void> {
-		await this.redis.connect(this.config.redisEndpoint)
 	}
 
 	async initiateAstroportPoolProvider(): Promise<void> {

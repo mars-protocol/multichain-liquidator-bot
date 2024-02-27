@@ -6,7 +6,7 @@ import { BigDec, LiquidityDepth, estimateInitialTickBound, } from "@osmosis-labs
 
 export class OsmosisPoolProvider implements PoolDataProviderInterface {
 
-    constructor(private lcdEndpoint: string) {}
+    constructor(private lcdEndpoint: string, private apiKey: string) {}
 
     loadPools = async (): Promise<Pool[]> => {
 		let fetched = false
@@ -16,7 +16,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 		while (!fetched && retryCount < 5) {
 			try {
 				const response = await fetch(
-					`${this.lcdEndpoint}/osmosis/poolmanager/v1beta1/all-pools`,
+					`${this.lcdEndpoint}/osmosis/poolmanager/v1beta1/all-pools?x-apikey=${this.apiKey}`,
 				)
 				const responseJson: any = await response.json()
 				// clear any residual pools from errored attemps etc
@@ -95,8 +95,8 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 				}).boundTickIndex
 	
 			// need to fetch token in and token out
-			const zeroToOneTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token0}&use_cur_tick=true&bound_tick=${initialMinTick.valueOf().toString()}`
-			const oneToZeroTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token1}&use_cur_tick=true&bound_tick=${initialMaxTick.valueOf().toString()}`
+			const zeroToOneTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token0}&use_cur_tick=true&bound_tick=${initialMinTick.valueOf().toString()}&x-apikey=${this.apiKey}`
+			const oneToZeroTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token1}&use_cur_tick=true&bound_tick=${initialMaxTick.valueOf().toString()}&x-apikey=${this.apiKey}`
 			const { depths: zeroToOneTicks } = await this.fetchDepths(zeroToOneTicksUrl)
 
 			const {depths: oneToZeroTicks } = await this.fetchDepths(oneToZeroTicksUrl)

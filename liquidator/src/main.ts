@@ -30,7 +30,7 @@ export const main = async () => {
 	// produce paths for the number of addresses we want under our seed
 	const addressCount = process.env.MAX_LIQUIDATORS || 1
 	const chainName = process.env.CHAIN_NAME!
-	const prefix = process.env.PREFIX!
+	const prefix = process.env.CHAIN_PREFIX!
 	const hdPaths: HdPath[] = []
 
 	while (hdPaths.length < Number(addressCount)) {
@@ -74,7 +74,7 @@ export const main = async () => {
 const getPoolProvider = (chainName: string, config: BaseExecutorConfig) : PoolDataProviderInterface => {
 	switch (chainName) {
 		case "osmosis":
-			return new OsmosisPoolProvider(process.env.LCD_ENDPOINT!)
+			return new OsmosisPoolProvider(process.env.LCD_ENDPOINT!, process.env.API_KEY!)
 		case "neutron":
 
 			return new AstroportPoolProvider(config.astroportFactory!, process.env.HIVE_ENDPOINT!)
