@@ -350,10 +350,10 @@ export class AMMRouter implements AMMRouterInterface {
 
 		const completeRoutes : RouteHop[][]= []
 		let routesInProgress : RouteHop[][] = []
-		let maxRoutteLength = 2
+		let maxRoutteLength = 3
 
 		// all pairs that have our sell asset
-		const startingPairs = pools.filter((pool) => 
+		const startingPairs = pools.filter((pool) =>
 			pool.token0 === tokenInDenom || pool.token1 === tokenInDenom)
 
 		// create routes for each possible starting pair
@@ -417,7 +417,6 @@ export class AMMRouter implements AMMRouterInterface {
 			routesInProgress = updatedRoutes
 		}
 
-	
 		return completeRoutes
 	}
 

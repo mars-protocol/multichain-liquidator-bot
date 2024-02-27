@@ -6,7 +6,7 @@ import { BigDec, LiquidityDepth, estimateInitialTickBound, } from "@osmosis-labs
 
 export class OsmosisPoolProvider implements PoolDataProviderInterface {
 
-    constructor(private lcdEndpoint: string) {}
+    constructor(private lcdEndpoint: string, private apiKey: string) {}
 
     loadPools = async (): Promise<Pool[]> => {
 		let fetched = false
@@ -16,7 +16,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 		while (!fetched && retryCount < 5) {
 			try {
 				const response = await fetch(
-					`${this.lcdEndpoint}/osmosis/poolmanager/v1beta1/all-pools`,
+					`${this.lcdEndpoint}/osmosis/poolmanager/v1beta1/all-pools?x-apikey=${this.apiKey}`,
 				)
 				const responseJson: any = await response.json()
 				// clear any residual pools from errored attemps etc
@@ -60,9 +60,8 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 					.filter(pool => pool.poolType === PoolType.CONCENTRATED_LIQUIDITY)
 					.map(pool => this.fetchTickData(pool as ConcentratedLiquidityPool))
 				)
-
 		return pools.filter(pool => (
-			pool.poolType !== PoolType.CONCENTRATED_LIQUIDITY) || 
+			pool.poolType !== PoolType.CONCENTRATED_LIQUIDITY) ||
 			((pool as ConcentratedLiquidityPool).liquidityDepths?.zeroToOne.length > 0 &&
 			(pool as ConcentratedLiquidityPool).liquidityDepths?.oneToZero.length > 0)
 		)}
@@ -74,7 +73,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 			const initialMinTick = estimateInitialTickBound({
 				specifiedToken: {
 					denom: pool.token0,
-					amount: new Int("1000")
+					amount: new Int("100")
 				},
 				isOutGivenIn: true,
 				token0Denom: pool.token0,
@@ -86,7 +85,7 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 			const initialMaxTick = estimateInitialTickBound({
 				specifiedToken: {
 					denom: pool.token1,
-					amount: new Int("1000")
+					amount: new Int("100")
 				},
 				isOutGivenIn: true,
 				token0Denom: pool.token0,
@@ -96,8 +95,8 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 				}).boundTickIndex
 	
 			// need to fetch token in and token out
-			const zeroToOneTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token0}&use_cur_tick=true&bound_tick=${initialMinTick.valueOf().toString()}`
-			const oneToZeroTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token1}&use_cur_tick=true&bound_tick=${initialMaxTick.valueOf().toString()}`
+			const zeroToOneTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token0}&use_cur_tick=true&bound_tick=${initialMinTick.valueOf().toString()}&x-apikey=${this.apiKey}`
+			const oneToZeroTicksUrl = `${this.lcdEndpoint}/osmosis/concentratedliquidity/v1beta1/liquidity_net_in_direction?pool_id=${pool.id}&token_in=${pool.token1}&use_cur_tick=true&bound_tick=${initialMaxTick.valueOf().toString()}&x-apikey=${this.apiKey}`
 			const { depths: zeroToOneTicks } = await this.fetchDepths(zeroToOneTicksUrl)
 
 			const {depths: oneToZeroTicks } = await this.fetchDepths(oneToZeroTicksUrl)

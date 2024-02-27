@@ -2,8 +2,7 @@
 
 The Liquidator service is responsible for handling liquidations of unhealthy positions.
 
-Unhealthy positions are flagged by the health checker and placed into the Liqudidation queue redis list,
-which the liquidator pulls from to liquidate.
+Unhealthy positions are pulled from the mars protocol api
 
 ## Redbank
 

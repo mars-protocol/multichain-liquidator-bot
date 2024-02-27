@@ -75,7 +75,6 @@ export class RedbankExecutor extends BaseExecutor {
 	}
 
 	async start() {
-		await this.initiateRedis()
 		await this.initiateAstroportPoolProvider()
 		await this.updatePriceSources()
 		await this.updateOraclePrices()
@@ -672,7 +671,6 @@ export class RedbankExecutor extends BaseExecutor {
 		)
 
 		console.log(`Liquidation hash: ${result.transactionHash}`)
-		this.redis.incrementBy('executor.liquidations.executed', txs.length)
 
 		console.log(`- Successfully liquidated ${txs.length} positions`)
 

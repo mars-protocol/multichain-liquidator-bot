@@ -65,7 +65,7 @@ describe('Osmosis Pool Provider', () => {
     let lcdEndpoint = 'https://lcd.osmosis.zone'
 
     fetchMock.mock('https://lcd.osmosis.zone/osmosis/poolmanager/v1beta1/all-pools', mockResponse);
-    const poolProvider = new OsmosisPoolProvider(lcdEndpoint)
+    const poolProvider = new OsmosisPoolProvider(lcdEndpoint, "")
 
     const response = await poolProvider.loadPools();
     

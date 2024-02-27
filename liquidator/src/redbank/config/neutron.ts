@@ -21,7 +21,6 @@ export const getConfig = (
 				neutralAssetDenom: 'ibc/2FF082B65C88E4B6D5EF1DB243CDA1D331D002759E938A0F5CD3FFDC5D53B3E349',
 				oracleAddress: 'neutron1dwp6m7pdrz6rnhdyrx5ha0acsduydqcpzkylvfgspsz60pj2agxqaqrr7g',
 				redbankAddress: 'neutron1n97wnm7q6d2hrcna3rqlnyqw2we6k0l8uqvmyqq6gsml92epdu7quugyph',
-				redisEndpoint: process.env.REDIS_ENDPOINT!,
 				liquidationProfitMarginPercent: 0.001,
 				poolsRefreshWindow: 60000,
 				astroportFactory : 'neutron1hptk0k5kng7hjy35vmh009qd5m6l33609nypgf2yc6nqnewduqasxplt4e'
@@ -42,7 +41,6 @@ export const getConfig = (
 			redbankAddress: 'neutron15dld0kmz0zl89zt4yeks4gy8mhmawy3gp4x5rwkcgkj5krqvu9qs4q7wve',
 			astroportRouter:'neutron12jm24l9lr9cupufqjuxpdjnnweana4h66tsx5cl800mke26td26sq7m05p',
 			astroportFactory : 'neutron1jj0scx400pswhpjes589aujlqagxgcztw04srynmhf0f6zplzn2qqmhwj7',
-			redisEndpoint: process.env.REDIS_ENDPOINT!,
 			liquidationProfitMarginPercent: 0.001,
 			poolsRefreshWindow: 60000,
 	  }

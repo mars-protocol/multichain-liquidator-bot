@@ -70,7 +70,6 @@ export class RoverExecutor extends BaseExecutor {
 
 	// Entry to rover executor
 	start = async () => {
-		await this.initiateRedis()
 		await this.initiateAstroportPoolProvider()
 		await this.refreshData()
 
@@ -78,7 +77,7 @@ export class RoverExecutor extends BaseExecutor {
 		const accounts = await this.wallet.getAccounts()
 		// get liquidator addresses
 		const liquidatorAddresses: string[] = accounts
-			.slice(1, this.config.maxLiquidators + 1)
+			.slice(2, this.config.maxLiquidators + 2)
 			.map((account) => account.address)
 
 		// initiate our wallets (in case they are not)
@@ -256,21 +255,21 @@ export class RoverExecutor extends BaseExecutor {
 			account_id: string,
 			health_factor: string,
 			total_debt: string
-		}[] = (await response.json())['positions']
-
+		}[] = (await response.json())['data']
 		const  targetAccounts = targetAccountObjects.filter(
 			(account) =>
-				Number(account.health_factor) < 0.96 &&
+				Number(account.health_factor) < 0.97 &&
+				account.account_id === "8496" &&
 				Number(account.health_factor) > 0.3 &&
-				account.total_debt.length > 3
+				account.total_debt.length > 4
 			)
-			.sort((accountA, accountB)=> Number(accountA.total_debt) - Number(accountB.total_debt))
+			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
 			.map((account)=> account.account_id)
 			.slice(0, this.config.maxLiquidators)
 
 		// Sleep to avoid spamming redis db when empty.
 		if (targetAccounts.length == 0) {
-			await sleep(200)
+			await sleep(2000)
 			return
 		}
 
@@ -284,6 +283,7 @@ export class RoverExecutor extends BaseExecutor {
 		}
 
 		await Promise.all(liquidationPromises)
+		await sleep(200000)
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
@@ -366,7 +366,7 @@ export class RoverExecutor extends BaseExecutor {
 			...swapToStableMsg,
 			refundAll,
 		]
-
+		
 		const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
 		const msg = {
 			update_credit_account: { account_id: liquidatorAccountId, actions },
