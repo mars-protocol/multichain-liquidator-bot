@@ -52,6 +52,7 @@ export class RoverExecutor extends BaseExecutor {
 	private vaults: string[] = []
 	private vaultDetails: Map<string, VaultInfo> = new Map()
 	private lastFetchedVaultTime = 0
+	// private pageCount = 0
 
 	private wallet: DirectSecp256k1HdWallet
 
@@ -198,7 +199,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			this.liquidationActionGenerator.setSwapperRoutes(roverData.routes)
 
-			await this.refreshPoolData(this.prices, this.markets)
+			// await this.refreshPoolData(this.prices, this.markets)
 		} catch(ex) {
 			console.error(JSON.stringify(ex))
 		}
@@ -256,15 +257,14 @@ export class RoverExecutor extends BaseExecutor {
 			health_factor: string,
 			total_debt: string
 		}[] = (await response.json())['data']
+
 		const  targetAccounts = targetAccountObjects.filter(
 			(account) =>
 				Number(account.health_factor) < 0.97 &&
-				account.account_id === "8496" &&
-				Number(account.health_factor) > 0.3 &&
+				// Number(account.health_factor) > 0.3 &&
 				account.total_debt.length > 4
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
-			.map((account)=> account.account_id)
 			.slice(0, this.config.maxLiquidators)
 
 		// Sleep to avoid spamming redis db when empty.
@@ -279,11 +279,48 @@ export class RoverExecutor extends BaseExecutor {
 		for (const targetAccount of targetAccounts) {
 			const next = liquidatorAddressesIterator.next()
 			const liquidatorAddress : string = next.value
-			liquidationPromises.push(this.liquidate(targetAccount, liquidatorAddress))
+			// do cleanup
+			if (Number(targetAccount.health_factor) > 0.1) {
+				liquidationPromises.push(this.liquidate(targetAccount.account_id, liquidatorAddress))
+			} else {
+				// if (targetAccount.health_factor > 0) {
+				// 	await this.cleanupBadDebt(targetAccount.account_id, liquidatorAddress)
+				// }
+			}
 		}
 
-		await Promise.all(liquidationPromises)
-		await sleep(200000)
+		await Promise.allSettled(liquidationPromises)
+		await sleep(2000)
+	}
+
+	cleanupBadDebt = async(accountIdToClear: string, liquidatorAddress: string) => {
+		// query account position
+		const debts : {denom: String, amount: String}[] = (await this.queryClient.queryContractSmart(
+			this.config.creditManagerAddress,
+			{
+				positions: {
+					account_id: accountIdToClear
+				}
+			}
+		))['debts']
+		console.log(debts, liquidatorAddress)
+
+		// for (const debt of debts) {
+
+		// 	// produce exact out
+		// 	let swap_out = 
+		// 	// repay
+		// 	await this.client.signAndBroadcast(liquidatorAddress, produceExecuteContractMessage(
+		// 		liquidatorAddress,
+		// 		this.config.creditManagerAddress,
+		// 		toUtf8(JSON.stringify({
+		// 			repay_from_wallet : {
+		// 				account_id: accountIdToClear
+		// 			}
+		// 		})),
+		// 		[] ))
+		// }
+		// repay
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
@@ -334,7 +371,7 @@ export class RoverExecutor extends BaseExecutor {
 		const vault = this.vaultDetails.get(bestCollateral.denom)
 
 		const collateralToDebtActions = bestCollateral.denom !== borrow.denom
-			? this.liquidationActionGenerator.convertCollateralToDebt(
+			? await this.liquidationActionGenerator.convertCollateralToDebt(
 				bestCollateral.denom,
 				borrow,
 				vault,
@@ -363,10 +400,11 @@ export class RoverExecutor extends BaseExecutor {
 			liquidateMessage,
 			...collateralToDebtActions,
 			...repayMsg,
-			...swapToStableMsg,
+			...await swapToStableMsg,
 			refundAll,
 		]
-		
+		// actions.forEach((action) => console.log(JSON.stringify(action)))
+
 		const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
 		const msg = {
 			update_credit_account: { account_id: liquidatorAccountId, actions },
@@ -400,7 +438,7 @@ export class RoverExecutor extends BaseExecutor {
 		if (result.code !== 0) {
 			console.log(`Liquidation failed. TxHash: ${result.transactionHash}`)
 		} else {
-			console.log(`Liquidation successfull. TxHash: ${result.transactionHash}`)
+			console.log(`Liquidation successfull. TxHash: ${result.transactionHash}, account : ${accountId}`)
 		}
 	}
 

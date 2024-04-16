@@ -27,7 +27,10 @@ export interface BaseExecutorConfig {
 	poolsRefreshWindow: number
 	astroportFactory?: string
 	astroportRouter?: string
+	// The mars api endpoint
 	marsEndpoint?: string
+	// The sidecar query server url
+	sqsUrl?: string
 }
 
 /**
@@ -205,7 +208,7 @@ export class BaseExecutor {
 			throw new Error(
 				'Stargate Client is undefined, ensure you call initiate at before calling this method',
 			)
-		const gasPriceRequest = await fetch("https://lcd.osmosis.zone/osmosis/txfees/v1beta1/cur_eip_base_fee")
+		const gasPriceRequest = await fetch(`${process.env.LCD_ENDPOINT}/osmosis/txfees/v1beta1/cur_eip_base_fee`)
 		const { base_fee: baseFee } = await gasPriceRequest.json()
 		const gasEstimated = await this.client.simulate(address, msgs, '')
 		const gas = Number(gasEstimated * 1.3)

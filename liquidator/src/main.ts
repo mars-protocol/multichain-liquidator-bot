@@ -30,7 +30,7 @@ export const main = async () => {
 	// produce paths for the number of addresses we want under our seed
 	const addressCount = process.env.MAX_LIQUIDATORS || 1
 	const chainName = process.env.CHAIN_NAME!
-	const prefix = process.env.CHAIN_PREFIX!
+	const prefix = process.env.PREFIX!
 	const hdPaths: HdPath[] = []
 
 	while (hdPaths.length < Number(addressCount)) {

@@ -8,6 +8,18 @@ export enum PoolType {
 	CONCENTRATED_LIQUIDITY = 'concentrated',
 	XYK = 'xyk',
 	STABLESWAP = 'stable',
+	COSMWASM = "cosmwasm",
+	UNSUPPORTED = "unsupported"
+}
+
+export const fromString = (poolType: String): PoolType => {
+	switch(poolType) {
+		case "concentrated_liquidity": return PoolType.CONCENTRATED_LIQUIDITY
+		case "xyk": return PoolType.XYK
+		case "stableswap": return PoolType.STABLESWAP
+		case "cosmwasm": return PoolType.COSMWASM
+		default: return  PoolType.UNSUPPORTED
+	}
 }
 
 export interface Pool {
