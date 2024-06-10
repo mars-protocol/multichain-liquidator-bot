@@ -68,10 +68,9 @@ export class BaseExecutor {
 	}
 
 	async initiateAstroportPoolProvider(): Promise<void> {
-		if (this.config.chainName === "neutron") {
-			const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
-			await astroportPoolProvider.initiate()
-		}
+		
+		const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
+		await astroportPoolProvider.initiate()
 	}
 
 	applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {
@@ -208,7 +207,7 @@ export class BaseExecutor {
 			throw new Error(
 				'Stargate Client is undefined, ensure you call initiate at before calling this method',
 			)
-		const gasPriceRequest = await fetch(`${process.env.LCD_ENDPOINT}/osmosis/txfees/v1beta1/cur_eip_base_fee`)
+		const gasPriceRequest = await fetch(`${process.env.LCD_ENDPOINT}/osmosis/txfees/v1beta1/cur_eip_base_fee?x-apikey=${process.env.API_KEY}`)
 		const { base_fee: baseFee } = await gasPriceRequest.json()
 		const gasEstimated = await this.client.simulate(address, msgs, '')
 		const gas = Number(gasEstimated * 1.3)

@@ -17,16 +17,16 @@ export const getConfig = (
 			oracleAddress: process.env.ORACLE_ADDRESS || 'osmo1mhznfr60vjdp2gejhyv2gax9nvyyzhd3z0qcwseyetkfustjauzqycsy2g',
 			redbankAddress: process.env.REDBANK_ADDRESS || 'osmo1c3ljch9dfw5kf52nfwpxd2zmj2ese7agnx0p9tenkrryasrle5sqf3ftpg',
 			accountNftAddress: process.env.ACCOUNT_NFT_ADDRESS || 'osmo1450hrg6dv2l58c0rvdwx8ec2a0r6dd50hn4frk370tpvqjhy8khqw7sw09',
-			// todo once deployed
 			marsParamsAddress: process.env.MARS_PARAMS_ADDRESS || 'osmo1nlmdxt9ctql2jr47qd4fpgzg84cjswxyw6q99u4y4u4q6c2f5ksq7ysent',
 			creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS || 'osmo1f2m24wktq0sw3c0lexlg7fv4kngwyttvzws3a3r3al9ld2s2pvds87jqvf',
 			liquidatorMasterAddress: liquidatorMasterAddress,
 			minGasTokens: 1000000,
 			logResults: false,
 			poolsRefreshWindow: 60000,
-			maxLiquidators: 40,
+			maxLiquidators: process.env.MAX_LIQUIDATORS ? parseInt(process.env.MAX_LIQUIDATORS) : 10,
 			stableBalanceThreshold: 5000000,
-			marsEndpoint: "https://api.marsprotocol.io",
+			// marsEndpoint: "http://127.0.0.1:3000",
+			marsEndpoint:"https://api.marsprotocol.io",
 			sqsUrl: "https://sqs.osmosis.zone/"
 		}
 	}

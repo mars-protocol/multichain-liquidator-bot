@@ -43,6 +43,7 @@ export const fetchRoverData = async (
 	creditManagerAddress: string,
 	swapperAddress: string,
 	vaultAddresses: string[],
+	params_address: string,
 ): Promise<RoverData> => {
 	const coreQuery = produceCoreRoverDataQuery(
 		address,
@@ -50,6 +51,7 @@ export const fetchRoverData = async (
 		oracleAddress,
 		creditManagerAddress,
 		swapperAddress,
+		params_address
 	)
 
 	const queries = vaultAddresses.map((vault) => {
@@ -88,7 +90,7 @@ export const fetchRoverData = async (
 		creditLineCaps: coreData.wasm.creditLineCaps,
 		routes: coreData.wasm.routes,
 		vaultInfo: vaultMap,
-		whitelistedAssets: coreData.wasm.whitelistedAssets,
+		whitelistedAssets: [],
 	}
 }
 

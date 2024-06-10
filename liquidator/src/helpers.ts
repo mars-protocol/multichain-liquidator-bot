@@ -163,8 +163,6 @@ export const seedAddresses = async (
 	const seededAddresses: string[] = []
 	const sendTokenMsgs: EncodeObject[] = []
 
-	
-
 	console.log(`seeding children for ${sender}`)
 	accounts.forEach((account) => {
 		if (account.address === sender) return

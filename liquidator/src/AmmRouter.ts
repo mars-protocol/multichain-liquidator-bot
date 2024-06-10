@@ -231,7 +231,6 @@ export class AMMRouter implements AMMRouterInterface {
 
 
 						if (result === "no-more-ticks") {
-							console.log('no more ticks')
 							tokenOutRequired = new BigNumber(10000000000000)
 							break
 						}
