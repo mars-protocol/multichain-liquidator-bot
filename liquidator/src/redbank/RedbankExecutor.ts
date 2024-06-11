@@ -1,5 +1,4 @@
 import { LiquidationTx } from '../types/liquidation.js'
-import { Position } from '../types/position'
 import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
@@ -51,7 +50,7 @@ export class RedbankExecutor extends BaseExecutor {
 	}
 
 	async start() {
-		await this.initiateRedis()
+		// await this.initiateRedis()
 		if (this.config.chainName === "neutron") {
 			await this.initiateAstroportPoolProvider()
 		}
@@ -299,18 +298,35 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.refreshData()
 
 		console.log('Checking for liquidations')
-		const positions: Position[] = await this.redis.popUnhealthyPositions<Position>(1)
+		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
+		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/creditmanager`
 
-		if (positions.length == 0) {
-			//sleep to avoid spamming redis db when empty
-			await sleep(200)
-			console.log(' - No items for liquidation yet')
+		const response = await fetch(url);
+		let targetAccountObjects: {
+			account_id: string,
+			health_factor: string,
+			total_debt: string
+		}[] = (await response.json())['data']
+
+		const  targetAccounts = targetAccountObjects.filter(
+			(account) =>
+				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
+				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
+				// To target specific accounts, filter here
+				// account.account_id === "22372" &&
+				account.total_debt.length > 3
+			)
+			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
+
+		// Sleep to avoid spamming.
+		if (targetAccounts.length == 0) {
+			await sleep(2000)
 			return
 		}
 
 		// Fetch position data
 		const positionData: DataResponse[] = await fetchRedbankBatch(
-			positions,
+			[{ Identifier:  targetAccounts[0].account_id }],
 			this.config.redbankAddress,
 			this.config.hiveEndpoint,
 		)
