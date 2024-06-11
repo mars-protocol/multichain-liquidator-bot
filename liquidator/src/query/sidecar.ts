@@ -33,9 +33,11 @@ export interface Pool {
 }
 
 export const getRoute = async (baseUrl: string, amountIn: string, inDenom: string, outDenom: string): Promise<RouteHop[]> => {
-    const response = await fetch(`${baseUrl}/router/quote?tokenIn=${amountIn}${inDenom}&tokenOutDenom=${outDenom}`)
+  let url = `${baseUrl}/router/quote?tokenIn=${amountIn}${inDenom}&tokenOutDenom=${outDenom}`  
+  const response = await fetch(url)
     if (response.ok === false) {
-      throw new Error(`Failed to fetch route: ${response.statusText}`)
+
+      throw new Error(`Failed to fetch route: ${response.statusText}, ${url}`)
     }
     let routeResponse : Response = await response.json()
 

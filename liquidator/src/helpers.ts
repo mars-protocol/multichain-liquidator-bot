@@ -33,6 +33,8 @@ import { camelCase } from 'lodash'
 import { HdPath } from '@cosmjs/crypto'
 import { Pool } from './types/Pool'
 import { SwapAmountInRoute } from 'osmojs/dist/codegen/osmosis/poolmanager/v1beta1/swap_route'
+import { RouteHop } from './types/RouteHop'
+import { OsmoRoute } from './types/swapper'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -396,6 +398,19 @@ export const repay = async (
 	]
 
 	return await client.execute(sender, addresses.redBank, msg, 'auto', undefined, coins)
+}
+
+export const createOsmoRoute = (route: RouteHop[]): OsmoRoute => {
+	const osmoRoute : OsmoRoute = {
+		swaps: route.map(hop => {
+		  return {
+			pool_id: hop.poolId.toNumber(),
+			to: hop.tokenOutDenom,
+		  }
+		})
+	}
+
+	return osmoRoute
 }
 
 export const queryHealth = async (
