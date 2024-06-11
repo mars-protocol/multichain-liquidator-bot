@@ -29,7 +29,7 @@ The Liquidator service is responsible for handling liquidations of unhealthy pos
 4. Manager
 
 The Manager service is responsible for ensuring all the data is processed within
-a timeframe. By default, the timeframe is a single block. It is also responsible for booting up new services (i.e health checker, executor) to meet demand. More info in [manager](manager/README)
+a timeframe. By default, the timeframe is a single block. It is also responsible for booting up new services (i.e health checker, executor) to meet demand. More info in [manager](manager/README.md)
 
 ## Usage
 
