@@ -299,7 +299,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 		console.log('Checking for liquidations')
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/creditmanager`
+		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/redbank`
 
 		const response = await fetch(url);
 		let targetAccountObjects: {

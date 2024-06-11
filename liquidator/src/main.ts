@@ -28,7 +28,7 @@ export const main = async () => {
 	// produce paths for the number of addresses we want under our seed
 	const addressCount = process.env.MAX_LIQUIDATORS || 1
 	const chainName = process.env.CHAIN_NAME!
-	const prefix = process.env.PREFIX!
+	const prefix = process.env.CHAIN_PREFIX!
 	const hdPaths: HdPath[] = []
 
 	while (hdPaths.length < Number(addressCount)) {
@@ -40,7 +40,6 @@ export const main = async () => {
 		hdPaths,
 	})
 	const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
-
 	// produce clients
 	const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!)
 	const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
