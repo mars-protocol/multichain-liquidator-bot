@@ -50,7 +50,6 @@ export class RedbankExecutor extends BaseExecutor {
 	}
 
 	async start() {
-		// await this.initiateRedis()
 		if (this.config.chainName === "neutron") {
 			await this.initiateAstroportPoolProvider()
 		}
@@ -179,7 +178,6 @@ export class RedbankExecutor extends BaseExecutor {
 							return routeAReturns.minus(routeBReturns).toNumber()
 						})
 						.pop()
-
 					if (bestRoute) {
 						// allow for 2.5% slippage from what we estimated
 						const minOutput = this.ammRouter
@@ -310,10 +308,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 		const  targetAccounts = targetAccountObjects.filter(
 			(account) =>
-				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
-				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
 				// To target specific accounts, filter here
-				// account.account_id === "22372" &&
 				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
@@ -324,9 +319,23 @@ export class RedbankExecutor extends BaseExecutor {
 			return
 		}
 
+		// for each account, run liquidations
+		for (const account of targetAccounts) {
+			console.log("running liquidation for account: ", account.account_id)
+			try {
+				await this.runLiquidation(account.account_id, liquidatorAddress)
+			} catch (e) {
+				console.log('ERROR:', e)
+			}
+		}
+	}
+
+	runLiquidation = async (liquidateeAddress: string, liquidatorAddress: string) => {
+		await this.withdrawAndSwapCollateral(liquidatorAddress)
+
 		// Fetch position data
 		const positionData: DataResponse[] = await fetchRedbankBatch(
-			[{ Identifier:  targetAccounts[0].account_id }],
+			[{ Identifier:  liquidateeAddress }],
 			this.config.redbankAddress,
 			this.config.hiveEndpoint,
 		)
@@ -368,31 +377,13 @@ export class RedbankExecutor extends BaseExecutor {
 			await this.getFee(firstMsgBatch, this.config.liquidatorMasterAddress),
 		)
 
+		await this.withdrawAndSwapCollateral(liquidatorAddress)
+
 		this.redis.incrementBy('executor.liquidations.executed', txs.length)
 
 		console.log(`- Successfully liquidated ${txs.length} positions`)
 
-		const collaterals: Collateral[] = await this.queryClient?.queryContractSmart(
-			this.config.redbankAddress,
-			{ user_collaterals: { user: liquidatorAddress } },
-		)
-
-		// second block of transactions
-		let secondBatch: EncodeObject[] = []
-
-		const balances = await this.client?.getAllBalances(liquidatorAddress)
-
-		const combinedCoins = this.combineBalances(collaterals, balances!)
-
-		this.appendWithdrawMessages(collaterals, liquidatorAddress, secondBatch)
-
-		this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, secondBatch)
-
-		await this.client.signAndBroadcast(
-			this.config.liquidatorMasterAddress,
-			secondBatch,
-			await this.getFee(secondBatch, this.config.liquidatorMasterAddress),
-		)
+		
 
 
 		if (this.config.logResults) {
@@ -413,6 +404,32 @@ export class RedbankExecutor extends BaseExecutor {
 		if (this.config.logResults) {
 			this.writeCsv()
 		}
+	}
+
+	withdrawAndSwapCollateral = async (liquidatorAddress: string) => {
+		const collaterals: Collateral[] = await this.queryClient?.queryContractSmart(
+			this.config.redbankAddress,
+			{ user_collaterals: { user: liquidatorAddress } },
+		)
+
+		console.log(`- found ${collaterals.length} collaterals to withdraw and swap`)
+
+		// second block of transactions
+		let secondBatch: EncodeObject[] = []
+
+		const balances = await this.client?.getAllBalances(liquidatorAddress)
+
+		const combinedCoins = this.combineBalances(collaterals, balances!)
+
+		this.appendWithdrawMessages(collaterals, liquidatorAddress, secondBatch)
+
+		this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, secondBatch)
+
+		await this.client.signAndBroadcast(
+			this.config.liquidatorMasterAddress,
+			secondBatch,
+			await this.getFee(secondBatch, this.config.liquidatorMasterAddress),
+		)
 	}
 
 	combineBalances(collaterals: Collateral[], balances: readonly Coin[]): Coin[] {
