@@ -2,7 +2,8 @@ import { sleep } from "../../helpers";
 import { Pool, PoolAsset, PoolType, XYKPool } from "../../types/Pool";
 import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
 import fetch from 'cross-fetch'
-import { Asset, AssetInfoCW, AssetInfoNative, ContractQueryPairs, ContractQueryPool, Pair, PoolResponseData, Query, ResponseData } from "./types/AstroportTypes";
+import { Asset, AssetInfoCW, AssetInfoNative, ContractQueryPairs, Pair, PoolQueryResponse, PoolResponseData, Query, ResponseData } from "./types/AstroportTypes";
+import { queryWasmLcd } from "../utils";
 
 export class AstroportPoolProvider implements PoolDataProviderInterface {
     
@@ -13,6 +14,7 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
     constructor(
         private astroportFactory: string,
         private graphqlEndpoint : string,
+        private lcdEndpoint: string
     ) {}
     
     initiate = async () => {
@@ -29,57 +31,63 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
     getPairs = () : Pair[] => {
         return this.pairs
     }
-    
-   loadPools = async ():Promise<Pool[]>  => {
-        let retries = 0    
+    objectToBase64(obj: any): string {
+        const jsonString = JSON.stringify(obj);
+        const base64String = Buffer.from(jsonString).toString('base64');
+        return base64String;
+    }
+
+    create_pool_query_promise = async(
+        query: Promise<PoolResponseData>,
+        contractAddress: string) : Promise<PoolQueryResponse> => {
+        return {
+            contractAddress,
+            result: await query
+        }
+    }
+
+    loadPools = async ():Promise<Pool[]>  => {
 
         if (this.pairs.length === 0) {
             throw new Error("Pools still not loaded. Ensure you have called initiate()")
         }
 
-        const poolQueries = this.pairs.map((pair) => this.producePoolQuery(pair) )
-        
-
-        // execute the query
-        while (retries < this.maxRetries) {
-            try {
-                const response = await fetch(this.graphqlEndpoint, {
-                    method: 'post',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(poolQueries),
-                });
-         
-                const responseData : PoolResponseData[] =await response.json()
-        
-                return responseData.map((poolResponse, index) => {
-        
-                    // Our address is our key. We add this in to our graphql queries so we can identify the correct pool
-                    const address : string = Object.keys(poolResponse.data)[0]
-        
-                    const queryData : ContractQueryPool = poolResponse.data[address]!.contractQuery
-                    const poolAssets = this.producePoolAssets(queryData.assets)
-                    const pool : XYKPool = {
-                        address : address,
-                        id : index as unknown as Long,
-                        poolAssets : poolAssets,
-                        swapFee : "0.003",
-                        token0 : poolAssets[0].token.denom,
-                        token1: poolAssets[1].token.denom,
-                        poolType : PoolType.XYK
+        // We want to know the owner of our pool queries, as it is not on the response
+        // Therefore, we create an object to keep the address of the pool with the query
+        const poolQueryPromises = this.pairs.map(
+            (pair) => this.create_pool_query_promise(
+                queryWasmLcd<PoolResponseData>(
+                this.lcdEndpoint,
+                pair.contract_addr,
+                this.objectToBase64(
+                    {
+                        pool: {}
                     }
-        
-                    return pool
-                })
-            } catch(err) {
-                console.error(err)
-                retries += 1
-                await sleep(1000)
-            }
-        }
+                )),
+                pair.contract_addr
+        ))
 
-        return []
+        let poolResponses = await Promise.all(poolQueryPromises)
+
+        return poolResponses
+            .filter((poolResponse) => poolResponse.result.data)
+            .map((poolResponse, index) => {
+                    
+                console.log(poolResponse.result)
+                const poolAssets = this.producePoolAssets(poolResponse.result.data.assets)
+                // TODO update to support PCL
+                const pool : XYKPool = {
+                    address : poolResponse.contractAddress,
+                    id : index as unknown as Long,
+                    poolAssets : poolAssets,
+                    swapFee : "0.003",
+                    token0 : poolAssets[0].token.denom,
+                    token1: poolAssets[1].token.denom,
+                    poolType : PoolType.XYK
+                }
+    
+                return pool
+            })
     }
 
     async fetchPairContracts(contractAddress: string, limit = 10): Promise<Pair[]> {
@@ -135,23 +143,6 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
 
         return pairs
     }
-
-    private producePoolQuery = (pair : Pair) : Query => {
-
-        const poolQuery = `
-            query($contractAddress: String!){
-                ${pair.contract_addr}:wasm {
-                    contractQuery(contractAddress:$contractAddress, query: {
-                        pool: {}
-                    })
-                }
-            }
-        `
-        return {
-            query : poolQuery,
-            variables : { contractAddress : pair.contract_addr }
-        }
-     }
 
      private producePairQuery = (startAfter : string | null, limit : number, contractAddress: string) : Query => {
     

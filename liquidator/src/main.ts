@@ -51,7 +51,6 @@ export const main = async () => {
 	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
 	// Produce network
 
-
 	const poolProvider = getPoolProvider(chainName, redbankConfig)
 
 	switch (executorType) {
@@ -73,11 +72,15 @@ const getPoolProvider = (chainName: string, config: BaseExecutorConfig) : PoolDa
 			return new OsmosisPoolProvider(process.env.LCD_ENDPOINT!)
 		case "neutron":
 
-			return new AstroportPoolProvider(config.astroportFactory!, process.env.HIVE_ENDPOINT!)
+			return new AstroportPoolProvider(
+				config.astroportFactory!,
+				process.env.HIVE_ENDPOINT!,
+				process.env.LCD_ENDPOINT!)
 		default:
 			throw new Error(`Invalid chain name. Chain name must be either osmosis or neutron, recieved ${chainName}`)
 	}
 }
+
 const launchRedbank = async (
 	client: SigningStargateClient,
 	wasmClient: CosmWasmClient,
