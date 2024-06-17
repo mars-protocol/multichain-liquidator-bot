@@ -605,13 +605,16 @@ export class RedbankExecutor extends BaseExecutor {
 			account_id: string,
 			health_factor: string,
 			total_debt: string
-		}[] = (await response.json())['positions']
+		}[] = (await response.json())['data']
 
+		console.log
 		let positions: Position[] = positionObjects
 			.filter(position =>
 					Number(position.health_factor) < 0.97 &&
 					Number(position.health_factor) > 0.3 &&
+					position.account_id =="osmo15aq8hur3uz7yz2q8juewm2s2rjchgma0s6ujxr" &&
 					position.total_debt.length > 5)
+					
 			.sort((a, b) => Number(a.total_debt) - Number(b.total_debt))
 			.map((positionObject) => {
 				return {

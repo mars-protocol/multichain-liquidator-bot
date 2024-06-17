@@ -127,6 +127,7 @@ export class RoverExecutor extends BaseExecutor {
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
 
+		console.log(targetAccounts.length)
 		
 		// Sleep to avoid spamming.
 		if (targetAccounts.length == 0) {
@@ -137,17 +138,25 @@ export class RoverExecutor extends BaseExecutor {
 		// Dispatch our liquidations
 		// We dispatch one liquidation per liquidator worker account.
 		// Set the number of liquidators in the .env
-		const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
-		for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {		
-			const next = liquidatorAddressesIterator.next()
+
+		// create chunks of accounts to liquidate
+		const unhealthyAccountChunks = []
+		for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {
+			unhealthyAccountChunks.push(targetAccounts.slice(i, i + this.liquidatorAccounts.size))
+		}
+
+		// iterate over chunks and liquidate
+		for (const chunk of unhealthyAccountChunks) {
+			const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
 			const liquidationPromises : Promise<void>[] = []
-			for (const targetAccount of targetAccounts.slice(i, i + this.liquidatorAccounts.size)) {
-				const liquidatorAddress : string = next.value
-				liquidationPromises.push(this.liquidate(targetAccount.account_id, liquidatorAddress))
+			for (const account of chunk) {
+				const nextLiquidator = liquidatorAddressesIterator.next()
+				console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
+				liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value))
 			}
 			await Promise.all(liquidationPromises)
 			console.log('sleeping until next block')
-			await sleep(12000)
+			await sleep(4000)
 		}
 	}
 
