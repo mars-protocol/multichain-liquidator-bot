@@ -172,7 +172,7 @@ export class RoverExecutor extends BaseExecutor {
 			// find best collateral / debt
 			const bestCollateral: Collateral = this.findBestCollateral(
 				roverPosition.deposits,
-				roverPosition.lends,
+				roverPosition.lends.map((lentAmount) => { return { denom : lentAmount.denom, amount: lentAmount.amount } }),
 				roverPosition.vaults,
 			)
 
