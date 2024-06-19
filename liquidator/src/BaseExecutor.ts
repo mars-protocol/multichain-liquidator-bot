@@ -120,7 +120,6 @@ export class BaseExecutor {
 		bank.balance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
 		wasm.prices.forEach((price: PriceResponse) => this.prices.set(price.denom, Number(price.price)))
 		await this.refreshMarketData()
-		await this.refreshPoolData(this.prices, this.markets)
 	}
 
 	refreshMarketData = async() => {

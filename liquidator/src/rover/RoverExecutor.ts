@@ -70,10 +70,6 @@ export class RoverExecutor extends BaseExecutor {
 
 	// Entry to rover executor
 	start = async () => {
-		// neutron specific initialisation
-		if (this.config.chainName === "neutron") {
-			await this.initiateAstroportPoolProvider()
-		}
 		await this.refreshData()
 		// set up accounts
 		const accounts = await this.wallet.getAccounts()
@@ -219,7 +215,6 @@ export class RoverExecutor extends BaseExecutor {
 				: []
 
 			const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
-
 			// todo estimate amount based on repay to prevent slippage.
 			const swapToStableMsg =
 				borrow.denom !== this.config.neutralAssetDenom && swapWinnings
@@ -227,8 +222,7 @@ export class RoverExecutor extends BaseExecutor {
 						await this.liquidationActionGenerator.generateSwapActions(
 							borrow.denom,
 							this.config.neutralAssetDenom,
-							// todo make this more accurate
-							'100000000000', 
+							bestDebt.amount.toFixed(0),
 							slippage
 					)]
 					: []
@@ -382,7 +376,6 @@ export class RoverExecutor extends BaseExecutor {
 			this.creditLines = roverData.creditLines
 			this.creditLineCaps = roverData.creditLineCaps
 
-			await this.refreshPoolData(this.prices, this.markets)
 		} catch(ex) {
 			console.error(JSON.stringify(ex))
 		}
