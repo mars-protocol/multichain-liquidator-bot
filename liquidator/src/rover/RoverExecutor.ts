@@ -75,7 +75,7 @@ export class RoverExecutor extends BaseExecutor {
 		const accounts = await this.wallet.getAccounts()
 		// get liquidator addresses
 		const liquidatorAddresses: string[] = accounts
-			.slice(1, this.config.maxLiquidators + 1)
+			.slice(2, this.config.maxLiquidators + 2)
 			.map((account) => account.address)
 
 		// initiate our wallets (in case they are not)
