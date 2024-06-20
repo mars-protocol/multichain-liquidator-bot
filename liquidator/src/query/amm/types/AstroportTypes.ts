@@ -46,28 +46,30 @@ export interface Token {
   //
   
   export interface PoolResponseData {
-    data: Map<string, {
-      wasm: {
-        contractQuery: ContractQueryPool;
-      };
-    }>;
+    data: ContractQueryPool
   }
   
   export interface Asset {
-    info: AssetInfoCW | AssetInfoNative;
-    amount: string;
+    info: AssetInfoCW | AssetInfoNative
+    amount: string
   }
   
   export interface ContractQueryPool {
-    assets: Asset[];
-    total_share: string;
+    assets: Asset[]
+    total_share: string
   }
 
   //
   // GraphQL 
   //
   export interface Query {
-    query: string;
+    query: string
     variables?: Record<string, any>;
   }
+
+
+export interface PoolQueryResponse {
+	contractAddress: string
+	result: PoolResponseData
+}
   

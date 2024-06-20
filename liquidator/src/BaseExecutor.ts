@@ -27,6 +27,7 @@ export interface BaseExecutorConfig {
 	poolsRefreshWindow: number
 	astroportFactory?: string
 	astroportRouter?: string
+	marsEndpoint?: string
 }
 
 /**

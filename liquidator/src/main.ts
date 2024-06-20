@@ -28,7 +28,7 @@ export const main = async () => {
 	// produce paths for the number of addresses we want under our seed
 	const addressCount = process.env.MAX_LIQUIDATORS || 1
 	const chainName = process.env.CHAIN_NAME!
-	const prefix = process.env.PREFIX!
+	const prefix = process.env.CHAIN_PREFIX!
 	const hdPaths: HdPath[] = []
 
 	while (hdPaths.length < Number(addressCount)) {
@@ -40,7 +40,6 @@ export const main = async () => {
 		hdPaths,
 	})
 	const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
-
 	// produce clients
 	const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!)
 	const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
@@ -51,7 +50,6 @@ export const main = async () => {
 
 	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
 	// Produce network
-
 
 	const poolProvider = getPoolProvider(chainName, redbankConfig)
 
@@ -74,11 +72,15 @@ const getPoolProvider = (chainName: string, config: BaseExecutorConfig) : PoolDa
 			return new OsmosisPoolProvider(process.env.LCD_ENDPOINT!)
 		case "neutron":
 
-			return new AstroportPoolProvider(config.astroportFactory!, process.env.HIVE_ENDPOINT!)
+			return new AstroportPoolProvider(
+				config.astroportFactory!,
+				process.env.HIVE_ENDPOINT!,
+				process.env.LCD_ENDPOINT!)
 		default:
 			throw new Error(`Invalid chain name. Chain name must be either osmosis or neutron, recieved ${chainName}`)
 	}
 }
+
 const launchRedbank = async (
 	client: SigningStargateClient,
 	wasmClient: CosmWasmClient,

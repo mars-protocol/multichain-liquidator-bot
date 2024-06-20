@@ -22,6 +22,7 @@ export const getConfig = (
 				redbankAddress: 'neutron1n97wnm7q6d2hrcna3rqlnyqw2we6k0l8uqvmyqq6gsml92epdu7quugyph',
 				redisEndpoint: process.env.REDIS_ENDPOINT!,
 				poolsRefreshWindow: 60000,
+				marsEndpoint: "https://api.marsprotocol.io",
 				astroportFactory : 'neutron1hptk0k5kng7hjy35vmh009qd5m6l33609nypgf2yc6nqnewduqasxplt4e'
 		  }
 		: {
