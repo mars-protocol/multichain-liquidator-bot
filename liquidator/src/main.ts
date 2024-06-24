@@ -33,7 +33,7 @@ export const main = async () => {
 	const prefix = process.env.CHAIN_PREFIX!
 	const hdPaths: HdPath[] = []
 
-	while (hdPaths.length < Number(addressCount)) {
+	while (hdPaths.length <= Number(addressCount)) {
 		hdPaths.push(makeCosmoshubPath(hdPaths.length))
 	}
 
@@ -53,8 +53,6 @@ export const main = async () => {
 
 	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
 	// Produce network
-
-
 	const poolProvider = getPoolProvider(chainName, redbankConfig)
 
 	switch (executorType) {

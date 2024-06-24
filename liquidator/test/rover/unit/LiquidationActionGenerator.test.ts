@@ -1,5 +1,5 @@
 import { AMMRouter } from '../../../src/AmmRouter'
-import { LiquidationActionGenerator } from '../../../src/rover/LiquidationActionGenerator'
+import { ActionGenerator } from '../../../src/rover/ActionGenerator'
 import { MarketInfo } from '../../../src/rover/types/MarketInfo'
 import {
 	generateRandomCreditLine,
@@ -55,7 +55,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 			test('When we are liquid', () => {
 				const markets: MarketInfo[] = []
 
-				const liquidationActionGenerator = new LiquidationActionGenerator(router)
+				const liquidationActionGenerator = new ActionGenerator(router)
 				const debtDenom = Math.random().toString()
 				const debtToRepay = 200
 
@@ -96,7 +96,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 			test('When we are illiquid but > 50% ', () => {
 				const markets: MarketInfo[] = []
 
-				const liquidationActionGenerator = new LiquidationActionGenerator(router)
+				const liquidationActionGenerator = new ActionGenerator(router)
 				const debtDenom = Math.random().toString()
 				const debtToRepay = 200
 
@@ -138,7 +138,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 			test('Correctly calculate repay amount based on collateral reserve factor', () => {
 				const markets: MarketInfo[] = []
 
-				const liquidationActionGenerator = new LiquidationActionGenerator(router)
+				const liquidationActionGenerator = new ActionGenerator(router)
 				const debtDenom = Math.random().toString()
 				const debtToRepay = 200
 
@@ -180,7 +180,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 			test('Debt asset unavailable', () => {
 				const markets: MarketInfo[] = []
 
-				const liquidationActionGenerator = new LiquidationActionGenerator(router)
+				const liquidationActionGenerator = new ActionGenerator(router)
 
 				const debtToRepay = 200
 				const collateralAmount = 500
@@ -234,7 +234,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 			test('Debt available but < 50% required liquidity', () => {
 				const markets: MarketInfo[] = []
 
-				const liquidationActionGenerator = new LiquidationActionGenerator(router)
+				const liquidationActionGenerator = new ActionGenerator(router)
 				const debtToRepay = 200
 
 				const collateralDenom = Math.random().toString()
@@ -278,7 +278,7 @@ describe('Liquidation Actions generator Unit Tests', () => {
 			test('If no swap route possible for borrow we throw error', () => {
 				const markets: MarketInfo[] = []
 
-				const liquidationActionGenerator = new LiquidationActionGenerator(router)
+				const liquidationActionGenerator = new ActionGenerator(router)
 				const debtToRepay = 200
 				const collateralAmount = 500
 

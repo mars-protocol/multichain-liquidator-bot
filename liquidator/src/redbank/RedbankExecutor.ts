@@ -24,6 +24,7 @@ import { PythPriceFetcher } from '../query/oracle/PythPriceFetcher'
 import { WasmPriceSourceForString } from '../types/marsOracleWasm.types'
 import { OraclePrice } from '../query/oracle/PriceFetcherInterface'
 import { calculateCollateralRatio, calculateLiquidationBonus, calculateMaxDebtRepayable, getLiquidationThresholdHealthFactor } from './LiquidationHelpers'
+import { getRoute } from '../query/sidecar'
 
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
@@ -250,10 +251,10 @@ export class RedbankExecutor extends BaseExecutor {
 		}
 	}
 
-	produceLiquidationTxs(positionData: DataResponse[]): {
+	async produceLiquidationTxs(positionData: DataResponse[]): Promise<{
 		txs: LiquidationTx[]
 		debtsToRepay: Map<string, BigNumber>
-	} {
+	}> {
 		const txs: LiquidationTx[] = []
 		const debtsToRepay = new Map<string, BigNumber>()
 
@@ -373,12 +374,14 @@ export class RedbankExecutor extends BaseExecutor {
 					1 + liquidationBonus)).multipliedBy(1-protocolLiquidationFee)
 
 				const collateralAmountToBeWon = collateralValueToBeWon.dividedBy(collateralPrice)
-				const collateralToNeutralRoute = this.ammRouter.getBestRouteGivenInput(
+				const collateralToNeutralRoute = await getRoute(
+					this.config.sqsUrl!, // todo ensure that we have alternative option
+					collateralAmountToBeWon.toFixed(0),
 					largestCollateralDenom,
 					this.config.neutralAssetDenom,
-					collateralAmountToBeWon
 				)
 
+				// TODO resolve this.
 				const neutralWon = this.ammRouter.getOutput(
 					collateralAmountToBeWon,
 					collateralToNeutralRoute
@@ -497,18 +500,18 @@ export class RedbankExecutor extends BaseExecutor {
 		return expectedNeutralCoins
 	}
 
-	appendSwapToDebtMessages(
+	async appendSwapToDebtMessages(
 		debtsToRepay: Coin[],
 		liquidatorAddress: string,
 		msgs: EncodeObject[],
 		neutralAvailable: BigNumber,
 		// min available stables?
-	): Map<string, BigNumber> {
+	): Promise<Map<string, BigNumber>> {
 		let remainingNeutral = neutralAvailable
 		const expectedDebtAssetsPostSwap: Map<string, BigNumber> = new Map()
 
-		debtsToRepay.forEach((debt) => {
-			const debtAmountRequiredFromSwap = new BigNumber(debt.amount)
+		for (const debt of debtsToRepay) {
+		const debtAmountRequiredFromSwap = new BigNumber(debt.amount)
 
 			if (debt.denom === this.config.neutralAssetDenom) {
 				const cappedAmount = remainingNeutral.isLessThan(debt.amount)
@@ -521,7 +524,7 @@ export class RedbankExecutor extends BaseExecutor {
 			} else {
 				const debtValue = debtAmountRequiredFromSwap.multipliedBy(this.prices.get(debt.denom) || 0).multipliedBy(1.02)
 
-				const bestRoute = this.ammRouter.getBestRouteGivenInput(
+				const bestRoute = await this.ammRouter.getBestRouteGivenInput(
 					this.config.neutralAssetDenom,
 					debt.denom,
 					debtValue
@@ -539,7 +542,7 @@ export class RedbankExecutor extends BaseExecutor {
 					)
 				}
 			}
-		})
+		}
 
 		return expectedDebtAssetsPostSwap
 	}
@@ -588,7 +591,7 @@ export class RedbankExecutor extends BaseExecutor {
 			this.config.redbankAddress,
 			{ user_collaterals: { user: liquidatorAddress } },
 		)
-		console.log(JSON.stringify(collateralsBefore))
+
 		if (collateralsBefore.length > 0) {
 			await this.liquidateCollaterals(
 				liquidatorAddress,
@@ -602,13 +605,16 @@ export class RedbankExecutor extends BaseExecutor {
 			account_id: string,
 			health_factor: string,
 			total_debt: string
-		}[] = (await response.json())['positions']
+		}[] = (await response.json())['data']
 
+		console.log
 		let positions: Position[] = positionObjects
 			.filter(position =>
 					Number(position.health_factor) < 0.97 &&
 					Number(position.health_factor) > 0.3 &&
+					position.account_id =="osmo15aq8hur3uz7yz2q8juewm2s2rjchgma0s6ujxr" &&
 					position.total_debt.length > 5)
+					
 			.sort((a, b) => Number(a.total_debt) - Number(b.total_debt))
 			.map((positionObject) => {
 				return {
@@ -637,12 +643,12 @@ export class RedbankExecutor extends BaseExecutor {
 
 		console.log(`- found ${positionData.length} positions queued for liquidation.`)
 
-		const { txs, debtsToRepay } = this.produceLiquidationTxs(positionData)
+		const { txs, debtsToRepay } = await this.produceLiquidationTxs(positionData)
 		const debtCoins: Coin[] = []
 		debtsToRepay.forEach((amount, denom) => debtCoins.push({ denom, amount: amount.toFixed(0) }))
 		// deposit any neutral in our account before starting liquidations
 		const firstMsgBatch: EncodeObject[] = []
-		this.appendSwapToDebtMessages(
+		await this.appendSwapToDebtMessages(
 			debtCoins,
 			liquidatorAddress,
 			firstMsgBatch,

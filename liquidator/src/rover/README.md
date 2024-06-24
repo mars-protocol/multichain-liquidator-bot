@@ -13,3 +13,18 @@ At a high level, liquidations on rover will be as follows
 - `SWAP` Optionally, swap the asset
 
 This is a simplistic approach that gives a high level overview, however there are nuances to it
+
+## How to run
+
+Install dependencies, Copy accross the .env file and run
+
+```
+npm install
+cp .env.sample .env
+make run
+```
+
+
+
+
+

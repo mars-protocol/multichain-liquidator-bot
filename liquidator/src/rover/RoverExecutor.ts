@@ -2,7 +2,7 @@ import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { produceExecuteContractMessage, produceSendMessage, sleep } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
 import { fetchBalances, fetchRoverData, fetchRoverPosition } from '../query/hive'
-import { LiquidationActionGenerator } from './LiquidationActionGenerator'
+import { ActionGenerator } from './ActionGenerator'
 import {
 	Coin,
 	VaultPosition,
@@ -41,7 +41,7 @@ export interface RoverExecutorConfig extends BaseExecutorConfig {
 export class RoverExecutor extends BaseExecutor {
 	private VAULT_RELOAD_WINDOW = 1800000
 	public config: RoverExecutorConfig
-	private liquidationActionGenerator: LiquidationActionGenerator
+	private liquidationActionGenerator: ActionGenerator
 	private creditLines: UserDebtResponse[] = []
 	private creditLineCaps: UncollateralizedLoanLimitResponse[] = []
 
@@ -50,7 +50,7 @@ export class RoverExecutor extends BaseExecutor {
 
 	private whitelistedCoins: string[] = []
 	private vaults: string[] = []
-	private vaultDetails: Map<string, VaultInfo> = new Map()
+	private vaultInfo: Map<string, VaultInfo> = new Map()
 	private lastFetchedVaultTime = 0
 
 	private wallet: DirectSecp256k1HdWallet
@@ -64,15 +64,13 @@ export class RoverExecutor extends BaseExecutor {
 	) {
 		super(config, client, queryClient, poolProvider)
 		this.config = config
-		this.liquidationActionGenerator = new LiquidationActionGenerator(this.ammRouter)
+		this.liquidationActionGenerator = new ActionGenerator(this.ammRouter)
 		this.wallet = wallet
 	}
 
 	// Entry to rover executor
 	start = async () => {
-		await this.initiateAstroportPoolProvider()
 		await this.refreshData()
-
 		// set up accounts
 		const accounts = await this.wallet.getAccounts()
 		// get liquidator addresses
@@ -81,8 +79,7 @@ export class RoverExecutor extends BaseExecutor {
 			.map((account) => account.address)
 
 		// initiate our wallets (in case they are not)
-		await this.topUpWallets(liquidatorAddresses)
-		console.log('topped up wallets')
+		await this.ensureWorkerMinBalance(liquidatorAddresses)
 		// Fetch or create our credit accounts for each address
 
 		const createCreditAccountpromises : Promise<CreateCreditAccountResponse>[] = []
@@ -103,12 +100,197 @@ export class RoverExecutor extends BaseExecutor {
 			await this.run()
 		}
 	}
-	updateLiquidatorBalances = async () => {
-		const liquidatorAddresses = Array.from(this.liquidatorAccounts.keys())
-		await this.topUpWallets(liquidatorAddresses)
+
+	run = async () => {
+
+		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
+		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/creditmanager`
+
+		const response = await fetch(url);
+		let targetAccountObjects: {
+			account_id: string,
+			health_factor: string,
+			total_debt: string
+		}[] = (await response.json())['data']
+
+		const  targetAccounts = targetAccountObjects.filter(
+			(account) =>
+				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
+				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
+				// To target specific accounts, filter here
+				// account.account_id === "22372" &&
+				account.total_debt.length > 3
+			)
+			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
+
+		console.log(targetAccounts.length)
+		
+		// Sleep to avoid spamming.
+		if (targetAccounts.length == 0) {
+			await sleep(2000)
+			return
+		}
+
+		// Dispatch our liquidations
+		// We dispatch one liquidation per liquidator worker account.
+		// Set the number of liquidators in the .env
+
+		// create chunks of accounts to liquidate
+		const unhealthyAccountChunks = []
+		for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {
+			unhealthyAccountChunks.push(targetAccounts.slice(i, i + this.liquidatorAccounts.size))
+		}
+
+		// iterate over chunks and liquidate
+		for (const chunk of unhealthyAccountChunks) {
+			const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
+			const liquidationPromises : Promise<void>[] = []
+			for (const account of chunk) {
+				const nextLiquidator = liquidatorAddressesIterator.next()
+				console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
+				liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value))
+			}
+			await Promise.all(liquidationPromises)
+			console.log('sleeping until next block')
+			await sleep(4000)
+		}
 	}
 
-	topUpWallets = async(addresses: string[]) => {
+	liquidate = async (accountId: string, liquidatorAddress : string) => {
+		try {
+			console.log('liquidating: ', accountId )
+			const roverPosition = await fetchRoverPosition(
+				accountId,
+				this.config.creditManagerAddress,
+				this.config.hiveEndpoint,
+			)
+
+			// find best collateral / debt
+			const bestCollateral: Collateral = this.findBestCollateral(
+				roverPosition.deposits,
+				roverPosition.lends.map((lentAmount) => { return { denom : lentAmount.denom, amount: lentAmount.amount } }),
+				roverPosition.vaults,
+			)
+
+			const bestDebt: Debt = this.findBestDebt(
+				roverPosition.debts.map((debtAmount) => {
+					return { amount: debtAmount.amount, denom: debtAmount.denom }
+				}),
+			)
+
+			//  - do message construction
+			// borrow messages will include the swap if we cannot borrow debt asset directly
+			const borrowActions = this.liquidationActionGenerator.produceBorrowActions(
+				bestDebt,
+				bestCollateral,
+				this.markets,
+				this.whitelistedCoins,
+				this.creditLines,
+				this.creditLineCaps,
+			)
+
+			// variables
+			const { borrow } = borrowActions[0] as { borrow: Coin }
+			const swapWinnings = (bestDebt.amount * this.prices.get(bestDebt.denom)!) > 1000000
+			const slippage =  process.env.SLIPPAGE ||  '0.005'
+
+			const liquidateMessage = this.liquidationActionGenerator.produceLiquidationAction(
+				bestCollateral.type,
+				{ denom: bestDebt.denom, amount: borrow.amount },
+				roverPosition.account_id,
+				bestCollateral.denom,
+				bestCollateral.vaultType,
+			)
+
+			const vault = this.vaultInfo.get(bestCollateral.denom)
+
+			const collateralToDebtActions = bestCollateral.denom !== borrow.denom
+				? await this.liquidationActionGenerator.convertCollateralToDebt(
+					bestCollateral.denom,
+					borrow,
+					vault,
+					slippage,
+					this.prices
+				)
+				: []
+
+			const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
+			// todo estimate amount based on repay to prevent slippage.
+			const swapToStableMsg =
+				borrow.denom !== this.config.neutralAssetDenom && swapWinnings
+					? [
+						await this.liquidationActionGenerator.generateSwapActions(
+							borrow.denom,
+							this.config.neutralAssetDenom,
+							bestDebt.amount.toFixed(0),
+							slippage
+					)]
+					: []
+			const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
+
+			const actions = [
+				...borrowActions,
+				liquidateMessage,
+				...collateralToDebtActions,
+				...repayMsg,
+				...swapToStableMsg,
+				refundAll,
+			]
+			if (process.env.DEBUG) {
+				actions.forEach((action) => console.log(JSON.stringify(action)))
+			}
+
+			const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
+
+			const msg = {
+				update_credit_account: { account_id: liquidatorAccountId, actions },
+			}
+
+			const msgs : EncodeObject[] = [
+				produceExecuteContractMessage(
+					liquidatorAddress,
+					this.config.creditManagerAddress,
+					toUtf8(JSON.stringify(msg)),
+				),
+			]
+
+			// add msg to send liquidators STABLE balance to master address. This will only send previously accrued 
+			// winnings, but not those from the current liquidation (if successfull)
+			const liquidatorBalances = this.liquidatorBalances.get(liquidatorAddress)
+			const stable = liquidatorBalances?.find((coin)=> coin.denom === this.config.neutralAssetDenom)
+
+			if (stable!== undefined && new BigNumber(stable.amount).isGreaterThan(this.config.stableBalanceThreshold)) {
+				const sendMsg = produceSendMessage(liquidatorAddress, this.config.liquidatorMasterAddress, [stable])
+				msgs.push(sendMsg)
+			}
+
+			const fee = this.config.chainName.toLowerCase() === "osmosis" ? await this.getOsmosisFee(msgs, liquidatorAddress) : 'auto'
+			const result = await this.client.signAndBroadcast(
+				liquidatorAddress,
+				msgs,
+				fee,
+			)
+
+			if (result.code !== 0) {
+				console.log(`Liquidation failed. TxHash: ${result.transactionHash}`)
+			} else {
+				console.log(`Liquidation successfull. TxHash: ${result.transactionHash}, account : ${accountId}`)
+			}
+		} catch(ex) {
+			if (process.env.DEBUG) {
+				console.error(ex)
+			}
+		}
+	}
+
+	/// Helpers
+
+	updateLiquidatorBalances = async () => {
+		const liquidatorAddresses = Array.from(this.liquidatorAccounts.keys())
+		await this.ensureWorkerMinBalance(liquidatorAddresses)
+	}
+
+	ensureWorkerMinBalance = async(addresses: string[]) => {
 		try {
 			const balances = await fetchBalances(this.config.hiveEndpoint, addresses)
 			this.liquidatorBalances= balances
@@ -116,7 +298,6 @@ export class RoverExecutor extends BaseExecutor {
 			const amountToSend = this.config.minGasTokens * 2
 			for (const address of Array.from(balances.keys())) {
 				const osmoBalance = Number(balances.get(address)?.find((coin : Coin) => coin.denom === this.config.gasDenom)?.amount || 0)
-
 				if (osmoBalance === undefined || osmoBalance < this.config.minGasTokens) {
 					// send message to send gas tokens to our liquidator
 					sendMsgs.push(produceSendMessage(this.config.liquidatorMasterAddress,address, [{denom: this.config.gasDenom, amount : amountToSend.toFixed(0)}]))
@@ -126,11 +307,10 @@ export class RoverExecutor extends BaseExecutor {
 			if (sendMsgs.length > 0) {
 				const fee = await this.getOsmosisFee(sendMsgs, this.config.liquidatorMasterAddress)
 				await this.client.signAndBroadcast(this.config.liquidatorMasterAddress, sendMsgs, fee)
-				console.log(`topped up ${sendMsgs.length} wallets`)
 			}
 		} catch(ex) {
-			console.error(JSON.stringify(ex))
-		}
+			console.error(ex)
+		} finally {}
 	}
 
 	fetchVaults = async () => {
@@ -182,6 +362,7 @@ export class RoverExecutor extends BaseExecutor {
 				this.config.creditManagerAddress,
 				this.config.swapperAddress,
 				this.vaults,
+				this.config.marsParamsAddress,
 			)
 
 			await this.refreshMarketData()
@@ -191,14 +372,10 @@ export class RoverExecutor extends BaseExecutor {
 				this.prices.set(price.denom, Number(price.price)),
 			)
 			this.whitelistedCoins = roverData.whitelistedAssets! as string[]
-
-			this.vaultDetails = roverData.vaultInfo
+			this.vaultInfo = roverData.vaultInfo
 			this.creditLines = roverData.creditLines
 			this.creditLineCaps = roverData.creditLineCaps
 
-			this.liquidationActionGenerator.setSwapperRoutes(roverData.routes)
-
-			await this.refreshPoolData(this.prices, this.markets)
 		} catch(ex) {
 			console.error(JSON.stringify(ex))
 		}
@@ -245,165 +422,6 @@ export class RoverExecutor extends BaseExecutor {
 		return { liquidatorAddress, tokenId: tokens[0] }
 	}
 
-	run = async () => {
-
-		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/creditmanager`
-
-		const response = await fetch(url);
-		let targetAccountObjects: {
-			account_id: string,
-			health_factor: string,
-			total_debt: string
-		}[] = (await response.json())['data']
-		const  targetAccounts = targetAccountObjects.filter(
-			(account) =>
-				Number(account.health_factor) < 0.97 &&
-				account.account_id === "8496" &&
-				Number(account.health_factor) > 0.3 &&
-				account.total_debt.length > 4
-			)
-			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
-			.map((account)=> account.account_id)
-			.slice(0, this.config.maxLiquidators)
-
-		// Sleep to avoid spamming redis db when empty.
-		if (targetAccounts.length == 0) {
-			await sleep(2000)
-			return
-		}
-
-		// Dispatch our liquidations
-		const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
-		const liquidationPromises : Promise<void>[] = []
-		for (const targetAccount of targetAccounts) {
-			const next = liquidatorAddressesIterator.next()
-			const liquidatorAddress : string = next.value
-			liquidationPromises.push(this.liquidate(targetAccount, liquidatorAddress))
-		}
-
-		await Promise.all(liquidationPromises)
-		await sleep(200000)
-	}
-
-	liquidate = async (accountId: string, liquidatorAddress : string) => {
-		console.log('liquidating: ', accountId )
-		const roverPosition = await fetchRoverPosition(
-			accountId,
-			this.config.creditManagerAddress,
-			this.config.hiveEndpoint,
-		)
-
-		// find best collateral / debt
-		const bestCollateral: Collateral = this.findBestCollateral(
-			roverPosition.deposits,
-			roverPosition.lends,
-			roverPosition.vaults,
-		)
-
-		const bestDebt: Debt = this.findBestDebt(
-			roverPosition.debts.map((debtAmount) => {
-				return { amount: debtAmount.amount, denom: debtAmount.denom }
-			}),
-		)
-
-		//  - do message construction
-		// borrow messages will include the swap if we cannot borrow debt asset directly
-		const borrowActions = this.liquidationActionGenerator.produceBorrowActions(
-			bestDebt,
-			bestCollateral,
-			this.markets,
-			this.whitelistedCoins,
-			this.creditLines,
-			this.creditLineCaps,
-		)
-
-		// variables
-		const { borrow } = borrowActions[0] as { borrow: Coin }
-		const swapWinnings = (bestDebt.amount * this.prices.get(bestDebt.denom)!) > 10000000
-		const slippage =  process.env.SLIPPAGE ||  '0.005'
-
-		const liquidateMessage = this.liquidationActionGenerator.produceLiquidationAction(
-			bestCollateral.type,
-			{ denom: bestDebt.denom, amount: borrow.amount },
-			roverPosition.account_id,
-			bestCollateral.denom,
-			bestCollateral.vaultType,
-		)
-
-		const vault = this.vaultDetails.get(bestCollateral.denom)
-
-		const collateralToDebtActions = bestCollateral.denom !== borrow.denom
-			? this.liquidationActionGenerator.convertCollateralToDebt(
-				bestCollateral.denom,
-				borrow,
-				vault,
-				slippage
-			)
-			: []
-
-		const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
-
-		// todo estimate amount based on repay to prevent slippage.
-		// note : the actual msg does not use the amount passed here - it just swaps everything in the credit account
-		// note 2 : The asset here will be the coin we borrowed, not collateral - as we swap all the collateral to debt asset above
-		const swapToStableMsg =
-			borrow.denom !== this.config.neutralAssetDenom && swapWinnings
-				? this.liquidationActionGenerator.generateSwapActions(
-						borrow.denom,
-						this.config.neutralAssetDenom,
-						'1000000',
-						slippage
-				  )
-				: []
-		const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
-
-		const actions = [
-			...borrowActions,
-			liquidateMessage,
-			...collateralToDebtActions,
-			...repayMsg,
-			...swapToStableMsg,
-			refundAll,
-		]
-		
-		const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
-		const msg = {
-			update_credit_account: { account_id: liquidatorAccountId, actions },
-		}
-
-		const msgs : EncodeObject[] = [
-			produceExecuteContractMessage(
-				liquidatorAddress,
-				this.config.creditManagerAddress,
-				toUtf8(JSON.stringify(msg)),
-			),
-		]
-
-		// add msg to send liquidators STABLE balance to master address. This will only send previously accrued 
-		// winnings, but not those from the current liquidation (if successfull)
-		const liquidatorBalances = this.liquidatorBalances.get(liquidatorAddress)
-		const stable = liquidatorBalances?.find((coin)=> coin.denom === this.config.neutralAssetDenom)
-
-		if (stable!== undefined && new BigNumber(stable.amount).isGreaterThan(this.config.stableBalanceThreshold)) {
-			const sendMsg = produceSendMessage(liquidatorAddress, this.config.liquidatorMasterAddress, [stable])
-			msgs.push(sendMsg)
-		}
-
-		const fee = this.config.chainName.toLowerCase() === "osmosis" ? await this.getOsmosisFee(msgs, liquidatorAddress) : 'auto'
-		const result = await this.client.signAndBroadcast(
-			liquidatorAddress,
-			msgs,
-			fee,
-		)
-
-		if (result.code !== 0) {
-			console.log(`Liquidation failed. TxHash: ${result.transactionHash}`)
-		} else {
-			console.log(`Liquidation successfull. TxHash: ${result.transactionHash}`)
-		}
-	}
-
 	findBestCollateral = (deposits: Coin[], lends: Coin[], vaultPositions: VaultPosition[]): Collateral => {
 
 		const largestDeposit = deposits
@@ -417,7 +435,6 @@ export class RoverExecutor extends BaseExecutor {
 		const largestCollateralCoin = this.calculateCoinValue(largestDeposit) > this.calculateCoinValue(largestLend) 
 			? largestDeposit
 			: largestLend
-
 
 		const largestCollateralVault = vaultPositions
 			.sort(
@@ -472,7 +489,7 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	calculateVaultSharesValue = (shares: BigNumber, vaultAddress: string): BigNumber => {
-		const vault = this.vaultDetails.get(vaultAddress)
+		const vault = this.vaultInfo.get(vaultAddress)
 		if (!vault) throw new Error(UNSUPPORTED_VAULT)
 		const positionLpShares = shares.multipliedBy(vault.lpShareToVaultShareRatio)
 		const lpSharePrice = this.prices.get(vault.baseToken) || 0

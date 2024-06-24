@@ -1,41 +1,36 @@
-import { AMMRouter } from '../AmmRouter'
-import { MarketInfo } from './types/MarketInfo'
-import { Collateral, Debt, PositionType } from './types/RoverPosition'
+import { AMMRouter } from '../AmmRouter.js'
+import { MarketInfo } from './types/MarketInfo.js'
+import { Collateral, Debt, PositionType } from './types/RoverPosition.js'
 import {
 	Action,
 	Coin,
 	VaultPositionType,
 	VaultBaseForString,
+	SwapperRoute,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
-import { RouteHop } from '../types/RouteHop'
+import { RouteHop } from '../types/RouteHop.js'
 import {
 	NO_ROUTE_FOR_SWAP,
 	NO_VALID_MARKET,
 	POOL_NOT_FOUND,
 	UNSUPPORTED_VAULT,
 } from './constants/errors.js'
-import { GENERIC_BUFFER } from '../constants'
+import { GENERIC_BUFFER } from '../constants.js'
 import {
 	UncollateralizedLoanLimitResponse,
 	UserDebtResponse,
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
-import { findUnderlying } from '../helpers'
-import { SwapperRoute } from '../types/swapper'
-import { VaultInfo } from '../query/types'
-import { PoolType, XYKPool } from '../types/Pool'
+import { createOsmoRoute, findUnderlying } from '../helpers.js'
+import { VaultInfo } from '../query/types.js'
+import { PoolType, XYKPool } from '../types/Pool.js'
+import { getRoute } from '../query/sidecar.js'
 
-export class LiquidationActionGenerator {
+export class ActionGenerator {
 	private router: AMMRouter
-	private swapperRoutes: SwapperRoute[]
 
 	constructor(osmosisRouter: AMMRouter) {
 		this.router = osmosisRouter
-		this.swapperRoutes = []
-	}
-
-	setSwapperRoutes = (swapperRoutes: SwapperRoute[]) => {
-		this.swapperRoutes = swapperRoutes
 	}
 
 	/**
@@ -61,11 +56,17 @@ export class LiquidationActionGenerator {
 		creditLineCaps: UncollateralizedLoanLimitResponse[],
 	): Action[] => {
 
+		// TODO remove caps
 		if (false) console.log(creditLines, creditLineCaps)
 
 		// estimate our debt to repay - this depends on collateral amount and close factor
-		const maxRepayValue = (collateral.value * collateral.closeFactor) / 2
+		let maxRepayValue = (collateral.value * collateral.closeFactor)
 		const maxDebtValue = debt.amount * debt.price
+		const debtCeiling = 10000000000
+		if (maxDebtValue > debtCeiling) {
+			maxRepayValue = debtCeiling
+		}
+
 		const debtToRepayRatio = maxDebtValue <= maxRepayValue ? 1 : maxRepayValue / maxDebtValue
 
 		// debt amount is a number, not a value (e.g in dollar / base asset denominated terms)
@@ -78,22 +79,9 @@ export class LiquidationActionGenerator {
 
 		// if asset is not enabled, or we have less than 50% the required liquidity, do alternative borrow
 		const marketInfo: MarketInfo | undefined = markets.find((market) => market.denom === debt.denom)
-		// const creditLine: UserDebtResponse | undefined = creditLines.find(
-		// 	(creditLine) => creditLine.uncollateralized && debt.denom === creditLine.denom,
-		// )
-		// const creditLineCap: UncollateralizedLoanLimitResponse | undefined = creditLineCaps.find(
-		// 	(creditLineCap) => creditLineCap.denom == debt.denom,
-		// )
-
-		// const remainingCreditLine =
-		// 	creditLineCap && creditLine
-		// 		? BigNumber(creditLineCap.limit).minus(creditLine.amount)
-		// 		: new BigNumber(0)
 		if (
 			!marketInfo ||
 			// TODO - check if asset is whitelisted
-			// !whitelistedAssets.find((denom) => denom === debt.denom) ||
-			// remainingCreditLine.dividedBy(2).isLessThan(debtAmount) ||
 			marketInfo.available_liquidity / debtAmount < 0.5
 		) {
 			return this.borrowWithoutLiquidity(debtCoin, markets, whitelistedAssets)
@@ -138,6 +126,8 @@ export class LiquidationActionGenerator {
 
 			.sort((marketA, marketB) => {
 				// find best routes for each market we are comparing. Best meaning cheapest input amount to get our required output
+
+				// TODO we should look to use sqs routes here, to tap into that liquidity
 				const marketARoute = this.router.getBestRouteGivenOutput(
 					marketA.denom,
 					debtCoin.denom,
@@ -219,36 +209,36 @@ export class LiquidationActionGenerator {
 		return actions
 	}
 	
-	private getAvailablePools = (): number[] => {
-		const pools : number[] = []
-		
-		this.swapperRoutes.forEach((route) => {
-			route.route.forEach((hop) => {
-				// Check if we have already pushed that pool
-				if (pools.find((pool)=> pool === hop.pool_id) === undefined) {
-					pools.push(hop.pool_id as number)
-				}
-			})
-		})
+	// private getAvailablePools = (): number[] => {
+	// 	const pools : number[] = []
 
-		return pools
-	}
+	// 	this.swapperRoutes.forEach((route) => {
+	// 		route.route.forEach((hop) => {
+	// 			// Check if we have already pushed that pool
+	// 			if (pools.find((pool)=> pool === hop.pool_id) === undefined) {
+	// 				pools.push(hop.pool_id as number)
+	// 			}
+	// 		})
+	// 	})
 
-	private isViableRoute = (route: RouteHop[]): boolean => {
+	// 	return pools
+	// }
 
-		return (
-			route.filter(
-				(hop) =>
-					this.swapperRoutes.find(
-						(swapperRoute) =>
-							(swapperRoute.denom_in === hop.tokenInDenom &&
-							swapperRoute.denom_out === hop.tokenOutDenom) ||
-							(swapperRoute.denom_in === hop.tokenOutDenom &&
-								swapperRoute.denom_out === hop.tokenInDenom),
-					) !== undefined,
-			).length > 0
-		)
-	}
+	// private isViableRoute = (route: RouteHop[]): boolean => {
+	// 	return true
+	// 	return (
+	// 		route.filter(
+	// 			(hop) =>
+	// 				this.swapperRoutes.find(
+	// 					(swapperRoute) =>
+	// 						(swapperRoute.denom_in === hop.tokenInDenom &&
+	// 						swapperRoute.denom_out === hop.tokenOutDenom) ||
+	// 						(swapperRoute.denom_in === hop.tokenOutDenom &&
+	// 							swapperRoute.denom_out === hop.tokenInDenom),
+	// 				) !== undefined,
+	// 		).length > 0
+	// 	)
+	// }
 	/**
 	 * Swap the coillateral we won to repay the debt we borrowed. This method calculates the
 	 * best route and returns an array of swap actions (on action per route hop) to execute
@@ -258,33 +248,29 @@ export class LiquidationActionGenerator {
 	 *
 	 * @param assetInDenom
 	 * @param assetOutDenom
-	 * @param outAmount
+	 * @param amount
 	 * @returns An array of swap actions that convert the asset from collateral to the debt.
 	 */
-	generateSwapActions = (
+	generateSwapActions = async(
 		assetInDenom: string,
 		assetOutDenom: string,
-		outAmount: string,
+		amount: string,
 		slippage: string
-	): Action[] => {
-		const bnOut = new BigNumber(outAmount)
+	): Promise<Action> => {
+		// const bnOut = new BigNumber(outAmount)
 
-		const swapperPools : number[] = this.getAvailablePools()
+		let sqsRoute = await getRoute(
+			'https://sqs.osmosis.zone/',
+			amount,
+			assetInDenom,
+			assetOutDenom
+		);
 
-		const usablePools = this.router.getPools().filter((pool) => swapperPools.indexOf(Number(pool.id)) !== -1)
+		let swapper_route : SwapperRoute = {
+			osmo: createOsmoRoute(sqsRoute)
+		} 
 
-		this.router.setPools(usablePools)
-
-		const routes: RouteHop[][] = this.router.getRoutes(assetInDenom, assetOutDenom)
-
-		const enabledRoutes = routes.filter((route) => this.isViableRoute(route))
-		const route = this.router.getRouteWithLowestInput(bnOut, enabledRoutes)
-
-		if (route.length === 0) throw new Error(`${NO_ROUTE_FOR_SWAP}. ${assetInDenom} -> ${assetOutDenom}`)
-
-		return route.map((hop: RouteHop) =>
-			this.produceSwapAction(hop.tokenInDenom, hop.tokenOutDenom, slippage),
-		)
+		return this.produceSwapAction(assetInDenom, assetOutDenom, slippage, swapper_route)
 	}
 
 	produceRefundAllAction = (): Action => {
@@ -307,7 +293,7 @@ export class LiquidationActionGenerator {
 			: this.produceLiquidateCoin(debtCoin, liquidateeAccountId, requestCoinDenom, positionType === PositionType.DEPOSIT)
 	}
 
-	produceVaultToDebtActions = (vault: VaultInfo, borrowDenom: string, slippage: string): Action[] => {
+	produceVaultToDebtActions = async (vault: VaultInfo, borrow: Coin, slippage: string, prices: Map<string, number>): Promise<Action[]> => {
 		let vaultActions: Action[] = []
 		if (!vault) throw new Error(UNSUPPORTED_VAULT)
 
@@ -319,6 +305,7 @@ export class LiquidationActionGenerator {
 
 		vaultActions.push(withdraw)
 
+		// Convert pool assets to borrowed asset
 		const pool = this.router.getPool(poolId!)
 
 		// todo log id - this shouldn't happen though
@@ -328,15 +315,24 @@ export class LiquidationActionGenerator {
 		if (pool.poolType === PoolType.CONCENTRATED_LIQUIDITY || pool.poolType === PoolType.STABLESWAP) {
 			return []
 		}
-		
-		(pool as XYKPool).poolAssets
-			.filter((poolAsset) => poolAsset.token.denom !== borrowDenom)
-			.forEach(
-				(poolAsset) =>
-					(vaultActions = vaultActions.concat(
-						this.generateSwapActions(poolAsset.token.denom, borrowDenom, '1', slippage),
-					)),
-			)
+
+		let filteredPools = (pool as XYKPool).poolAssets
+			.filter((poolAsset) => poolAsset.token.denom !== borrow.denom)
+
+		for (const poolAsset of filteredPools) {
+			const asset_out_price = prices.get(borrow.denom) || 0
+			const asset_in_price = prices.get(poolAsset.token.denom) || 0
+			const amount_in = new BigNumber(asset_out_price / asset_in_price)
+									.multipliedBy(borrow.amount);
+			(vaultActions.push(
+				await this.generateSwapActions(
+					poolAsset.token.denom,
+					borrow.denom,
+					amount_in.toFixed(0),
+					slippage
+				),
+			))
+		}
 		return vaultActions
 	}
 
@@ -363,18 +359,19 @@ export class LiquidationActionGenerator {
 		return actions
 	}
 
-	convertCollateralToDebt = (
+	convertCollateralToDebt = async (
 		collateralDenom: string,
 		borrow: Coin,
 		vault: VaultInfo | undefined,
-		slippage: string
-	): Action[] => {
+		slippage: string,
+		prices: Map<string, number>,
+	): Promise<Action[]> => {
 		return vault !== undefined
-			? this.produceVaultToDebtActions(vault!, borrow.denom, slippage)
-			: this.swapCollateralCoinToBorrowActions(collateralDenom, borrow, slippage)
+			? await this.produceVaultToDebtActions(vault!, borrow, slippage, prices)
+			: await this.swapCollateralCoinToBorrowActions(collateralDenom, borrow, slippage, prices)
 	}
 
-	swapCollateralCoinToBorrowActions = (collateralDenom: string, borrowed: Coin, slippage: string): Action[] => {
+	swapCollateralCoinToBorrowActions = async(collateralDenom: string, borrowed: Coin, slippage: string, prices: Map<string, number>): Promise<Action[]> => {
 		let actions: Action[] = []
 		// if gamm token, we need to do a withdraw of the liquidity
 		if (collateralDenom.startsWith('gamm/')) {
@@ -383,14 +380,22 @@ export class LiquidationActionGenerator {
 
 			// find underlying tokens and swap to borrowed asset
 			const underlyingDenoms = findUnderlying(collateralDenom, this.router.getPools())
-			underlyingDenoms?.forEach((denom) => {
+
+			for (const denom of underlyingDenoms!) {
 				if (denom !== borrowed.denom) {
-					actions = actions.concat(this.generateSwapActions(denom, borrowed.denom, borrowed.amount, slippage))
+					const asset_out_price = prices.get(borrowed.denom) || 0
+					const asset_in_price = prices.get(collateralDenom) || 0
+					const amount_in = new BigNumber(asset_out_price / asset_in_price).multipliedBy(Number(borrowed.amount))
+					console.log(amount_in.toFixed(0))
+					actions = actions.concat(await this.generateSwapActions(denom, borrowed.denom, amount_in.toFixed(0), slippage))
 				}
-			})
+			}
 		} else {
+			const asset_out_price = prices.get(borrowed.denom) || 0
+			const asset_in_price = prices.get(collateralDenom) || 0
+			const amount_in = new BigNumber(asset_out_price / asset_in_price).multipliedBy(Number(borrowed.amount))
 			actions = actions.concat(
-				this.generateSwapActions(collateralDenom, borrowed.denom, borrowed.amount, slippage),
+				await this.generateSwapActions(collateralDenom, borrowed.denom, amount_in.toFixed(0), slippage),
 			)
 		}
 
@@ -448,12 +453,14 @@ export class LiquidationActionGenerator {
 		denomIn: string,
 		denomOut: string,
 		slippage: string = '0.005',
+		route: SwapperRoute | null = null,
 	): Action => {
 		return {
 			swap_exact_in: {
 				coin_in: { denom: denomIn, amount: 'account_balance' },
 				denom_out: denomOut,
 				slippage: slippage,
+				route: route,
 			},
 		}
 	}

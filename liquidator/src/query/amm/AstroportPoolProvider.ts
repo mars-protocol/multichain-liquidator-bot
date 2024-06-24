@@ -30,7 +30,7 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
         return this.pairs
     }
     
-   loadPools = async ():Promise<Pool[]>  => {
+    loadPools = async ():Promise<Pool[]>  => {
         let retries = 0    
 
         if (this.pairs.length === 0) {

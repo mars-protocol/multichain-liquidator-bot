@@ -27,7 +27,10 @@ export interface BaseExecutorConfig {
 	poolsRefreshWindow: number
 	astroportFactory?: string
 	astroportRouter?: string
+	// The mars api endpoint
 	marsEndpoint?: string
+	// The sidecar query server url
+	sqsUrl?: string
 }
 
 /**
@@ -65,10 +68,9 @@ export class BaseExecutor {
 	}
 
 	async initiateAstroportPoolProvider(): Promise<void> {
-		if (this.config.chainName === "neutron") {
-			const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
-			await astroportPoolProvider.initiate()
-		}
+		
+		const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
+		await astroportPoolProvider.initiate()
 	}
 
 	applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {
@@ -118,7 +120,6 @@ export class BaseExecutor {
 		bank.balance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
 		wasm.prices.forEach((price: PriceResponse) => this.prices.set(price.denom, Number(price.price)))
 		await this.refreshMarketData()
-		await this.refreshPoolData(this.prices, this.markets)
 	}
 
 	refreshMarketData = async() => {
@@ -205,13 +206,13 @@ export class BaseExecutor {
 			throw new Error(
 				'Stargate Client is undefined, ensure you call initiate at before calling this method',
 			)
-		const gasPriceRequest = await fetch("https://lcd.osmosis.zone/osmosis/txfees/v1beta1/cur_eip_base_fee")
+		const gasPriceRequest = await fetch(`${process.env.LCD_ENDPOINT}/osmosis/txfees/v1beta1/cur_eip_base_fee?x-apikey=${process.env.API_KEY}`)
 		const { base_fee: baseFee } = await gasPriceRequest.json()
 		const gasEstimated = await this.client.simulate(address, msgs, '')
 		const gas = Number(gasEstimated * 1.3)
 		const gasPrice = Number(baseFee)
-		const safeGasPrice = gasPrice < 0.025 ? 0.005 : gasPrice
-		const amount = coins(((gas * safeGasPrice)+1).toFixed(0), this.config.gasDenom)
+		const safeGasPrice = gasPrice < 0.025 ? 0.025 : gasPrice
+		const amount = coins((((gas * safeGasPrice)+1)).toFixed(0), this.config.gasDenom)
 		const fee = {
 			amount,
 			gas: gas.toFixed(0),

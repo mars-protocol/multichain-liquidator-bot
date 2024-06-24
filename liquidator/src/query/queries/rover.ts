@@ -4,6 +4,7 @@ export const produceCoreRoverDataQuery = (
 	oracleAddress: string,
 	creditManagerAddress: string,
 	swapperAddress: string,
+  params_address: string,
 ) => {
 	return `{
     bank {
@@ -26,8 +27,8 @@ export const produceCoreRoverDataQuery = (
           query: { user_debts: { user :"${creditManagerAddress}"} }
         ),
         whitelistedAssets: contractQuery(
-          contractAddress: "${creditManagerAddress}"
-          query: { allowed_coins: {} }
+          contractAddress: "${params_address}"
+          query: { all_asset_params: {} }
         ),
         creditLineCaps: contractQuery(
           contractAddress: "${redbankAddress}"

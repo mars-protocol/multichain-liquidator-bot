@@ -6,6 +6,7 @@ import { ConcentratedLiquidityPool, Pool, PoolType,  XYKPool } from './types/Poo
 
 import { Coin, Dec, Int } from '@keplr-wallet/unit'
 import { ConcentratedLiquidityMath, BigDec } from '@osmosis-labs/math'
+import Long from 'long'
 // const { calcOutGivenIn, calcInGivenOut } = ConcentratedLiquidityMath
 
 export interface AMMRouterInterface {
@@ -230,7 +231,6 @@ export class AMMRouter implements AMMRouterInterface {
 
 
 						if (result === "no-more-ticks") {
-							console.log('no more ticks')
 							tokenOutRequired = new BigNumber(10000000000000)
 							break
 						}
@@ -282,14 +282,12 @@ export class AMMRouter implements AMMRouterInterface {
 		return amountAfterFees
 	}
 
-	getBestRouteGivenInput(
+	async getBestRouteGivenInput(
 		tokenInDenom: string,
 		tokenOutDenom: string,
 		amountIn: BigNumber,
-	): RouteHop[] {
-
+	): Promise<RouteHop[]> {
 		const routeOptions = this.getRoutes(tokenInDenom, tokenOutDenom)
-
 		return this.getRouteWithHighestOutput(amountIn, routeOptions)
 	}
 
@@ -329,6 +327,7 @@ export class AMMRouter implements AMMRouterInterface {
 		tokenOutDenom: string,
 		amountOut: BigNumber,
 	): RouteHop[] {
+
 		const routeOptions = this.getRoutes(tokenInDenom, tokenOutDenom)
 		return this.getRouteWithLowestInput(amountOut, routeOptions)
 	}
