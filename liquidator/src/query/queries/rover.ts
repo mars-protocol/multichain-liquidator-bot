@@ -15,11 +15,11 @@ export const produceCoreRoverDataQuery = (
     wasm {
         markets: contractQuery(
             contractAddress: "${redbankAddress}"
-            query: { markets: {} }
+            query: { markets: { limit : 50 } }
         ),
         prices: contractQuery(
             contractAddress: "${oracleAddress}"
-            query: { prices: {} }
+            query: { prices: { limit : 50 } }
         ),
         creditLines: contractQuery(
           contractAddress: "${redbankAddress}"
@@ -27,7 +27,7 @@ export const produceCoreRoverDataQuery = (
         ),
         whitelistedAssets: contractQuery(
           contractAddress: "${creditManagerAddress}"
-          query: { allowed_coins: {} }
+          query: { allowed_coins: { limit : 50 } }
         ),
         creditLineCaps: contractQuery(
           contractAddress: "${redbankAddress}"

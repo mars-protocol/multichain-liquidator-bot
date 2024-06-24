@@ -2,7 +2,7 @@ import { AstroportPoolProvider } from "../../src/query/amm/AstroportPoolProvider
 
 describe("Astroport Pool Provider Tests", () => {
     const astroportFactoryContract = "neutron1jj0scx400pswhpjes589aujlqagxgcztw04srynmhf0f6zplzn2qqmhwj7"
-    const poolProvider = new AstroportPoolProvider(astroportFactoryContract,"https://testnet-neutron-gql.marsprotocol.io/graphql/")
+    const poolProvider = new AstroportPoolProvider(astroportFactoryContract,"https://testnet-neutron-gql.marsprotocol.io/graphql/", "todo")
 
     test("We can load pairs", async () => {
         const pairs = await poolProvider.fetchPairContracts(astroportFactoryContract)
@@ -12,7 +12,7 @@ describe("Astroport Pool Provider Tests", () => {
 
     test("We can load pools", async () => {
         const astroportFactoryContract = "neutron1jj0scx400pswhpjes589aujlqagxgcztw04srynmhf0f6zplzn2qqmhwj7"
-        const poolProvider = new AstroportPoolProvider(astroportFactoryContract,"https://testnet-neutron-gql.marsprotocol.io/graphql/")
+        const poolProvider = new AstroportPoolProvider(astroportFactoryContract,"https://testnet-neutron-gql.marsprotocol.io/graphql/", "tosdo")
         const pairs = await poolProvider.fetchPairContracts(astroportFactoryContract)
         poolProvider.setPairs(pairs)
 

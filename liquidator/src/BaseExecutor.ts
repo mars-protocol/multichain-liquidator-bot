@@ -28,6 +28,7 @@ export interface BaseExecutorConfig {
 	astroportFactory?: string
 	astroportRouter?: string
 	marsEndpoint?: string
+	chainId?: string
 }
 
 /**
@@ -123,7 +124,7 @@ export class BaseExecutor {
 		wasm.prices.forEach((price: PriceResponse) => this.prices.set(price.denom, Number(price.price)))
 		
 		await this.refreshMarketData()
-		await this.refreshPoolData()
+		// await this.refreshPoolData()
 	}
 
 	refreshMarketData = async() => {

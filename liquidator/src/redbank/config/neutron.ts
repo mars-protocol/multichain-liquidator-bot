@@ -23,7 +23,8 @@ export const getConfig = (
 				redisEndpoint: process.env.REDIS_ENDPOINT!,
 				poolsRefreshWindow: 60000,
 				marsEndpoint: "https://api.marsprotocol.io",
-				astroportFactory : 'neutron1hptk0k5kng7hjy35vmh009qd5m6l33609nypgf2yc6nqnewduqasxplt4e'
+				astroportFactory : 'neutron1hptk0k5kng7hjy35vmh009qd5m6l33609nypgf2yc6nqnewduqasxplt4e',
+				astroportApi: "https://app.astroport.fi/api/",
 		  }
 		: {
 			liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
@@ -42,5 +43,6 @@ export const getConfig = (
 			astroportFactory : 'neutron1jj0scx400pswhpjes589aujlqagxgcztw04srynmhf0f6zplzn2qqmhwj7',
 			redisEndpoint: process.env.REDIS_ENDPOINT!,
 			poolsRefreshWindow: 60000,
+			astroportApi: "https://app.astroport.fi/api/",
 	  }
 }

@@ -26,6 +26,8 @@ import { PoolDataProviderInterface } from '../../../src/query/amm/PoolDataProvid
 import { ExchangeInterface } from '../../../src/execute/ExchangeInterface'
 import { Osmosis } from '../../../src/execute/Osmosis.js'
 import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
+import { RouteRequesterInterface } from '../../../src/query/amm/RouteRequesterInterface.js'
+import { AstroportRouteRequester } from '../../../src/query/amm/AstroportRouteRequester.js'
 
 const EXECUTOR_QUEUE = 'executor_queue'
 const redisInterface = new RedisInterface()
@@ -99,6 +101,7 @@ const runTest = async (testConfig: TestConfig, numberOfPositions: number) => {
 		queueName: 'redbank-queue',
 		redisEndpoint: '',
 		poolsRefreshWindow: 60000,
+		astroportApi: "https://app.astroport.fi/api/",
 	}
 
 	const osmoToSend = { amount: '11000000', denom: testConfig.gasDenom }
@@ -164,9 +167,11 @@ const runTest = async (testConfig: TestConfig, numberOfPositions: number) => {
 
 	const poolProvider = new OsmosisPoolProvider(testConfig.lcdEndpoint)
 	const exchangeInterface = new Osmosis()
+	const api = new AstroportRouteRequester()
+	
 	console.log(`================= executing liquidations =================`)
 	// execute liquidations
-	await dispatchLiquidations(sgClient, cwClient, config, poolProvider, exchangeInterface)
+	await dispatchLiquidations(sgClient, cwClient, config, poolProvider, exchangeInterface, api)
 
 	for (const index in useableAddresses) {
 		const health = await queryHealth(cwClient, useableAddresses[index], testConfig.redbankAddress)
@@ -218,9 +223,9 @@ const dispatchLiquidations = async (
 	config: RedbankExecutorConfig,
 	poolProvider: PoolDataProviderInterface,
 	exchangeInterface: ExchangeInterface,
-
+	routeRequestApi: RouteRequesterInterface, 
 ) => {
-	const executor = new RedbankExecutor(config, client, cwClient, poolProvider, exchangeInterface)
+	const executor = new RedbankExecutor(config, client, cwClient, poolProvider, exchangeInterface, routeRequestApi)
 
 	await executor.initiateRedis()
 	await executor.run()
