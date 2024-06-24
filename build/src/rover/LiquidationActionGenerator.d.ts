@@ -1,0 +1,30 @@
+import { AMMRouter } from '../AmmRouter';
+import { MarketInfo } from './types/MarketInfo';
+import { Collateral, Debt, PositionType } from './types/RoverPosition';
+import { Action, Coin, VaultPositionType } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types';
+import { UncollateralizedLoanLimitResponse, UserDebtResponse } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types';
+import { SwapperRoute } from '../types/swapper';
+import { VaultInfo } from '../query/types';
+export declare class LiquidationActionGenerator {
+    private router;
+    private swapperRoutes;
+    constructor(osmosisRouter: AMMRouter);
+    setSwapperRoutes: (swapperRoutes: SwapperRoute[]) => void;
+    produceBorrowActions: (debt: Debt, collateral: Collateral, markets: MarketInfo[], whitelistedAssets: string[], creditLines: UserDebtResponse[], creditLineCaps: UncollateralizedLoanLimitResponse[]) => Action[];
+    borrowWithoutLiquidity: (debtCoin: Coin, markets: MarketInfo[], whitelistedAssets: string[]) => Action[];
+    private getAvailablePools;
+    private isViableRoute;
+    generateSwapActions: (assetInDenom: string, assetOutDenom: string, outAmount: string) => Action[];
+    produceRefundAllAction: () => Action;
+    produceLiquidationAction: (positionType: PositionType, debtCoin: Coin, liquidateeAccountId: string, requestCoinDenom: string, vaultPositionType?: VaultPositionType) => Action;
+    produceVaultToDebtActions: (vault: VaultInfo, borrowDenom: string) => Action[];
+    produceWithdrawLiquidityAction: (lpTokenDenom: string) => Action;
+    generateRepayActions: (debtDenom: string) => Action[];
+    convertCollateralToDebt: (collateralDenom: string, borrow: Coin, vault: VaultInfo | undefined) => Action[];
+    swapCollateralCoinToBorrowActions: (collateralDenom: string, borrowed: Coin) => Action[];
+    private produceLiquidateCoin;
+    private produceLiquidateVault;
+    private produceRepayAction;
+    private produceSwapAction;
+    private produceBorrowAction;
+}
