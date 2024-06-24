@@ -6,15 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RedbankExecutor = void 0;
 const encoding_1 = require("@cosmjs/encoding");
 const proto_signing_1 = require("@cosmjs/proto-signing");
-const helpers_1 = require("../helpers");
+const helpers_js_1 = require("../helpers.js");
 const osmojs_1 = require("osmojs");
 require("dotenv/config.js");
-const hive_1 = require("../query/hive");
+const hive_js_1 = require("../query/hive.js");
 const bignumber_js_1 = __importDefault(require("bignumber.js"));
-const BaseExecutor_1 = require("../BaseExecutor");
-const liquidationGenerator_1 = require("../liquidationGenerator");
+const BaseExecutor_js_1 = require("../BaseExecutor.js");
+const liquidationGenerator_js_1 = require("../liquidationGenerator.js");
 const { executeContract } = osmojs_1.cosmwasm.wasm.v1.MessageComposer.withTypeUrl;
-class RedbankExecutor extends BaseExecutor_1.BaseExecutor {
+class RedbankExecutor extends BaseExecutor_js_1.BaseExecutor {
     constructor(config, client, queryClient, poolProvider, exchangeInterface, routeRequestApi) {
         super(config, client, queryClient, poolProvider);
         this.exchangeInterface = exchangeInterface;
@@ -23,7 +23,7 @@ class RedbankExecutor extends BaseExecutor_1.BaseExecutor {
             const msg = JSON.stringify({
                 liquidate: { user: tx.user_address, collateral_denom: tx.collateral_denom },
             });
-            return (0, helpers_1.produceExecuteContractMessage)(this.config.liquidatorMasterAddress, this.config.redbankAddress, (0, encoding_1.toUtf8)(msg), [
+            return (0, helpers_js_1.produceExecuteContractMessage)(this.config.liquidatorMasterAddress, this.config.redbankAddress, (0, encoding_1.toUtf8)(msg), [
                 {
                     amount: tx.amount,
                     denom: tx.debt_denom,
@@ -32,11 +32,11 @@ class RedbankExecutor extends BaseExecutor_1.BaseExecutor {
         };
         this.executeViaFilterer = (txs, debtCoins) => {
             const msg = (0, encoding_1.toUtf8)(JSON.stringify({ liquidate_many: { liquidations: txs } }));
-            return (0, helpers_1.produceExecuteContractMessage)(this.config.liquidatorMasterAddress, this.config.liquidationFiltererAddress, msg, debtCoins);
+            return (0, helpers_js_1.produceExecuteContractMessage)(this.config.liquidatorMasterAddress, this.config.liquidationFiltererAddress, msg, debtCoins);
         };
         this.runLiquidation = async (liquidateeAddress, liquidatorAddress) => {
             await this.withdrawAndSwapCollateral(liquidatorAddress);
-            const positionData = await (0, hive_1.fetchRedbankBatch)([{ Identifier: liquidateeAddress }], this.config.redbankAddress, this.config.hiveEndpoint);
+            const positionData = await (0, hive_js_1.fetchRedbankBatch)([{ Identifier: liquidateeAddress }], this.config.redbankAddress, this.config.hiveEndpoint);
             console.log(`- found ${positionData.length} positions queued for liquidation. `);
             const { txs, debtsToRepay } = this.produceLiquidationTxs(positionData);
             const debtCoins = [];
@@ -112,8 +112,8 @@ class RedbankExecutor extends BaseExecutor_1.BaseExecutor {
             const positionAddress = Object.keys(positionResponse.data)[0];
             const position = positionResponse.data[positionAddress];
             if (position.collaterals.length > 0 && position.debts.length > 0) {
-                const largestCollateralDenom = (0, liquidationGenerator_1.getLargestCollateral)(position.collaterals, this.prices);
-                const largestDebt = (0, liquidationGenerator_1.getLargestDebt)(position.debts, this.prices);
+                const largestCollateralDenom = (0, liquidationGenerator_js_1.getLargestCollateral)(position.collaterals, this.prices);
+                const largestDebt = (0, liquidationGenerator_js_1.getLargestDebt)(position.debts, this.prices);
                 if (availableValue.isGreaterThan(1000)) {
                     const debtPrice = this.prices.get(largestDebt.denom);
                     const debtValue = new bignumber_js_1.default(largestDebt.amount).multipliedBy(debtPrice);
@@ -144,7 +144,7 @@ class RedbankExecutor extends BaseExecutor_1.BaseExecutor {
     appendWithdrawMessages(collateralsWon, liquidatorAddress, msgs) {
         collateralsWon.forEach((collateral) => {
             const denom = collateral.denom;
-            msgs.push(executeContract((0, helpers_1.produceWithdrawMessage)(liquidatorAddress, denom, this.config.redbankAddress)
+            msgs.push(executeContract((0, helpers_js_1.produceWithdrawMessage)(liquidatorAddress, denom, this.config.redbankAddress)
                 .value));
         });
         return msgs;
@@ -206,7 +206,7 @@ class RedbankExecutor extends BaseExecutor_1.BaseExecutor {
         const targetAccounts = targetAccountObjects.filter((account) => account.total_debt.length > 3)
             .sort((accountA, accountB) => Number(accountB.total_debt) - Number(accountA.total_debt));
         if (targetAccounts.length == 0) {
-            await (0, helpers_1.sleep)(2000);
+            await (0, helpers_js_1.sleep)(2000);
             return;
         }
         for (const account of targetAccounts) {

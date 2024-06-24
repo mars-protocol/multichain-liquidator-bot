@@ -3,7 +3,7 @@ import { Coin, SigningStargateClient } from '@cosmjs/stargate';
 import { EncodeObject } from '@cosmjs/proto-signing';
 import 'dotenv/config.js';
 import BigNumber from 'bignumber.js';
-import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor';
+import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor.js';
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate';
 import { Collateral, DataResponse } from '../query/types.js';
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface.js';
