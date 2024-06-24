@@ -14,6 +14,7 @@ import { BaseExecutorConfig } from './BaseExecutor.js'
 import { AstroportCW } from './execute/AstroportCW.js'
 import { HdPath } from '@cosmjs/crypto'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
+import { AstroportRouteRequester } from './query/amm/AstroportRouteRequester.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -49,13 +50,23 @@ export const main = async () => {
 	const redbankConfig = getConfig(liquidatorMasterAddress, network, chainName)
 
 	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
+	// todo add sqs server
+	const routeRequester = chainName === "neutron" ? new AstroportRouteRequester() : undefined
+	
 	// Produce network
 
 	const poolProvider = getPoolProvider(chainName, redbankConfig)
 
 	switch (executorType) {
 		case REDBANK:
-			await launchRedbank(client, queryClient, redbankConfig, poolProvider, exchangeInterface)
+			await launchRedbank(
+				client,
+				queryClient,
+				redbankConfig,
+				poolProvider,
+				exchangeInterface,
+				routeRequester
+			)
 			return
 		case ROVER:
 			throw new Error('Rover not supported by MarsV1')
@@ -86,7 +97,8 @@ const launchRedbank = async (
 	wasmClient: CosmWasmClient,
 	redbankConfig : RedbankExecutorConfig,
 	poolProvider : PoolDataProviderInterface,
-	exchangeInterface : ExchangeInterface
+	exchangeInterface : ExchangeInterface,
+	apiRequester?: any,
 
 ) => {
 	await new RedbankExecutor(
@@ -94,7 +106,9 @@ const launchRedbank = async (
 		client,
 		wasmClient,
 		poolProvider,
-		exchangeInterface
+		exchangeInterface,
+		apiRequester,
+		
 	).start()
 }
 

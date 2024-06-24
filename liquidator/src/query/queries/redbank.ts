@@ -41,11 +41,11 @@ export const produceRedbankGeneralQuery = (
         wasm {
             markets: contractQuery(
                 contractAddress: "${redbankAddress}"
-                query: { markets: {} }
+                query: { markets: { limit : 50 } }
             ),
             prices: contractQuery(
                 contractAddress: "${oracleAddress}"
-                query: { prices: {} }
+                query: { prices: { limit : 50 } }
             )
           }
         }`

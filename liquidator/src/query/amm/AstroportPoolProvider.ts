@@ -73,7 +73,6 @@ export class AstroportPoolProvider implements PoolDataProviderInterface {
             .filter((poolResponse) => poolResponse.result.data)
             .map((poolResponse, index) => {
                     
-                console.log(poolResponse.result)
                 const poolAssets = this.producePoolAssets(poolResponse.result.data.assets)
                 // TODO update to support PCL
                 const pool : XYKPool = {

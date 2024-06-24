@@ -3,13 +3,10 @@ import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import { coins, EncodeObject } from '@cosmjs/proto-signing'
-
 import { produceExecuteContractMessage, produceWithdrawMessage, sleep } from '../helpers'
 import { cosmwasm } from 'osmojs'
-
 import 'dotenv/config.js'
 import { fetchRedbankBatch } from '../query/hive'
-
 import BigNumber from 'bignumber.js'
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
@@ -17,6 +14,7 @@ import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface.js'
 import { ExchangeInterface } from '../execute/ExchangeInterface.js'
+import { RouteRequesterInterface } from '../query/amm/RouteRequesterInterface.js'
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
@@ -24,6 +22,7 @@ export interface RedbankExecutorConfig extends BaseExecutorConfig {
 	liquidationFiltererAddress: string
 	liquidatableAssets: string[]
 	safetyMargin: number
+	astroportApi: string
 }
 
 /**
@@ -42,7 +41,8 @@ export class RedbankExecutor extends BaseExecutor {
 		client: SigningStargateClient,
 		queryClient: CosmWasmClient,
 		poolProvider: PoolDataProviderInterface,
-		private exchangeInterface: ExchangeInterface
+		private exchangeInterface: ExchangeInterface,
+		private routeRequestApi: RouteRequesterInterface,
 	) {
 		super(config, client, queryClient, poolProvider)
 		console.log({config})
@@ -50,11 +50,7 @@ export class RedbankExecutor extends BaseExecutor {
 	}
 
 	async start() {
-		if (this.config.chainName === "neutron") {
-			await this.initiateAstroportPoolProvider()
-		}
 		await this.refreshData()
-		await this.refreshMarketData()
 		
 		// run
 		while (true) {
@@ -86,7 +82,6 @@ export class RedbankExecutor extends BaseExecutor {
 			if (position.collaterals.length > 0 && position.debts.length > 0) {
 				const largestCollateralDenom = getLargestCollateral(position.collaterals, this.prices)
 				const largestDebt = getLargestDebt(position.debts, this.prices)
-
 				// total debt value is calculated in base denom (i.e uosmo, usdc).
 				// We scale down to ensure we have space for slippage etc in the swap
 				// transactions that follow
@@ -151,69 +146,60 @@ export class RedbankExecutor extends BaseExecutor {
 		return msgs
 	}
 
-	appendSwapToNeutralMessages(
-		coins: Coin[],
+	async appendSwapToNeutralMessages(
+		collaterals: Coin[],
 		liquidatorAddress: string,
 		msgs: EncodeObject[],
-	): BigNumber {
-		let expectedNeutralCoins = new BigNumber(0)
-		coins
-			.filter((collateral) => collateral.denom !== this.config.neutralAssetDenom)
-			.forEach((collateral) => {
-				let collateralAmount =
-					collateral.denom === this.config.gasDenom
-						? new BigNumber(collateral.amount).minus(100000000) // keep min 100 tokens for gas
-						: new BigNumber(collateral.amount)
+	): Promise<BigNumber> {
+		let expectedNeutralCoinAmount = new BigNumber(0)
+		for (const collateral of collaterals) {
+			if (collateral.denom === this.config.neutralAssetDenom)
+				continue
 
-				if (collateralAmount.isGreaterThan(1000) && !collateralAmount.isNaN()) {
-					const routeOptions = this.ammRouter.getRoutes(
-						collateral.denom,
-						this.config.neutralAssetDenom,
+			let collateralAmount =
+				collateral.denom === this.config.gasDenom
+					? new BigNumber(collateral.amount).minus(100000000) // keep min 100 tokens for gas
+					: new BigNumber(collateral.amount)
+			if (collateralAmount.isGreaterThan(1000) && !collateralAmount.isNaN()) {
+				let {
+					route,
+					expectedOutput,
+				} = await this.routeRequestApi.requestRoute(
+					"https://app.astroport.fi/api/",
+					collateral.denom,
+					this.config.neutralAssetDenom,
+					collateralAmount.toFixed(0),
+				)
+
+				// allow for 2.5% slippage from what we estimated
+				const minOutput = new BigNumber(expectedOutput)
+					.multipliedBy(0.975)
+					.toFixed(0)
+				expectedNeutralCoinAmount = expectedNeutralCoinAmount.plus(minOutput)
+				msgs.push(
+					this.exchangeInterface.produceSwapMessage(
+						route,
+						{ denom: collateral.denom, amount: collateralAmount.toFixed(0) },
+						minOutput,
+						liquidatorAddress,
 					)
-
-					const bestRoute = routeOptions
-						.sort((routeA, routeB) => {
-							const routeAReturns = this.ammRouter.getOutput(collateralAmount, routeA)
-							const routeBReturns = this.ammRouter.getOutput(collateralAmount, routeB)
-							return routeAReturns.minus(routeBReturns).toNumber()
-						})
-						.pop()
-					if (bestRoute) {
-						// allow for 2.5% slippage from what we estimated
-						const minOutput = this.ammRouter
-							.getOutput(new BigNumber(collateralAmount), bestRoute)
-							.multipliedBy(0.975)
-							.toFixed(0)
-
-						expectedNeutralCoins = expectedNeutralCoins.plus(minOutput)
-						
-						msgs.push(
-							this.exchangeInterface.produceSwapMessage(
-								bestRoute,
-								{ denom: collateral.denom, amount: collateralAmount.toFixed(0) },
-								minOutput,
-								liquidatorAddress,
-							)
-						)
-					}
-				}
-			})
-
-		return expectedNeutralCoins
+				)
+			}
+		}
+		
+		return expectedNeutralCoinAmount
 	}
 
-	appendSwapToDebtMessages(
+	async appendSwapToDebtMessages(
 		debtsToRepay: Coin[],
 		liquidatorAddress: string,
 		msgs: EncodeObject[],
 		neutralAvailable: BigNumber,
-		// min available stables?
-	): Map<string, BigNumber> {
+	): Promise<Map<string, BigNumber>> {
 		let remainingNeutral = neutralAvailable
 		const expectedDebtAssetsPostSwap: Map<string, BigNumber> = new Map()
 
-		debtsToRepay.forEach((debt) => {
-			const debtAmountRequiredFromSwap = new BigNumber(debt.amount)
+		for (const debt of debtsToRepay) {
 
 			if (debt.denom === this.config.neutralAssetDenom) {
 				const cappedAmount = remainingNeutral.isLessThan(debt.amount)
@@ -224,32 +210,36 @@ export class RedbankExecutor extends BaseExecutor {
 				const totalDebt = cappedAmount.plus(expectedDebtAssetsPostSwap.get(debt.denom) || 0)
 				expectedDebtAssetsPostSwap.set(debt.denom, totalDebt)
 			} else {
-				// console.log({debtDenom : de})
-				const bestRoute = this.ammRouter.getBestRouteGivenOutput(
+
+				let debtPrice = this.prices.get(debt.denom)
+				if (!debtPrice) {
+					throw new Error(`No price for debt: ${debt.denom}`)
+				}
+				let amountToSwap = new BigNumber(debt.amount).multipliedBy(debtPrice)
+				amountToSwap = amountToSwap.isGreaterThan(neutralAvailable) ? neutralAvailable : amountToSwap
+				let {
+					route,
+					expectedOutput,
+				} = await this.routeRequestApi.requestRoute(
+					"https://app.astroport.fi/api/",
 					this.config.neutralAssetDenom,
 					debt.denom,
-					debtAmountRequiredFromSwap,
+					amountToSwap.toFixed(0),
 				)
-				if (bestRoute) {
-					let amountToSwap = this.ammRouter.getRequiredInput(
-						// we add a little more to ensure we get enough to cover debt
-						debtAmountRequiredFromSwap.multipliedBy(1.02),
-						bestRoute,
-					)
 
-					
-					amountToSwap = amountToSwap.isGreaterThan(neutralAvailable) ? neutralAvailable : amountToSwap
-					msgs.push(
-						this.exchangeInterface.produceSwapMessage(
-							bestRoute,
-							{ denom: this.config.neutralAssetDenom, amount: amountToSwap.toFixed(0) },
-							debtAmountRequiredFromSwap.toFixed(0),
-							liquidatorAddress,
-						)
+
+				msgs.push(
+					this.exchangeInterface.produceSwapMessage(
+						route,
+						{ denom: this.config.neutralAssetDenom, amount: amountToSwap.toFixed(0) },
+						expectedOutput,
+						liquidatorAddress,
 					)
-				}
+				)
+
+				expectedDebtAssetsPostSwap.set(debt.denom, new BigNumber(expectedOutput))
 			}
-		})
+		}
 
 		return expectedDebtAssetsPostSwap
 	}
@@ -341,13 +331,10 @@ export class RedbankExecutor extends BaseExecutor {
 		)
 
 		console.log(`- found ${positionData.length} positions queued for liquidation. `)
-		positionData.forEach((position) => console.log(JSON.stringify(position.data)))
 
 		const { txs, debtsToRepay } = this.produceLiquidationTxs(positionData)
-
 		const debtCoins: Coin[] = []
 		debtsToRepay.forEach((amount, denom) => debtCoins.push({ denom, amount: amount.toFixed(0) }))
-
 		// deposit any neutral in our account before starting liquidations
 		const firstMsgBatch: EncodeObject[] = []
 		this.appendSwapToDebtMessages(
@@ -383,9 +370,6 @@ export class RedbankExecutor extends BaseExecutor {
 
 		console.log(`- Successfully liquidated ${txs.length} positions`)
 
-		
-
-
 		if (this.config.logResults) {
 			txs.forEach((tx) => {
 				this.addCsvRow({
@@ -412,8 +396,6 @@ export class RedbankExecutor extends BaseExecutor {
 			{ user_collaterals: { user: liquidatorAddress } },
 		)
 
-		console.log(`- found ${collaterals.length} collaterals to withdraw and swap`)
-
 		// second block of transactions
 		let secondBatch: EncodeObject[] = []
 
@@ -422,14 +404,14 @@ export class RedbankExecutor extends BaseExecutor {
 		const combinedCoins = this.combineBalances(collaterals, balances!)
 
 		this.appendWithdrawMessages(collaterals, liquidatorAddress, secondBatch)
-
-		this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, secondBatch)
-
-		await this.client.signAndBroadcast(
-			this.config.liquidatorMasterAddress,
-			secondBatch,
-			await this.getFee(secondBatch, this.config.liquidatorMasterAddress),
-		)
+		await this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, secondBatch)
+		if (secondBatch.length > 0) {
+			await this.client.signAndBroadcast(
+				this.config.liquidatorMasterAddress,
+				secondBatch,
+				await this.getFee(secondBatch, this.config.liquidatorMasterAddress),
+			)
+		} 
 	}
 
 	combineBalances(collaterals: Collateral[], balances: readonly Coin[]): Coin[] {
