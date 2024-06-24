@@ -1,0 +1,148 @@
+export interface InstantiateMsg {
+    base_denom: string;
+    custom_init?: Empty | null;
+    owner: string;
+}
+export interface Empty {
+    [k: string]: unknown;
+}
+export type ExecuteMsg = {
+    set_price_source: {
+        denom: string;
+        price_source: OsmosisPriceSourceForString;
+    };
+} | {
+    remove_price_source: {
+        denom: string;
+    };
+} | {
+    update_owner: OwnerUpdate;
+} | {
+    update_config: {
+        base_denom?: string | null;
+    };
+} | {
+    custom: Empty;
+};
+export type OsmosisPriceSourceForString = {
+    fixed: {
+        price: Decimal;
+        [k: string]: unknown;
+    };
+} | {
+    spot: {
+        pool_id: number;
+        [k: string]: unknown;
+    };
+} | {
+    arithmetic_twap: {
+        downtime_detector?: DowntimeDetector | null;
+        pool_id: number;
+        window_size: number;
+        [k: string]: unknown;
+    };
+} | {
+    geometric_twap: {
+        downtime_detector?: DowntimeDetector | null;
+        pool_id: number;
+        window_size: number;
+        [k: string]: unknown;
+    };
+} | {
+    xyk_liquidity_token: {
+        pool_id: number;
+        [k: string]: unknown;
+    };
+} | {
+    staked_geometric_twap: {
+        downtime_detector?: DowntimeDetector | null;
+        pool_id: number;
+        transitive_denom: string;
+        window_size: number;
+        [k: string]: unknown;
+    };
+} | {
+    pyth: {
+        contract_addr: string;
+        denom_decimals: number;
+        max_confidence: Decimal;
+        max_deviation: Decimal;
+        max_staleness: number;
+        price_feed_id: Identifier;
+        [k: string]: unknown;
+    };
+} | {
+    lsd: {
+        geometric_twap: GeometricTwap;
+        redemption_rate: RedemptionRateForString;
+        transitive_denom: string;
+        [k: string]: unknown;
+    };
+};
+export type Decimal = string;
+export type Downtime = 'duration30s' | 'duration1m' | 'duration2m' | 'duration3m' | 'duration4m' | 'duration5m' | 'duration10m' | 'duration20m' | 'duration30m' | 'duration40m' | 'duration50m' | 'duration1h' | 'duration15h' | 'duration2h' | 'duration25h' | 'duration3h' | 'duration4h' | 'duration5h' | 'duration6h' | 'duration9h' | 'duration12h' | 'duration18h' | 'duration24h' | 'duration36h' | 'duration48h';
+export type Identifier = string;
+export type OwnerUpdate = {
+    propose_new_owner: {
+        proposed: string;
+    };
+} | 'clear_proposed' | 'accept_proposed' | 'abolish_owner_role' | {
+    set_emergency_owner: {
+        emergency_owner: string;
+    };
+} | 'clear_emergency_owner';
+export interface DowntimeDetector {
+    downtime: Downtime;
+    recovery: number;
+    [k: string]: unknown;
+}
+export interface GeometricTwap {
+    downtime_detector?: DowntimeDetector | null;
+    pool_id: number;
+    window_size: number;
+    [k: string]: unknown;
+}
+export interface RedemptionRateForString {
+    contract_addr: string;
+    max_staleness: number;
+    [k: string]: unknown;
+}
+export type QueryMsg = {
+    config: {};
+} | {
+    price_source: {
+        denom: string;
+    };
+} | {
+    price_sources: {
+        limit?: number | null;
+        start_after?: string | null;
+    };
+} | {
+    price: {
+        denom: string;
+        kind?: ActionKind | null;
+    };
+} | {
+    prices: {
+        kind?: ActionKind | null;
+        limit?: number | null;
+        start_after?: string | null;
+    };
+};
+export type ActionKind = 'default' | 'liquidation';
+export interface ConfigResponse {
+    base_denom: string;
+    owner?: string | null;
+    proposed_new_owner?: string | null;
+}
+export interface PriceResponse {
+    denom: string;
+    price: Decimal;
+}
+export interface PriceSourceResponseForString {
+    denom: string;
+    price_source: string;
+}
+export type ArrayOfPriceSourceResponseForString = PriceSourceResponseForString[];
+export type ArrayOfPriceResponse = PriceResponse[];
