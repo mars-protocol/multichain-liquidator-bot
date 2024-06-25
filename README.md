@@ -39,8 +39,16 @@ git checkout mars-v2
 yarn install
 ```
 3. Set environment variables
+
+- Credit manager:
+
 ```shell
 cp .osmosis.rover.env .env
+```
+
+- Redbank:
+
+```shell
 cp .osmosis.redbank.env .env
 ```
 4. Run liquidator
@@ -48,10 +56,9 @@ cp .osmosis.redbank.env .env
 yarn start
 ```
 
-
 ### Common errors
 
-There are a few errors that sometimes prevent us from liquidating, for various reasons
-- `Coin amount was zero` - this error occurs because one of the assets we have tried to swap to has reached 100% of the deposit cap, so we have 
-- `Cosmwasm pool not supported` - (Osmosis) We currently do not support cosmwasm pools on osmosis via the swapper, but the sqs router will give us back routes with cosmwasm pools in it.
+There are a few errors that sometimes prevent us from liquidating, for various reasons.
+- `Coin amount was zero` - this error occurs because one of the assets we have tried to swap to has reached 100% of the deposit cap.
+- `Cosmwasm pool not supported` - (Osmosis) We currently do not support cosmwasm pools on osmosis via the swapper, but the sqs router will give us back routes with cosmwasm pools in it. Generally, liquidity conditions change frequently and the optimal route will be different later, at which time the liquidation will succeed if there are no cosmwasm pools in the route.
 - `Amount recieved was less than n` - This is a liquidity / slippage issue. Should not occur under normal circumstances but can if there is an issue with routing or a really large position.
