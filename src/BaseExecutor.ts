@@ -2,7 +2,7 @@ import { SigningStargateClient } from '@cosmjs/stargate'
 import { Coin, EncodeObject, coins } from '@cosmjs/proto-signing'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { AMMRouter } from './AmmRouter.js'
-import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from "./types/Pool"
+import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from "./types/Pool.js"
 import 'dotenv/config.js'
 import { MarketInfo } from './rover/types/MarketInfo.js'
 import { CSVWriter, Row } from './CsvWriter.js'
@@ -25,12 +25,13 @@ export interface BaseExecutorConfig {
 	neutralAssetDenom: string
 	logResults: boolean
 	poolsRefreshWindow: number
+	// The sidecar query server url
+	sqsUrl?: string
 	astroportFactory?: string
 	astroportRouter?: string
 	// The mars api endpoint
 	marsEndpoint?: string
-	// The sidecar query server url
-	sqsUrl?: string
+
 }
 
 /**
@@ -211,7 +212,7 @@ export class BaseExecutor {
 		const gasEstimated = await this.client.simulate(address, msgs, '')
 		const gas = Number(gasEstimated * 1.3)
 		const gasPrice = Number(baseFee)
-		const safeGasPrice = gasPrice < 0.025 ? 0.025 : gasPrice
+		const safeGasPrice = gasPrice < 0.1 ? 0.1 : gasPrice
 		const amount = coins((((gas * safeGasPrice)+1)).toFixed(0), this.config.gasDenom)
 		const fee = {
 			amount,

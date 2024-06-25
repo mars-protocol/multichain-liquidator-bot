@@ -3,8 +3,8 @@ import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 
 import { RedisClientType } from "redis";
 import { Coin, makeCosmoshubPath } from "@cosmjs/amino";
-import { RedisInterface } from "../../liquidator/src/redis.js"
-import { deposit, loadSeeds, produceBorrowMessage, produceDepositMessage as produceDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../liquidator/src/helpers.js"
+import { RedisInterface } from "../../src/redis.js"
+import { deposit, loadSeeds, produceBorrowMessage, produceDepositMessage as produceDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../src/helpers.js"
 import { createClient, recoverWallet, requiredEnvironmentVariables } from "./helpers.js";
 import 'dotenv/config.js'
 import path from "path";

@@ -8,7 +8,7 @@ export const getConfig = (
 	return network === Network.MAINNET
 		? {
 				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
-				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!, // todo hardcode here
+				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
 				safetyMargin: 0.05,
 				chainName: "osmosis",
 				lcdEndpoint: process.env.LCD_ENDPOINT!, // use env vars in order to be able to quickly change
@@ -22,7 +22,8 @@ export const getConfig = (
 				redbankAddress: 'osmo1c3ljch9dfw5kf52nfwpxd2zmj2ese7agnx0p9tenkrryasrle5sqf3ftpg',
 				poolsRefreshWindow: 60000,
 				liquidationProfitMarginPercent: 0.01,
-				marsEndpoint: "https://api.marsprotocol.io"
+				marsEndpoint: "https://api.marsprotocol.io",
+				sqsUrl: process.env.SQS_URL!,
 		  }
 		: {
 				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
@@ -39,6 +40,7 @@ export const getConfig = (
 				marsParamsAddress: '',
 				redbankAddress: 'osmo1t0dl6r27phqetfu0geaxrng0u9zn8qgrdwztapt5xr32adtwptaq6vwg36',
 				poolsRefreshWindow: 60000,
-				liquidationProfitMarginPercent: 0.01
+				liquidationProfitMarginPercent: 0.01,
+				sqsUrl: process.env.SQS_URL!,
 		  }
 }

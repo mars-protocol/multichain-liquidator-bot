@@ -115,8 +115,8 @@ export const fetchRedbankData = async (
 		body: JSON.stringify({ query }),
 		headers: { 'Content-Type': 'application/json' },
 	})
-
-	return (await response.json()).data
+	const myData = await response.json()
+	return myData.data
 }
 
 export const fetchRoverPosition = async (

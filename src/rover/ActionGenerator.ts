@@ -257,7 +257,6 @@ export class ActionGenerator {
 		amount: string,
 		slippage: string
 	): Promise<Action> => {
-		// const bnOut = new BigNumber(outAmount)
 
 		let sqsRoute = await getRoute(
 			'https://sqs.osmosis.zone/',
@@ -386,7 +385,6 @@ export class ActionGenerator {
 					const asset_out_price = prices.get(borrowed.denom) || 0
 					const asset_in_price = prices.get(collateralDenom) || 0
 					const amount_in = new BigNumber(asset_out_price / asset_in_price).multipliedBy(Number(borrowed.amount))
-					console.log(amount_in.toFixed(0))
 					actions = actions.concat(await this.generateSwapActions(denom, borrowed.denom, amount_in.toFixed(0), slippage))
 				}
 			}
