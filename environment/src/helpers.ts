@@ -2,7 +2,7 @@ import { SigningCosmWasmClient, SigningCosmWasmClientOptions } from "@cosmjs/cos
 import { DirectSecp256k1HdWallet, GeneratedType, Registry } from "@cosmjs/proto-signing"
 import { AminoTypes, GasPrice, SigningStargateClient } from "@cosmjs/stargate"
 import path from "path"
-import { setPrice, readAddresses } from "../../liquidator/src/helpers.js"
+import { setPrice, readAddresses } from "../../src/helpers.js"
 import "dotenv/config.js"
 
 import { 

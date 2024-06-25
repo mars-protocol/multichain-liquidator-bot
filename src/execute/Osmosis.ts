@@ -9,7 +9,6 @@ const {swapExactAmountIn} = osmosis.poolmanager.v1beta1.MessageComposer.withType
 
 export class Osmosis implements ExchangeInterface {
     produceSwapMessage(route: RouteHop[], tokenIn: Coin, minimumRecieve: string, sender: string): EncodeObject {
-
         return swapExactAmountIn({
             sender,
             routes: route.map((hop) => {

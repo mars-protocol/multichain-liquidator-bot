@@ -89,3 +89,6 @@ coverage.*
 
 /liquidator/pool.json
 /liquidator/results.csv
+
+build
+*.js

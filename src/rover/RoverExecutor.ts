@@ -75,7 +75,7 @@ export class RoverExecutor extends BaseExecutor {
 		const accounts = await this.wallet.getAccounts()
 		// get liquidator addresses
 		const liquidatorAddresses: string[] = accounts
-			.slice(2, this.config.maxLiquidators + 2)
+			.slice(0, this.config.maxLiquidators)
 			.map((account) => account.address)
 
 		// initiate our wallets (in case they are not)
@@ -122,18 +122,12 @@ export class RoverExecutor extends BaseExecutor {
 				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
-
-		console.log(targetAccounts.length)
 		
 		// Sleep to avoid spamming.
 		if (targetAccounts.length == 0) {
 			await sleep(2000)
 			return
 		}
-
-		// Dispatch our liquidations
-		// We dispatch one liquidation per liquidator worker account.
-		// Set the number of liquidators in the .env
 
 		// create chunks of accounts to liquidate
 		const unhealthyAccountChunks = []
@@ -158,7 +152,6 @@ export class RoverExecutor extends BaseExecutor {
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
 		try {
-			console.log('liquidating: ', accountId )
 			const roverPosition = await fetchRoverPosition(
 				accountId,
 				this.config.creditManagerAddress,

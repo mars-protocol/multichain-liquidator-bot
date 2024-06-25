@@ -49,6 +49,7 @@ export const getConfig = (
 		logResults: false,
 		poolsRefreshWindow: 60000,
 		maxLiquidators: 100,
-		stableBalanceThreshold : 5000000
+		stableBalanceThreshold : 5000000,
+		sqsUrl: "https://sqs.osmosis.zone/"
 	}
 }
