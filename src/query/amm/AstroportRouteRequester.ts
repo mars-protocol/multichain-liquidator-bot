@@ -17,7 +17,7 @@ export class AstroportRouteRequester implements RouteRequesterInterface {
             let response = await fetch(url)
 
             let astroportRoutes: AstroportApiRoute[] = await response.json()
-
+            
             let bestRoute = astroportRoutes
             .sort((a, b) => {
                 let a_val = new BigNumber(a.value_out)
