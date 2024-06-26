@@ -59,7 +59,7 @@ export class RedbankExecutor extends BaseExecutor {
 			try {
 				await this.run()
 			} catch (e) {
-				console.log('ERROR:', e)
+				// console.log('ERROR:', e)
 			}
 		}
 	}
@@ -162,7 +162,7 @@ export class RedbankExecutor extends BaseExecutor {
 				collateral.denom === this.config.gasDenom
 					? new BigNumber(collateral.amount).minus(100000000) // keep min 100 tokens for gas
 					: new BigNumber(collateral.amount)
-			if (collateralAmount.isGreaterThan(1000) && !collateralAmount.isNaN()) {
+			if (collateralAmount.isGreaterThan(1000000) && !collateralAmount.isNaN()) {
 				let {
 					route,
 					expectedOutput,
@@ -175,7 +175,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 				// allow for 2.5% slippage from what we estimated
 				const minOutput = new BigNumber(expectedOutput)
-					.multipliedBy(0.975)
+					.multipliedBy(0.925)
 					.toFixed(0)
 				expectedNeutralCoinAmount = expectedNeutralCoinAmount.plus(minOutput)
 				msgs.push(
@@ -212,12 +212,11 @@ export class RedbankExecutor extends BaseExecutor {
 				const totalDebt = cappedAmount.plus(expectedDebtAssetsPostSwap.get(debt.denom) || 0)
 				expectedDebtAssetsPostSwap.set(debt.denom, totalDebt)
 			} else {
-
 				let debtPrice = this.prices.get(debt.denom)
 				if (!debtPrice) {
 					throw new Error(`No price for debt: ${debt.denom}`)
 				}
-				let amountToSwap = new BigNumber(debt.amount).multipliedBy(debtPrice)
+				let amountToSwap = new BigNumber(debt.amount).multipliedBy(debtPrice).multipliedBy(1.025)
 				amountToSwap = amountToSwap.isGreaterThan(neutralAvailable) ? neutralAvailable : amountToSwap
 				let {
 					route,
@@ -229,17 +228,18 @@ export class RedbankExecutor extends BaseExecutor {
 					amountToSwap.toFixed(0),
 				)
 
-
+				let minOutput = new BigNumber(debt.amount)
+				console.log('expected output', expectedOutput)
 				msgs.push(
 					this.exchangeInterface.produceSwapMessage(
 						route,
 						{ denom: this.config.neutralAssetDenom, amount: amountToSwap.toFixed(0) },
-						expectedOutput,
+						minOutput.toString(),
 						liquidatorAddress,
 					)
 				)
 
-				expectedDebtAssetsPostSwap.set(debt.denom, new BigNumber(expectedOutput))
+				expectedDebtAssetsPostSwap.set(debt.denom, new BigNumber(minOutput))
 			}
 		}
 
@@ -287,7 +287,6 @@ export class RedbankExecutor extends BaseExecutor {
 
 		await this.refreshData()
 
-		console.log('Checking for liquidations')
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
 		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/redbank`
 
@@ -296,12 +295,13 @@ export class RedbankExecutor extends BaseExecutor {
 			account_id: string,
 			health_factor: string,
 			total_debt: string
-		}[] = (await response.json())['data']
+		}[] = (await response.json())['data'] 
 
 		const  targetAccounts = targetAccountObjects.filter(
 			(account) =>
 				// To target specific accounts, filter here
-				account.total_debt.length > 3
+				account.total_debt.length > 3 &&
+				Number(account.health_factor) > 0.1
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
 
@@ -339,7 +339,7 @@ export class RedbankExecutor extends BaseExecutor {
 		debtsToRepay.forEach((amount, denom) => debtCoins.push({ denom, amount: amount.toFixed(0) }))
 		// deposit any neutral in our account before starting liquidations
 		const firstMsgBatch: EncodeObject[] = []
-		this.appendSwapToDebtMessages(
+		await this.appendSwapToDebtMessages(
 			debtCoins,
 			liquidatorAddress,
 			firstMsgBatch,
