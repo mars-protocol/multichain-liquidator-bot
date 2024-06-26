@@ -3,8 +3,7 @@ import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 
 import { RedisClientType } from "redis";
 import { Coin, makeCosmoshubPath } from "@cosmjs/amino";
-import { RedisInterface } from "../../src/redis.js"
-import { deposit, loadSeeds, produceBorrowMessage, produceDepositMessage as produceDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses, setPrice } from "../../src/helpers.js"
+import { deposit, loadSeeds, produceBorrowMessage, produceDepositMessage as produceDepositMessage, ProtocolAddresses, readAddresses, Seed, seedAddresses } from "../../src/helpers.js"
 import { createClient, recoverWallet, requiredEnvironmentVariables } from "./helpers.js";
 import 'dotenv/config.js'
 import path from "path";
@@ -24,10 +23,6 @@ const OWNER_SEED = process.env.DEPLOYER_SEED!
 
 // Setup clients
 const ACCOUNTS_PER_SEED = Number(process.env.ACCOUNTS_PER_SEED || '100')
-const RPC_URL = process.env.RPC_URL!
-
-const QUEUE_NAME = process.env.QUEUE_NAME
-const redisInterface = new RedisInterface(QUEUE_NAME)
 
 // Assets
 
@@ -194,7 +189,6 @@ const createPositions = async(
         console.log(`DEPOSITING : ${depositAmount} osmo`)
         const depositMsg = produceDepositMessage(
             address,
-            OSMO_DENOM,
             addresses.redBank,
             [osmoToDeposit]
         )
