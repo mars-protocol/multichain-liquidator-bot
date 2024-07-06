@@ -158,11 +158,12 @@ export class RedbankExecutor extends BaseExecutor {
 			if (collateral.denom === this.config.neutralAssetDenom)
 				continue
 
+			const price = this.prices.get(collateral.denom)!
 			let collateralAmount =
 				collateral.denom === this.config.gasDenom
 					? new BigNumber(collateral.amount).minus(100000000) // keep min 100 tokens for gas
 					: new BigNumber(collateral.amount)
-			if (collateralAmount.isGreaterThan(1000000) && !collateralAmount.isNaN()) {
+			if (collateralAmount.multipliedBy(price).isGreaterThan(1000000) && !collateralAmount.isNaN()) {
 				let {
 					route,
 					expectedOutput,
@@ -402,11 +403,10 @@ export class RedbankExecutor extends BaseExecutor {
 		let secondBatch: EncodeObject[] = []
 
 		const balances = await this.client?.getAllBalances(liquidatorAddress)
-
 		const combinedCoins = this.combineBalances(collaterals, balances!)
-
 		this.appendWithdrawMessages(collaterals, liquidatorAddress, secondBatch)
 		await this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, secondBatch)
+
 		if (secondBatch.length > 0) {
 			await this.client.signAndBroadcast(
 				this.config.liquidatorMasterAddress,

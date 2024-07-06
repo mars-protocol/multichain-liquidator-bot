@@ -26,3 +26,10 @@ yarn start
 ```
 
 
+### Debugging Errors
+
+- `Min output less than xxxx`: This is a slippage error - if this occurs, increase your slippage amount in the .env file, or reduce the amount of the neutral asset in the liquidator wallet
+- `Invalid coins`: A common generic error in cosmos that can have a variety of causes, however in the context of the liquidators, it has occured in the past when swapping on astroport, due to a very small amount of value being swapped. This is generally caused by assets that have very large number of decimals (e.g dydx). Issue has been fixed but comment left here for reference.
+
+
+
