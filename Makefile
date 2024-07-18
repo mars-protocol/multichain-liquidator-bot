@@ -34,7 +34,7 @@ run_node: build ## Run the service with race condition checking enabled
 	node build/src/main.js
 
 docker_build: build ## Build the service Docker container
-	docker build --platform=linux/amd64 -t ${IMAGE_NAME} .
+	sudo docker build --platform=linux/amd64 -t ${IMAGE_NAME} .
 
 docker_run: ## Run the Docker container in interactive mode
 	docker run -it --rm --network="host" \
@@ -50,7 +50,7 @@ docker_run: ## Run the Docker container in interactive mode
 		${IMAGE_NAME}
 
 docker_push: ## Push the Docker container to the registry
-	docker push ${IMAGE_NAME}
+	sudo docker push ${IMAGE_NAME}
 
 fmt: ## Format the code using `go fmt`
 	go fmt ./...
