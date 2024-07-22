@@ -359,6 +359,7 @@ export class RoverExecutor extends BaseExecutor {
 			)
 
 			await this.refreshMarketData()
+			await this.refreshPoolData(this.prices, this.markets)
 
 			roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
 			roverData.prices.forEach((price: PriceResponse) =>
