@@ -421,8 +421,8 @@ export class RedbankExecutor extends BaseExecutor {
 						? new BigNumber(coin.amount).minus(100000000) // keep min 100 tokens for gas
 						: new BigNumber(coin.amount)
 
-				if (coinAmount.isGreaterThan(1000) && !coinAmount.isNaN()) {
-					
+				if (coinAmount.multipliedBy(this.prices.get(coin.denom)!).isGreaterThan(10000)) {
+
 					const route = await getRoute(
 						this.config.sqsUrl!,
 						coinAmount.toFixed(0),
