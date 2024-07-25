@@ -118,7 +118,7 @@ export class RoverExecutor extends BaseExecutor {
 				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
 				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
 				// To target specific accounts, filter here
-				// account.account_id === "22372" &&
+				account.account_id === "1359" &&
 				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
@@ -368,6 +368,9 @@ export class RoverExecutor extends BaseExecutor {
 			this.vaultInfo = roverData.vaultInfo
 			this.creditLines = roverData.creditLines
 			this.creditLineCaps = roverData.creditLineCaps
+
+			// TODO: @piobab added to fix `Failed to find specified pool : 803`
+			await this.refreshPoolData(this.prices, this.markets)
 
 		} catch(ex) {
 			console.error(JSON.stringify(ex))

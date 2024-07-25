@@ -26,7 +26,8 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 					if (data['@type'] === '/osmosis.concentratedliquidity.v1beta1.Pool') {
 					  const result =  camelCaseKeys(data) as ConcentratedLiquidityPool;
 					  result.poolType = PoolType.CONCENTRATED_LIQUIDITY
-					  pools.push(result)
+					  // TODO: @piobab added to fix `Failed to find specified pool : 803`
+					  //pools.push(result)
 					} else if (data['@type'] === '/osmosis.gamm.v1beta1.Pool') {
 						const result = camelCaseKeys(data) as XYKPool
 						result.poolType = PoolType.XYK
@@ -45,7 +46,8 @@ export class OsmosisPoolProvider implements PoolDataProviderInterface {
 						result.poolType = PoolType.STABLESWAP
 						result.token0 = result.poolLiquidity[0].denom
 						result.token1 = result.poolLiquidity[1].denom
-						pools.push(result)
+						// TODO: @piobab added to fix `Failed to find specified pool : 803`
+						// pools.push(result)
 					}
 				  });
 				fetched = true
