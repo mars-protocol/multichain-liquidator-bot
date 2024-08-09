@@ -81,6 +81,7 @@ typings/
 .vscode
 .serverless
 /.build
+/build
 /.data
 /.overlay
 /lib
