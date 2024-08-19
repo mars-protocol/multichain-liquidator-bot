@@ -217,7 +217,7 @@ export class AMMRouter implements AMMRouterInterface {
 						const swapFee = new Dec(clPool.swapFee)
 
 						if (inittedTicks.length === 0) {
-							tokenOutRequired = new BigNumber(10000000000000000)
+							tokenOutRequired = new BigNumber('10000000000000000')
 							break
 						}
 						const result = ConcentratedLiquidityMath.calcInGivenOut({
@@ -276,7 +276,7 @@ export class AMMRouter implements AMMRouterInterface {
 				}
 			})
 		} catch (ex) {
-			return new BigNumber(100000000000000000000)
+			return new BigNumber("100000000000000000000")
 		}
 
 		return amountAfterFees

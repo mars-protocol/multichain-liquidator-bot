@@ -33,7 +33,7 @@
 		"csv-writer": "^1.6.0",
 		"dotenv": "^16.0.2",
 		"lodash": "^4.17.21",
-		"marsjs-types": "^1.0.5",
+		"marsjs-types": "^1.0.6",
 		"osmojs": "^16.5.1",
 		"redis": "^4.3.0",
 		"request": "^2.88.2",

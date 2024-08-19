@@ -16,10 +16,6 @@ import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/errors'
-import {
-	UncollateralizedLoanLimitResponse,
-	UserDebtResponse,
-} from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface'
 import { QueryMsg, VaultConfigBaseForString } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types'
@@ -42,8 +38,6 @@ export class RoverExecutor extends BaseExecutor {
 	private VAULT_RELOAD_WINDOW = 1800000
 	public config: RoverExecutorConfig
 	private liquidationActionGenerator: ActionGenerator
-	private creditLines: UserDebtResponse[] = []
-	private creditLineCaps: UncollateralizedLoanLimitResponse[] = []
 
 	private liquidatorAccounts: Map<string, number> = new Map()
 	private liquidatorBalances : Map<string, Coin[]> = new Map()
@@ -118,7 +112,7 @@ export class RoverExecutor extends BaseExecutor {
 				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
 				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
 				// To target specific accounts, filter here
-				// account.account_id === "22372" &&
+				//account.account_id === "3821" &&
 				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
@@ -178,8 +172,6 @@ export class RoverExecutor extends BaseExecutor {
 				bestCollateral,
 				this.markets,
 				this.whitelistedCoins,
-				this.creditLines,
-				this.creditLineCaps,
 			)
 
 			// variables
@@ -189,7 +181,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			const liquidateMessage = this.liquidationActionGenerator.produceLiquidationAction(
 				bestCollateral.type,
-				{ denom: bestDebt.denom, amount: borrow.amount },
+				{ denom: bestDebt.denom, amount: (Number(borrow.amount) * 0.995).toFixed(0) },
 				roverPosition.account_id,
 				bestCollateral.denom,
 				bestCollateral.vaultType,
@@ -352,14 +344,14 @@ export class RoverExecutor extends BaseExecutor {
 				this.config.liquidatorMasterAddress,
 				this.config.redbankAddress,
 				this.config.oracleAddress,
-				this.config.creditManagerAddress,
 				this.config.swapperAddress,
 				this.vaults,
 				this.config.marsParamsAddress,
 			)
 
 			await this.refreshMarketData()
-			await this.refreshPoolData(this.prices, this.markets)
+			// TODO remove for neutron
+			// await this.refreshPoolData(this.prices, this.markets)
 
 			roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
 			roverData.prices.forEach((price: PriceResponse) =>
@@ -367,9 +359,6 @@ export class RoverExecutor extends BaseExecutor {
 			)
 			this.whitelistedCoins = roverData.whitelistedAssets! as string[]
 			this.vaultInfo = roverData.vaultInfo
-			this.creditLines = roverData.creditLines
-			this.creditLineCaps = roverData.creditLineCaps
-
 		} catch(ex) {
 			console.error(JSON.stringify(ex))
 		}

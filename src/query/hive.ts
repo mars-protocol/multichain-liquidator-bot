@@ -40,7 +40,6 @@ export const fetchRoverData = async (
 	address: string,
 	redbankAddress: string,
 	oracleAddress: string,
-	creditManagerAddress: string,
 	swapperAddress: string,
 	vaultAddresses: string[],
 	params_address: string,
@@ -49,7 +48,6 @@ export const fetchRoverData = async (
 		address,
 		redbankAddress,
 		oracleAddress,
-		creditManagerAddress,
 		swapperAddress,
 		params_address
 	)
@@ -86,8 +84,6 @@ export const fetchRoverData = async (
 		markets: coreData.wasm.markets,
 		masterBalance: coreData.bank.balance,
 		prices: coreData.wasm.prices,
-		creditLines: coreData.wasm.creditLines.filter((debt) => debt.uncollateralized),
-		creditLineCaps: coreData.wasm.creditLineCaps,
 		routes: coreData.wasm.routes,
 		vaultInfo: vaultMap,
 		whitelistedAssets: [],

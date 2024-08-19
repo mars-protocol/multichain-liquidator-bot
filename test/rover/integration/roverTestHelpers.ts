@@ -34,7 +34,9 @@ export const createCreditAccount = async (
 	exec: MarsCreditManagerClient,
 ): Promise<string> => {
 	const before = await nft.tokens({ owner: userAddress })
-	await exec.createCreditAccount()
+	await exec.createCreditAccount(
+		'default'
+	)
 	const after = await nft.tokens({ owner: userAddress })
 	const diff = difference(after.tokens, before.tokens)
 

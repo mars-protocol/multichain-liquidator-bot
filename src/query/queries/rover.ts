@@ -2,7 +2,6 @@ export const produceCoreRoverDataQuery = (
 	address: string,
 	redbankAddress: string,
 	oracleAddress: string,
-	creditManagerAddress: string,
 	swapperAddress: string,
   params_address: string,
 ) => {
@@ -22,17 +21,9 @@ export const produceCoreRoverDataQuery = (
             contractAddress: "${oracleAddress}"
             query: { prices: { limit: 50 } }
         ),
-        creditLines: contractQuery(
-          contractAddress: "${redbankAddress}"
-          query: { user_debts: { user :"${creditManagerAddress}"} }
-        ),
         whitelistedAssets: contractQuery(
           contractAddress: "${params_address}"
           query: { all_asset_params: {} }
-        ),
-        creditLineCaps: contractQuery(
-          contractAddress: "${redbankAddress}"
-          query: { uncollateralized_loan_limits: { user :"${creditManagerAddress}"} }
         ),
         routes: contractQuery(
           contractAddress: "${swapperAddress}"

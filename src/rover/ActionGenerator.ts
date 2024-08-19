@@ -17,10 +17,6 @@ import {
 	UNSUPPORTED_VAULT,
 } from './constants/errors.js'
 import { GENERIC_BUFFER } from '../constants.js'
-import {
-	UncollateralizedLoanLimitResponse,
-	UserDebtResponse,
-} from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import { createOsmoRoute, findUnderlying } from '../helpers.js'
 import { VaultInfo } from '../query/types.js'
 import { PoolType, XYKPool } from '../types/Pool.js'
@@ -52,17 +48,12 @@ export class ActionGenerator {
 		collateral: Collateral,
 		markets: MarketInfo[],
 		whitelistedAssets: string[],
-		creditLines: UserDebtResponse[],
-		creditLineCaps: UncollateralizedLoanLimitResponse[],
 	): Action[] => {
-
-		// TODO remove caps
-		if (false) console.log(creditLines, creditLineCaps)
 
 		// estimate our debt to repay - this depends on collateral amount and close factor
 		let maxRepayValue = (collateral.value * collateral.closeFactor)
 		const maxDebtValue = debt.amount * debt.price
-		const debtCeiling = 10000000000
+		const debtCeiling = 1000000000
 		if (maxDebtValue > debtCeiling) {
 			maxRepayValue = debtCeiling
 		}
@@ -75,6 +66,41 @@ export class ActionGenerator {
 		const debtCoin: Coin = {
 			amount: debtAmount.toFixed(0),
 			denom: debt.denom,
+		}
+
+		if (debt.denom === "ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858") {
+			let actions : Action[] = [
+				// borrow usdc
+				{
+					borrow: {
+						amount: debtCoin.amount,
+						denom: "ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4"
+					}
+				},
+				// swap to axlsdc
+				{
+					swap_exact_in: {
+						coin_in: {
+							amount: "account_balance",
+							denom: "ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4"
+						},
+						denom_out: "ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858",
+						route: {
+							osmo: {
+								swaps: [
+									{
+										pool_id: 1223,
+										to: "ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858"
+									}
+								]
+							}
+						},
+						min_receive: (debtAmount * 0.995).toFixed(0)
+					}
+				}
+			]
+
+			return actions
 		}
 
 		// if asset is not enabled, or we have less than 50% the required liquidity, do alternative borrow
@@ -202,7 +228,10 @@ export class ActionGenerator {
 		// credit manager sub account. To minimise slippage, should ensure that we do not keep
 		// additional funds inside the subaccount we are using for liquidations
 		bestRoute.forEach((hop: RouteHop) => {
-			const action = this.produceSwapAction(hop.tokenInDenom, hop.tokenOutDenom)
+			const action = this.produceSwapAction(
+				hop.tokenInDenom,
+				hop.tokenOutDenom,
+				debtAmount.multipliedBy(0.995).toFixed(0))
 			actions.push(action)
 		})
 
@@ -248,7 +277,7 @@ export class ActionGenerator {
 	 *
 	 * @param assetInDenom
 	 * @param assetOutDenom
-	 * @param amount
+	 * @param amount`
 	 * @returns An array of swap actions that convert the asset from collateral to the debt.
 	 */
 	generateSwapActions = async(
@@ -450,14 +479,14 @@ export class ActionGenerator {
 	private produceSwapAction = (
 		denomIn: string,
 		denomOut: string,
-		slippage: string = '0.005',
+		minReceive: string,
 		route: SwapperRoute | null = null,
 	): Action => {
 		return {
 			swap_exact_in: {
 				coin_in: { denom: denomIn, amount: 'account_balance' },
 				denom_out: denomOut,
-				slippage: slippage,
+				min_receive: minReceive,
 				route: route,
 			},
 		}

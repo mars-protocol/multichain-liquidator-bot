@@ -2,8 +2,6 @@ import { AMMRouter } from '../../../src/AmmRouter'
 import { ActionGenerator } from '../../../src/rover/ActionGenerator'
 import { MarketInfo } from '../../../src/rover/types/MarketInfo'
 import {
-	generateRandomCreditLine,
-	generateRandomCreditLineCap,
 	generateRandomMarket,
 } from './helpers'
 import {
@@ -83,8 +81,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 					collateral,
 					markets,
 					[debt.denom, market.denom],
-					[generateRandomCreditLine(debt.denom), generateRandomCreditLine(collateral.denom)],
-					[generateRandomCreditLineCap(debt.denom), generateRandomCreditLineCap(collateral.denom)],
 				)
 				console.log(borrowActions)
 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
@@ -125,8 +121,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 					collateral,
 					markets,
 					[debt.denom, market.denom],
-					[generateRandomCreditLine(debt.denom), generateRandomCreditLine(collateral.denom)],
-					[generateRandomCreditLineCap(debt.denom), generateRandomCreditLineCap(collateral.denom)],
 				)
 				console.log(borrowActions)
 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
@@ -165,8 +159,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 					collateral,
 					markets,
 					[debt.denom, collateral.denom],
-					[generateRandomCreditLine(debt.denom), generateRandomCreditLine(collateral.denom)],
-					[generateRandomCreditLineCap(debt.denom), generateRandomCreditLineCap(collateral.denom)],
 				)
 				console.log(borrowActions)
 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
@@ -209,8 +201,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 					collateral,
 					markets,
 					[market.denom, debt.denom, collateral.denom],
-					[generateRandomCreditLine(debt.denom), generateRandomCreditLine(collateral.denom)],
-					[generateRandomCreditLineCap(debt.denom), generateRandomCreditLineCap(collateral.denom)],
 				)
 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
 
@@ -266,8 +256,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 					collateral,
 					markets,
 					[debt.denom, market.denom, market2.denom],
-					[generateRandomCreditLine(debt.denom), generateRandomCreditLine(collateral.denom)],
-					[generateRandomCreditLineCap(debt.denom), generateRandomCreditLineCap(collateral.denom)],
 				)
 				console.log(borrowActions)
 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
@@ -303,11 +291,6 @@ describe('Liquidation Actions generator Unit Tests', () => {
 						collateral,
 						markets,
 						[debtDenom],
-						[generateRandomCreditLine(debt.denom), generateRandomCreditLine(collateral.denom)],
-						[
-							generateRandomCreditLineCap(debt.denom),
-							generateRandomCreditLineCap(collateral.denom),
-						],
 					)
 				}).toThrow(NO_ROUTE_FOR_SWAP)
 			})

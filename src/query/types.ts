@@ -2,10 +2,6 @@ import BigNumber from 'bignumber.js'
 import { Coin } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
-import {
-	UncollateralizedLoanLimitResponse,
-	UserDebtResponse,
-} from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import { MarketInfo } from '../rover/types/MarketInfo'
 import { SwapperRoute } from '../types/swapper'
 
@@ -48,8 +44,6 @@ export interface RoverData {
 	markets: MarketInfo[]
 	prices: PriceResponse[]
 	whitelistedAssets: string[]
-	creditLines: UserDebtResponse[]
-	creditLineCaps: UncollateralizedLoanLimitResponse[]
 	routes: SwapperRoute[]
 	vaultInfo: Map<string, VaultInfo>
 }
@@ -60,8 +54,6 @@ export interface CoreDataResponse {
 		markets: MarketInfo[]
 		prices: PriceResponse[]
 		whitelistedAssets: string[]
-		creditLines: UserDebtResponse[]
-		creditLineCaps: UncollateralizedLoanLimitResponse[]
 		routes: SwapperRoute[]
 	}
 }

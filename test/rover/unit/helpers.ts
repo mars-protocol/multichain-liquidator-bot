@@ -1,5 +1,4 @@
 import {
-	UncollateralizedLoanLimitResponse,
 	UserDebtResponse,
 } from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
 import { MarketInfo } from '../../../src/rover/types/MarketInfo'
@@ -35,15 +34,5 @@ export const generateRandomCreditLine = (
 		amount_scaled: 'not used',
 		denom,
 		uncollateralized: true,
-	}
-}
-
-export const generateRandomCreditLineCap = (
-	denom: string = 'uatom',
-	limit: string = '1000000000',
-): UncollateralizedLoanLimitResponse => {
-	return {
-		denom,
-		limit,
 	}
 }
