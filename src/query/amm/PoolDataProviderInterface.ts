@@ -1,6 +1,6 @@
 import { Pool } from "../../types/Pool";
 
-export interface PoolDataProviderInterface {
+export interface PoolDataProvider {
 
     loadPools(): Promise<Pool[]>
 

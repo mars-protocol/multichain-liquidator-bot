@@ -7,7 +7,6 @@ export const getConfig = (
 ): RedbankExecutorConfig => {
 	return network === Network.MAINNET
 		? {
-				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
 				chainName: "neutron",
 				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!, // todo hardcode here
 				safetyMargin: 0.05,
@@ -19,14 +18,13 @@ export const getConfig = (
 				logResults: false, // enable for debugging
 				marsParamsAddress: 'todo',
 				neutralAssetDenom: 'ibc/2FF082B65C88E4B6D5EF1DB243CDA1D331D002759E938A0F5CD3FFDC5D53B3E349',
-				oracleAddress: 'neutron1dwp6m7pdrz6rnhdyrx5ha0acsduydqcpzkylvfgspsz60pj2agxqaqrr7g',
-				redbankAddress: 'neutron1n97wnm7q6d2hrcna3rqlnyqw2we6k0l8uqvmyqq6gsml92epdu7quugyph',
+				oracleAddress: 'neutron17hnkmu6awcq3j6yt9afz7nh3gx223p5xsma06ma5d9nnaks2kj2q94mugv',
+				redbankAddress: 'neutron1d6dzqytwa8d6p3m5fkwzvtlzqk38fg4crg4hnupdyga88j65ahkqakpyl6',
 				liquidationProfitMarginPercent: 0.001,
 				poolsRefreshWindow: 60000,
 				astroportFactory : 'neutron1hptk0k5kng7hjy35vmh009qd5m6l33609nypgf2yc6nqnewduqasxplt4e'
 		  }
 		: {
-			liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
 			liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!, // todo hardcode here
 			safetyMargin: 0.05,
 			chainName: "neutron",

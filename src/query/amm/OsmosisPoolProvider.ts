@@ -1,10 +1,10 @@
 import { Dec, Int } from "@keplr-wallet/unit";
 import { camelCaseKeys } from "../../helpers";
 import { ConcentratedLiquidityPool, Pool, PoolType, StableswapPool as StableswapPool, XYKPool } from "../../types/Pool";
-import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
+import { PoolDataProvider } from "./PoolDataProviderInterface";
 import { BigDec, LiquidityDepth, estimateInitialTickBound, } from "@osmosis-labs/math";
 
-export class OsmosisPoolProvider implements PoolDataProviderInterface {
+export class OsmosisPoolProvider implements PoolDataProvider {
 
     constructor(private lcdEndpoint: string, private apiKey: string) {}
 

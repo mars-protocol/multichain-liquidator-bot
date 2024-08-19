@@ -15,8 +15,8 @@ import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
-import { PoolDataProviderInterface } from '../query/amm/PoolDataProviderInterface'
-import { ExchangeInterface } from '../execute/ExchangeInterface.js'
+import { PoolDataProvider } from '../query/amm/PoolDataProviderInterface'
+import { Exchange } from '../execute/ExchangeInterface.js'
 import { AssetParamsBaseForAddr } from '../types/marsParams.js'
 import { OsmosisPriceSourceForString } from '../types/marsOracleOsmosis.types'
 import { OsmosisOraclePriceFetcher as MarsOraclePriceFetcher } from '../query/oracle/OsmosisOraclePriceFetcher'
@@ -24,14 +24,13 @@ import { PythPriceFetcher } from '../query/oracle/PythPriceFetcher'
 import { WasmPriceSourceForString } from '../types/marsOracleWasm.types'
 import { OraclePrice } from '../query/oracle/PriceFetcherInterface'
 import { calculateCollateralRatio, calculateLiquidationBonus, calculateMaxDebtRepayable, getLiquidationThresholdHealthFactor } from './LiquidationHelpers'
-import { getRoute } from '../query/sidecar'
+import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
 export interface RedbankExecutorConfig extends BaseExecutorConfig {
 	liquidationFiltererAddress: string
-	liquidatableAssets: string[]
 	safetyMargin: number
 	liquidationProfitMarginPercent: number
 }
@@ -68,10 +67,11 @@ export class RedbankExecutor extends BaseExecutor {
 		config: RedbankExecutorConfig,
 		client: SigningStargateClient,
 		queryClient: CosmWasmClient,
-		poolProvider: PoolDataProviderInterface,
-		private exchangeInterface: ExchangeInterface
+		poolProvider: PoolDataProvider,
+		private exchangeInterface: Exchange,
+		routeRequester: RouteRequester
 	) {
-		super(config, client, queryClient, poolProvider)
+		super(config, client, queryClient, poolProvider, routeRequester)
 		this.config = config
 	}
 
@@ -422,12 +422,12 @@ export class RedbankExecutor extends BaseExecutor {
 						: new BigNumber(coin.amount)
 
 				if (coinAmount.multipliedBy(this.prices.get(coin.denom)!).isGreaterThan(10000)) {
-
-					const route = await getRoute(
-						this.config.sqsUrl!,
-						coinAmount.toFixed(0),
+					// a
+					const routeResponse = await this.routeRequester.requestRoute(
+						"todo - remove this param",
 						coin.denom,
 						this.config.neutralAssetDenom,
+						coin.amount,
 					)
 
 					let minOutput = coinAmount
@@ -443,7 +443,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 					msgs.push(
 						this.exchangeInterface.produceSwapMessage(
-							route,
+							routeResponse.route,
 							{ denom: coin.denom, amount: coinAmount.toFixed(0) },
 							minOutput,
 							liquidatorAddress,
@@ -482,16 +482,16 @@ export class RedbankExecutor extends BaseExecutor {
 					debtValue = neutralAvailable
 				}
 
-				const route = await getRoute(
-					this.config.sqsUrl!,
-					debtAmountRequiredFromSwap.toFixed(0),
+				const routeResponse = await this.routeRequester.requestRoute(
+					"todo - remove this param",
 					this.config.neutralAssetDenom,
 					debt.denom,
+					debtValue.toFixed(0),
 				)
 
 				msgs.push(
 					this.exchangeInterface.produceSwapMessage(
-						route,
+						routeResponse.route,
 						{ denom: this.config.neutralAssetDenom, amount: debtValue.toFixed(0) },
 						debtAmountRequiredFromSwap.toFixed(0),
 						liquidatorAddress,

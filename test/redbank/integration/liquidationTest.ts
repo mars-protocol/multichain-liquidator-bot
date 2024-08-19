@@ -26,8 +26,8 @@
 // import { RedbankExecutor, RedbankExecutorConfig } from '../../../src/redbank/RedbankExecutor'
 // import { localnetConfig, TestConfig } from './config.js'
 // import { PoolDataProviderInterface } from '../../../src/query/amm/PoolDataProviderInterface'
-// import { ExchangeInterface } from '../../../src/execute/ExchangeInterface'
-// import { Osmosis } from '../../../src/execute/Osmosis.js'
+// import { ExchangeInterface } from '../../../../src/query/routing/RouteRequesterInterface.js
+// import { Osmosis } from '../../../src/../../../src/query/routing/AstroportRouteRequester.js
 // import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
 // import { AssetParamsUpdate } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types.js'
 // import { Coin } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types.js'

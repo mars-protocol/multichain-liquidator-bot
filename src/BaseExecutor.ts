@@ -10,8 +10,9 @@ import { CSVWriter, Row } from './CsvWriter.js'
 import BigNumber from 'bignumber.js'
 import { fetchRedbankData } from './query/hive.js'
 import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types.js'
-import { PoolDataProviderInterface } from './query/amm/PoolDataProviderInterface.js'
+import { PoolDataProvider } from './query/amm/PoolDataProviderInterface.js'
 import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
+import { RouteRequester } from './query/routing/RouteRequesterInterface.js'
 
 export interface BaseExecutorConfig {
 	lcdEndpoint: string
@@ -62,8 +63,9 @@ export class BaseExecutor {
 		public config: BaseExecutorConfig,
 		public client: SigningStargateClient,
 		public queryClient: CosmWasmClient,
-		private poolProvider: PoolDataProviderInterface,
-		public ammRouter : AMMRouter = new AMMRouter()
+		private poolProvider: PoolDataProvider,
+		public routeRequester: RouteRequester,
+		public ammRouter : AMMRouter = new AMMRouter(),
 	) {
 		console.log({config})
 	}

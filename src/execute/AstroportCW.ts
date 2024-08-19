@@ -1,7 +1,7 @@
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { Coin } from "marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types";
 import { RouteHop } from "../types/RouteHop";
-import { ExchangeInterface } from "./ExchangeInterface";
+import { Exchange } from "./ExchangeInterface";
 import { AssetInfoCW, AssetInfoNative } from "../query/amm/types/AstroportTypes";
 import { produceExecuteContractMessage } from "../helpers";
 import { toUtf8 } from '@cosmjs/encoding'
@@ -25,7 +25,7 @@ interface SwapMsg {
 // This uses the execute_swap_operations function on the router
 // See here - https://github.com/astroport-fi/astroport-core/tree/main/contracts/router#execute_swap_operations
 
-export class AstroportCW implements ExchangeInterface {
+export class AstroportCW implements Exchange {
 
     /**
      * @param prefix The prefix of the chain we are operating on. 

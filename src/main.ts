@@ -8,14 +8,17 @@ import { getConfig as getRoverConfig } from './rover/config/osmosis.js'
 import { RoverExecutor } from './rover/RoverExecutor.js'
 import { getSecretManager } from './secretManager.js'
 import { Network } from './types/network.js'
-import { PoolDataProviderInterface } from './query/amm/PoolDataProviderInterface.js'
+import { PoolDataProvider } from './query/amm/PoolDataProviderInterface.js'
 import { OsmosisPoolProvider } from './query/amm/OsmosisPoolProvider.js'
 import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
-import { ExchangeInterface } from './execute/ExchangeInterface.js'
+import { Exchange } from './execute/ExchangeInterface.js'
 import { Osmosis } from './execute/Osmosis.js'
 import { getConfig } from './redbank/config/getConfig.js'
 import { BaseExecutorConfig } from './BaseExecutor.js'
 import { AstroportCW } from './execute/AstroportCW.js'
+import { AstroportRouteRequester } from './query/routing/AstroportRouteRequester.js'
+import { OsmosisRouteRequester } from './query/routing/OsmosisRouteRequester.js'
+import { RouteRequester } from './query/routing/RouteRequesterInterface.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -52,15 +55,15 @@ export const main = async () => {
 	const redbankConfig = getConfig(liquidatorMasterAddress, network, chainName)
 
 	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
-	// Produce network
+	const routeRequester = chainName === "neutron" ? new AstroportRouteRequester() : new OsmosisRouteRequester()
 	const poolProvider = getPoolProvider(chainName, redbankConfig)
 
 	switch (executorType) {
 		case REDBANK:
-			await launchRedbank(client, queryClient, redbankConfig, poolProvider, exchangeInterface)
+			await launchRedbank(client, queryClient, redbankConfig, poolProvider, exchangeInterface, routeRequester)
 			return
 		case ROVER:
-			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator, poolProvider)
+			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator, poolProvider, routeRequester)
 			return
 		default:
 			throw new Error(
@@ -69,7 +72,7 @@ export const main = async () => {
 	}
 }
 
-const getPoolProvider = (chainName: string, config: BaseExecutorConfig) : PoolDataProviderInterface => {
+const getPoolProvider = (chainName: string, config: BaseExecutorConfig) : PoolDataProvider => {
 	switch (chainName) {
 		case "osmosis":
 			return new OsmosisPoolProvider(process.env.LCD_ENDPOINT!, process.env.API_KEY!)
@@ -87,15 +90,16 @@ const launchRover = async (
 	network: Network,
 	liquidatorMasterAddress: string,
 	liquidatorWallet: DirectSecp256k1HdWallet,
-	poolProvider : PoolDataProviderInterface
-
+	poolProvider : PoolDataProvider,
+	routeRequester: RouteRequester,
 ) => {
 	await new RoverExecutor(
 		getRoverConfig(liquidatorMasterAddress, network),
 		client,
 		wasmClient,
 		liquidatorWallet,
-		poolProvider
+		poolProvider,
+		routeRequester,
 	).start()
 }
 
@@ -103,16 +107,17 @@ const launchRedbank = async (
 	client: SigningStargateClient,
 	wasmClient: CosmWasmClient,
 	redbankConfig : RedbankExecutorConfig,
-	poolProvider : PoolDataProviderInterface,
-	exchangeInterface : ExchangeInterface
-
+	poolProvider : PoolDataProvider,
+	exchangeInterface : Exchange,
+	routeRequester: RouteRequester,
 ) => {
 	await new RedbankExecutor(
 		redbankConfig,
 		client,
 		wasmClient,
 		poolProvider,
-		exchangeInterface
+		exchangeInterface,
+		routeRequester,
 	).start()
 }
 

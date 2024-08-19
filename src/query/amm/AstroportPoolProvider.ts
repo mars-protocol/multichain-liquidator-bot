@@ -1,11 +1,10 @@
 import { sleep } from "../../helpers";
 import { Pool, PoolAsset, PoolType, XYKPool } from "../../types/Pool";
-import { PoolDataProviderInterface } from "./PoolDataProviderInterface";
+import { PoolDataProvider } from "./PoolDataProviderInterface";
 import fetch from 'cross-fetch'
 import { Asset, AssetInfoCW, AssetInfoNative, ContractQueryPairs, ContractQueryPool, Pair, PoolResponseData, Query, ResponseData } from "./types/AstroportTypes";
 
-export class AstroportPoolProvider implements PoolDataProviderInterface {
-    
+export class AstroportPoolProvider implements PoolDataProvider {
     private maxRetries = 8
 
     private pairs : Pair[] = []
