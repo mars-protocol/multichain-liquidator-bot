@@ -7,7 +7,6 @@ export const getConfig = (
 ): RedbankExecutorConfig => {
 	return network === Network.MAINNET
 		? {
-				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
 				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
 				safetyMargin: 0.05,
 				chainName: "osmosis",
@@ -26,7 +25,6 @@ export const getConfig = (
 				sqsUrl: process.env.SQS_URL!,
 		  }
 		: {
-				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
 				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
 				chainName: "osmosis",
 				safetyMargin: 0.05,
