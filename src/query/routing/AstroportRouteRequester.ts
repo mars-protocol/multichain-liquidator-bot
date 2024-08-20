@@ -4,27 +4,28 @@ import { RequestRouteResponse, RouteRequester } from "./RouteRequesterInterface"
 import { RouteHop } from "../../types/RouteHop";
 import { PoolType } from "../../types/Pool";
 
-export class AstroportRouteRequester implements RouteRequester {
+export class AstroportRouteRequester extends RouteRequester {
+
+    constructor(apiUrl: string) {
+        super(apiUrl);
+    }
+
     async requestRoute(
-        apiUrl: string, 
         tokenInDenom: string,
         tokenOutDenom: string,
         tokenOutAmount: string,
         ): Promise<RequestRouteResponse> {
             // todo pass chain id in?
-            let url = `${apiUrl}routes?start=${tokenInDenom}&end=${tokenOutDenom}&amount=${tokenOutAmount}&chainId=neutron-1&limit=5`
-            console.log(url)
+            let url = `${this.apiUrl}routes?start=${tokenInDenom}&end=${tokenOutDenom}&amount=${tokenOutAmount}&chainId=neutron-1&limit=5`
             let response = await fetch(url)
 
             let astroportRoutes: AstroportApiRoute[] = await response.json()
-            
             let bestRoute = astroportRoutes
             .sort((a, b) => {
                 let a_val = new BigNumber(a.value_out)
                 let b_val = new BigNumber(b.value_out)
                 return a_val.minus(b_val).toNumber()
             }).pop();
-        
             if (!bestRoute) {
                 throw new Error(`No route found for ${tokenInDenom} to ${tokenOutDenom}`)
             }

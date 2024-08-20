@@ -81,7 +81,6 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.fetchAssetParams()
 		await this.fetchTargetHealthFactor()
 
-
 		setInterval(this.fetchAssetParams, 10 * this.MINUTE)
 		setInterval(this.updatePriceSources, 10 * this.MINUTE)
 		setInterval(this.updateOraclePrices, 1 * this.MINUTE )
@@ -97,7 +96,7 @@ export class RedbankExecutor extends BaseExecutor {
 		}
 	}
 
-	async fetchTargetHealthFactor() { 
+	async fetchTargetHealthFactor() {
 		try {
 			this.targetHealthFactor = await this.queryClient.queryContractSmart(this.config.marsParamsAddress, {
 				target_health_factor: {}
@@ -422,9 +421,7 @@ export class RedbankExecutor extends BaseExecutor {
 						: new BigNumber(coin.amount)
 
 				if (coinAmount.multipliedBy(this.prices.get(coin.denom)!).isGreaterThan(10000)) {
-					// a
 					const routeResponse = await this.routeRequester.requestRoute(
-						"todo - remove this param",
 						coin.denom,
 						this.config.neutralAssetDenom,
 						coin.amount,
@@ -483,7 +480,6 @@ export class RedbankExecutor extends BaseExecutor {
 				}
 
 				const routeResponse = await this.routeRequester.requestRoute(
-					"todo - remove this param",
 					this.config.neutralAssetDenom,
 					debt.denom,
 					debtValue.toFixed(0),
@@ -565,7 +561,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 		let positions: Position[] = positionObjects
 			.filter(position =>
-					Number(position.health_factor) < 0.94 &&
+					Number(position.health_factor) < 0.98 &&
 					Number(position.health_factor) > 0.3 &&
 					position.total_debt.length > 5)
 					
@@ -584,15 +580,13 @@ export class RedbankExecutor extends BaseExecutor {
 		}
 
 		for (const position of positions) {
-
+			console.log(`- Liquidating ${position.Identifier}`)
 			// Fetch position data
 			const positionData: DataResponse[] = await fetchRedbankBatch(
 				[position],
 				this.config.redbankAddress,
 				this.config.hiveEndpoint,
 			)
-
-			console.log(`- found ${positionData.length} positions queued for liquidation. ${position.Identifier}`)
 
 			const { txs, debtsToRepay } = await this.produceLiquidationTxs(positionData)
 			const debtCoins: Coin[] = []
@@ -615,7 +609,7 @@ export class RedbankExecutor extends BaseExecutor {
 				// index [0] is safe as we know the length is 1 from the conditional
 				txs.length == 1 ? this.executeViaRedbankMsg(txs[0]) : this.executeViaFilterer(txs, debtCoins)
 			firstMsgBatch.push(execute)
-			
+
 			if (!firstMsgBatch || firstMsgBatch.length === 0 || txs.length === 0) continue
 
 			const firstFee = this.config.chainName.toLowerCase() === "osmosis" ? await this.getOsmosisFee(firstMsgBatch, this.config.liquidatorMasterAddress) : 'auto'
@@ -660,7 +654,7 @@ export class RedbankExecutor extends BaseExecutor {
 			if (this.config.logResults) {
 				this.writeCsv()
 			}
-		}		
+		}
 	}
 
 	async liquidateCollaterals(liquidatorAddress: string, collaterals: Collateral[]) {
@@ -669,11 +663,14 @@ export class RedbankExecutor extends BaseExecutor {
 		const balances = await this.client?.getAllBalances(liquidatorAddress)
 
 		const combinedCoins = this.combineBalances(collaterals, balances!)
-		this.appendWithdrawMessages(collaterals, liquidatorAddress, msgs)
+
+		if (combinedCoins.length === 0) return
+
+		// this.appendWithdrawMessages(collaterals, liquidatorAddress, msgs)
 		await this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, msgs)
 		if (msgs.length === 0) return
 
-		const secondFee = this.config.chainName.toLowerCase() === "osmosis" 
+		const secondFee = this.config.chainName.toLowerCase() === "osmosis"
 			? await this.getOsmosisFee(msgs, this.config.liquidatorMasterAddress)
 			// todo support neutron
 			: 'auto'

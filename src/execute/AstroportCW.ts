@@ -3,7 +3,7 @@ import { Coin } from "marsjs-types/creditmanager/generated/mars-credit-manager/M
 import { RouteHop } from "../types/RouteHop";
 import { Exchange } from "./ExchangeInterface";
 import { AssetInfoCW, AssetInfoNative } from "../query/amm/types/AstroportTypes";
-import { produceExecuteContractMessage } from "../helpers";
+import { camelToSnake, produceExecuteContractMessage } from "../helpers";
 import { toUtf8 } from '@cosmjs/encoding'
 
 interface AstroSwap {
@@ -16,8 +16,10 @@ interface SwapOperation {
 }
 
 interface SwapMsg {
-    executeSwapOperations : SwapOperation[]
-    minimumRecieve: string
+    executeSwapOperations : {
+        operations: SwapOperation[]
+        minimumReceive: string
+    },
 }
 
 
@@ -33,19 +35,21 @@ export class AstroportCW implements Exchange {
      */
     constructor(private prefix: string, private astroportRouterContract: string) {}
 
-    produceSwapMessage(route: RouteHop[], tokenIn: Coin, minimumRecieve: string, sender: string): EncodeObject {
-        
+    produceSwapMessage(route: RouteHop[], tokenIn: Coin, minimumReceive: string, sender: string): EncodeObject {
+
         const executeSwapOperations = route.map((route) => this.produceSwapOperation(route))
-       
+
         const msg : SwapMsg = {
-            executeSwapOperations,
-            minimumRecieve
+            executeSwapOperations: {
+                operations: executeSwapOperations,
+                minimumReceive
+            },
         }
 
         return produceExecuteContractMessage(
             sender,
             this.astroportRouterContract,
-            toUtf8(JSON.stringify(msg)),
+            toUtf8(camelToSnake(JSON.stringify(msg))),
             [tokenIn]
         )
     }

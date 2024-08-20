@@ -29,7 +29,6 @@ export const main = async () => {
 	const executorType = process.env.EXECUTOR_TYPE!
 
 	const sm = getSecretManager()
-
 	// produce paths for the number of addresses we want under our seed
 	const addressCount = process.env.MAX_LIQUIDATORS || 1
 	const chainName = process.env.CHAIN_NAME!
@@ -55,7 +54,7 @@ export const main = async () => {
 	const redbankConfig = getConfig(liquidatorMasterAddress, network, chainName)
 
 	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
-	const routeRequester = chainName === "neutron" ? new AstroportRouteRequester() : new OsmosisRouteRequester()
+	const routeRequester = chainName === "neutron" ? new AstroportRouteRequester(process.env.ASTROPORT_API_URL!) : new OsmosisRouteRequester(process.env.API_URL!)
 	const poolProvider = getPoolProvider(chainName, redbankConfig)
 
 	switch (executorType) {

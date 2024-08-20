@@ -77,6 +77,14 @@ export const getAddress = async (wallet: DirectSecp256k1HdWallet): Promise<strin
 	return accounts[0].address
 }
 
+export const camelToSnake= (camelCaseStr: string): string => {
+    return camelCaseStr
+        // Insert an underscore before each uppercase letter
+        .replace(/([a-z])([A-Z])/g, '$1_$2')
+        // Convert the entire string to lowercase
+        .toLowerCase();
+}
+
 export const produceSigningStargateClient = async (
 	rpcEndpoint: string,
 	liquidator: DirectSecp256k1HdWallet,

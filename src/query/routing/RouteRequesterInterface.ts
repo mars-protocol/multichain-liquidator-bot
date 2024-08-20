@@ -5,9 +5,14 @@ import { RouteHop } from "../../types/RouteHop"
  * and lower maintainance way of getting routes that using AMM routing and supporting every
  * possible pool type on the various chains.
  */
-export interface RouteRequester {
-    requestRoute(
-        apiUrl: string,
+export abstract class RouteRequester {
+    protected apiUrl: string;
+
+    constructor(apiUrl: string) {
+        this.apiUrl = apiUrl;
+    }
+
+    abstract requestRoute(
         tokenInDenom: string,
         tokenOutDenom: string,
         tokenInAmount: string
