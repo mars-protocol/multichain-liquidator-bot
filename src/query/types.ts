@@ -42,7 +42,6 @@ export interface VaultInfo {
 export interface RoverData {
 	masterBalance: Coin[]
 	markets: MarketInfo[]
-	prices: PriceResponse[]
 	whitelistedAssets: string[]
 	routes: SwapperRoute[]
 	vaultInfo: Map<string, VaultInfo>

@@ -1,7 +1,6 @@
 export const produceCoreRoverDataQuery = (
 	address: string,
 	redbankAddress: string,
-	oracleAddress: string,
 	swapperAddress: string,
   params_address: string,
 ) => {
@@ -16,10 +15,6 @@ export const produceCoreRoverDataQuery = (
         markets: contractQuery(
             contractAddress: "${redbankAddress}"
             query: { markets: {} }
-        ),
-        prices: contractQuery(
-            contractAddress: "${oracleAddress}"
-            query: { prices: { limit: 50 } }
         ),
         whitelistedAssets: contractQuery(
           contractAddress: "${params_address}"

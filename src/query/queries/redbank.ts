@@ -29,7 +29,6 @@ export const produceBalanceQuery = (
 export const produceRedbankGeneralQuery = (
 	address: string,
 	redbankAddress: string,
-	oracleAddress: string,
 ) => {
 	return `{
         bank {
@@ -43,10 +42,6 @@ export const produceRedbankGeneralQuery = (
                 contractAddress: "${redbankAddress}"
                 query: { markets: {} }
             ),
-        prices: contractQuery(
-            contractAddress: "${oracleAddress}"
-            query: { prices: { limit: 50 } }
-        )
       }
     }`
 }

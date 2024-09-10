@@ -1,5 +1,4 @@
 import { calculateCollateralRatio, calculateLiquidationBonus, calculateMaxDebtRepayable, getLiquidationThresholdHealthFactor } from "../../../src/redbank/LiquidationHelpers"
-import { AssetParamsBaseForAddr } from "../../../src/types/marsParams"
 
 describe('Redbank Executor Tests', () => {
 

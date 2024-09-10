@@ -1,3 +1,4 @@
+import BigNumber from 'bignumber.js'
 import { VaultPositionType } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 
 export interface RoverPosition {
@@ -10,6 +11,7 @@ export enum PositionType {
 	LEND,
 	DEPOSIT,
 	VAULT,
+	STAKED_ASTRO_LP
 }
 
 export interface Collateral {
@@ -26,5 +28,5 @@ export interface Collateral {
 export interface Debt {
 	amount: number
 	denom: string
-	price: number
+	price: BigNumber
 }

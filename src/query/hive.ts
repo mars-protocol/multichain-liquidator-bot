@@ -2,7 +2,6 @@ import { Position } from '../types/position'
 import fetch from 'cross-fetch'
 import { Coin, Positions } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { MarketInfo } from '../rover/types/MarketInfo'
-import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 import { NO_ROVER_DATA } from '../rover/constants/errors'
 import BigNumber from 'bignumber.js'
 import {
@@ -39,7 +38,6 @@ export const fetchRoverData = async (
 	hiveEndpoint: string,
 	address: string,
 	redbankAddress: string,
-	oracleAddress: string,
 	swapperAddress: string,
 	vaultAddresses: string[],
 	params_address: string,
@@ -47,7 +45,6 @@ export const fetchRoverData = async (
 	const coreQuery = produceCoreRoverDataQuery(
 		address,
 		redbankAddress,
-		oracleAddress,
 		swapperAddress,
 		params_address
 	)
@@ -83,7 +80,6 @@ export const fetchRoverData = async (
 	return {
 		markets: coreData.wasm.markets,
 		masterBalance: coreData.bank.balance,
-		prices: coreData.wasm.prices,
 		routes: coreData.wasm.routes,
 		vaultInfo: vaultMap,
 		whitelistedAssets: [],
@@ -94,18 +90,16 @@ export const fetchRedbankData = async (
 	hiveEndpoint: string,
 	address: string,
 	redbankAddress: string,
-	oracleAddress: string,
 ): Promise<{
 	bank: {
 		balance: Coin[]
 	}
 	wasm: {
 		markets: MarketInfo[]
-		prices: PriceResponse[]
 		whitelistedAssets?: string[]
 	}
 }> => {
-	const query = produceRedbankGeneralQuery(address, redbankAddress, oracleAddress)
+	const query = produceRedbankGeneralQuery(address, redbankAddress)
 	const response = await fetch(hiveEndpoint, {
 		method: 'post',
 		body: JSON.stringify({ query }),

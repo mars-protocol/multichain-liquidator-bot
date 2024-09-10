@@ -18,7 +18,6 @@ export class AstroportRouteRequester extends RouteRequester {
             // todo pass chain id in?
             let url = `${this.apiUrl}routes?start=${tokenInDenom}&end=${tokenOutDenom}&amount=${tokenOutAmount}&chainId=neutron-1&limit=5`
             let response = await fetch(url)
-
             let astroportRoutes: AstroportApiRoute[] = await response.json()
             let bestRoute = astroportRoutes
             .sort((a, b) => {

@@ -5,12 +5,12 @@ import { fetchBalances, fetchRoverData, fetchRoverPosition } from '../query/hive
 import { ActionGenerator } from './ActionGenerator'
 import {
 	Coin,
+	Positions,
 	VaultPosition,
 	VaultPositionType,
 	VaultUnlockingPosition,
 } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
 import { VaultInfo } from '../query/types'
-import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 import BigNumber from 'bignumber.js'
 import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
@@ -43,7 +43,6 @@ export class RoverExecutor extends BaseExecutor {
 	private liquidatorAccounts: Map<string, number> = new Map()
 	private liquidatorBalances : Map<string, Coin[]> = new Map()
 
-	private whitelistedCoins: string[] = []
 	private vaults: string[] = []
 	private vaultInfo: Map<string, VaultInfo> = new Map()
 	private lastFetchedVaultTime = 0
@@ -60,13 +59,14 @@ export class RoverExecutor extends BaseExecutor {
 	) {
 		super(config, client, queryClient, poolProvider, routeRequester)
 		this.config = config
-		this.liquidationActionGenerator = new ActionGenerator(this.ammRouter)
+		this.liquidationActionGenerator = new ActionGenerator(routeRequester)
 		this.wallet = wallet
 	}
 
 	// Entry to rover executor
 	start = async () => {
 		await this.refreshData()
+
 		// set up accounts
 		const accounts = await this.wallet.getAccounts()
 		// get liquidator addresses
@@ -114,7 +114,7 @@ export class RoverExecutor extends BaseExecutor {
 				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
 				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
 				// To target specific accounts, filter here
-				//account.account_id === "3821" &&
+				// account.account_id === "562" &&
 				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
@@ -141,7 +141,6 @@ export class RoverExecutor extends BaseExecutor {
 				liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value))
 			}
 			await Promise.all(liquidationPromises)
-			console.log('sleeping until next block')
 			await sleep(4000)
 		}
 	}
@@ -154,13 +153,9 @@ export class RoverExecutor extends BaseExecutor {
 				this.config.hiveEndpoint,
 			)
 
-			// find best collateral / debt
-			const bestCollateral: Collateral = this.findBestCollateral(
-				roverPosition.deposits,
-				roverPosition.lends.map((lentAmount) => { return { denom : lentAmount.denom, amount: lentAmount.amount } }),
-				roverPosition.vaults,
-			)
-
+			// Find best collateral to claim
+			const bestCollateral: Collateral = this.findBestCollateral(roverPosition)
+			// Find best debt to liquidate
 			const bestDebt: Debt = this.findBestDebt(
 				roverPosition.debts.map((debtAmount) => {
 					return { amount: debtAmount.amount, denom: debtAmount.denom }
@@ -173,22 +168,20 @@ export class RoverExecutor extends BaseExecutor {
 				bestDebt,
 				bestCollateral,
 				this.markets,
-				this.whitelistedCoins,
 			)
 
 			// variables
 			const { borrow } = borrowActions[0] as { borrow: Coin }
-			const swapWinnings = (bestDebt.amount * this.prices.get(bestDebt.denom)!) > 1000000
+			const swapWinnings = this.prices.get(bestDebt.denom)!.multipliedBy(bestDebt.amount).toNumber() > 1000000
 			const slippage =  process.env.SLIPPAGE ||  '0.005'
 
-			const liquidateMessage = this.liquidationActionGenerator.produceLiquidationAction(
+			const liquidateAction = this.liquidationActionGenerator.produceLiquidationAction(
 				bestCollateral.type,
 				{ denom: bestDebt.denom, amount: (Number(borrow.amount) * 0.995).toFixed(0) },
 				roverPosition.account_id,
 				bestCollateral.denom,
 				bestCollateral.vaultType,
 			)
-
 			const vault = this.vaultInfo.get(bestCollateral.denom)
 
 			const collateralToDebtActions = bestCollateral.denom !== borrow.denom
@@ -217,7 +210,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			const actions = [
 				...borrowActions,
-				liquidateMessage,
+				liquidateAction,
 				...collateralToDebtActions,
 				...repayMsg,
 				...swapToStableMsg,
@@ -251,7 +244,8 @@ export class RoverExecutor extends BaseExecutor {
 				msgs.push(sendMsg)
 			}
 
-			const fee = this.config.chainName.toLowerCase() === "osmosis" ? await this.getOsmosisFee(msgs, liquidatorAddress) : 'auto'
+			const fee = await this.getFee(msgs, this.config.liquidatorMasterAddress, this.config.chainName.toLowerCase())
+
 			const result = await this.client.signAndBroadcast(
 				liquidatorAddress,
 				msgs,
@@ -292,7 +286,7 @@ export class RoverExecutor extends BaseExecutor {
 			}
 
 			if (sendMsgs.length > 0) {
-				const fee = await this.getOsmosisFee(sendMsgs, this.config.liquidatorMasterAddress)
+				const fee = await this.getFee(sendMsgs, this.config.liquidatorMasterAddress, this.config.chainName.toLowerCase())
 				await this.client.signAndBroadcast(this.config.liquidatorMasterAddress, sendMsgs, fee)
 			}
 		} catch(ex) {
@@ -345,21 +339,16 @@ export class RoverExecutor extends BaseExecutor {
 				this.config.hiveEndpoint,
 				this.config.liquidatorMasterAddress,
 				this.config.redbankAddress,
-				this.config.oracleAddress,
 				this.config.swapperAddress,
 				this.vaults,
 				this.config.marsParamsAddress,
 			)
 
 			await this.refreshMarketData()
-			// TODO remove for neutron
-			// await this.refreshPoolData(this.prices, this.markets)
+			await this.updatePriceSources()
+			await this.updateOraclePrices()
 
 			roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
-			roverData.prices.forEach((price: PriceResponse) =>
-				this.prices.set(price.denom, Number(price.price)),
-			)
-			this.whitelistedCoins = roverData.whitelistedAssets! as string[]
 			this.vaultInfo = roverData.vaultInfo
 		} catch(ex) {
 			console.error(JSON.stringify(ex))
@@ -373,18 +362,18 @@ export class RoverExecutor extends BaseExecutor {
 		let { tokens } = await this.queryClient.queryContractSmart(this.config.accountNftAddress, {
 			tokens: { owner: liquidatorAddress },
 		})
-
+		let msgs = [
+			produceExecuteContractMessage(
+				liquidatorAddress,
+				this.config.creditManagerAddress,
+				toUtf8(`{ "create_credit_account": "default" }`),
+			),
+		]
 		if (tokens.length === 0) {
 			const result = await this.client.signAndBroadcast(
 				liquidatorAddress,
-				[
-					produceExecuteContractMessage(
-						liquidatorAddress,
-						this.config.creditManagerAddress,
-						toUtf8(`{ "create_credit_account": "default" }`),
-					),
-				],
-				'auto',
+				msgs,
+				await this.getFee(msgs, liquidatorAddress, this.config.chainName.toLowerCase()),
 			)
 
 			if (result.code !== 0) {
@@ -407,61 +396,69 @@ export class RoverExecutor extends BaseExecutor {
 		return { liquidatorAddress, tokenId: tokens[0] }
 	}
 
-	findBestCollateral = (deposits: Coin[], lends: Coin[], vaultPositions: VaultPosition[]): Collateral => {
+	findBestCollateral = (positions: Positions): Collateral => {
+		
+		const largestDeposit = positions
+				.deposits
+				.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
+				.pop()
 
-		const largestDeposit = deposits
-			.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
-			.pop()
+		const largestLend = positions
+				.lends
+				.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
+				.pop()
 
-		const largestLend = lends
-			.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
-			.pop()
-
-		const largestCollateralCoin = this.calculateCoinValue(largestDeposit) > this.calculateCoinValue(largestLend) 
-			? largestDeposit
-			: largestLend
-
-		const largestCollateralVault = vaultPositions
+		const largestStakedLp = positions
+				.staked_astro_lps
+				.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
+				.pop()
+		
+		const largestCollateralVault = positions.vaults
 			.sort(
 				(vaultA, vaultB) =>
 					this.calculateVaultValue(vaultA).value - this.calculateVaultValue(vaultB).value,
 			)
 			.pop()
 
-		const bestCollateral: Coin | VaultPosition | undefined =
-			this.calculateCoinValue(largestCollateralCoin) >
-			this.calculateVaultValue(largestCollateralVault).value
-				? largestCollateralCoin
-				: largestCollateralVault
+		let bestCollateral: Coin | VaultPosition | undefined = largestDeposit
+		let positionType = PositionType.DEPOSIT
+		let vaultType = undefined
 
-		if (!bestCollateral) throw new Error('Failed to find a collateral')
+		if 	(largestLend && this.calculateCoinValue(largestLend) > this.calculateCoinValue(bestCollateral)) {
+			positionType = PositionType.LEND
+			bestCollateral = largestLend
+		}
 
-		const isVault = (bestCollateral as VaultPosition).vault !== undefined
+		if 	(largestStakedLp && this.calculateCoinValue(largestStakedLp) > this.calculateCoinValue(bestCollateral)) {
+			positionType = PositionType.STAKED_ASTRO_LP
+			bestCollateral = largestStakedLp
+		}
 
-		if (isVault) {
-			const { value, type } = this.calculateVaultValue(bestCollateral as VaultPosition)
-			return {
-				amount: 0,
-				value,
-				denom: (bestCollateral as VaultPosition).vault.address,
-				closeFactor: 0.5, // todo
-				price: 0,
-				type: PositionType.VAULT,
-				vaultType: type,
+		if 	(largestCollateralVault) {
+			let vaultResult = this.calculateVaultValue(largestCollateralVault)
+			if (vaultResult.value > this.calculateCoinValue(bestCollateral)) {
+				positionType = PositionType.VAULT
+				bestCollateral = largestCollateralVault;
+				vaultType = vaultResult.type
 			}
 		}
 
-		const amount = Number((bestCollateral as Coin).amount)
-		const value = amount * (this.prices.get((bestCollateral as Coin).denom) || 0)
+		if (!bestCollateral) throw new Error('Failed to find a collateral')
 
+		const denom = positionType === PositionType.VAULT 
+				? (bestCollateral as VaultPosition).vault.address
+				: (bestCollateral as Coin).denom
+		const amount = Number(bestCollateral.amount)
+		const value = this.prices.get(denom)?.multipliedBy(amount).toNumber() || 0
 
 		return {
 			amount,
 			value,
-			denom: (bestCollateral as Coin).denom,
+			denom,
 			closeFactor: 0.5, // todo
-			price: this.prices.get((bestCollateral as Coin).denom) || 0,
-			type: largestDeposit === largestCollateralCoin ? PositionType.DEPOSIT : PositionType.LEND,
+			price: this.prices.get(denom)?.toNumber() || 0,
+			type: positionType,
+			vaultType
 		}
 	}
 
@@ -549,7 +546,7 @@ export class RoverExecutor extends BaseExecutor {
 		return {
 			amount: Number((largestDebt as Coin).amount),
 			denom: (largestDebt as Coin).denom,
-			price: this.prices.get((largestDebt as Coin).denom) || 0,
+			price: this.prices.get((largestDebt as Coin).denom)!,
 		}
 	}
 }

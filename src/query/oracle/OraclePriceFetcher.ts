@@ -8,7 +8,7 @@ export interface OsmosisOraclePriceFetcherParams {
     priceDenom: string
 }
 
-export class OsmosisOraclePriceFetcher implements PriceFetcher {
+export class OraclePriceFetcher implements PriceFetcher {
     
     constructor(
         private client : CosmWasmClient

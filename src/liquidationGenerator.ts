@@ -5,7 +5,7 @@ import { AssetResponse, Collateral, Debt } from './query/types'
 // Sort asset array from highest amount to lowest
 const sortAssetArrayByAmount = (
 	assets: AssetResponse[],
-	prices: Map<string, number>,
+	prices: Map<string, BigNumber>,
 ): AssetResponse[] => {
 	// deep copy, so we don't mess up the og array.
 	const assetClone = [...assets]
@@ -20,11 +20,11 @@ const sortAssetArrayByAmount = (
 
 export const getLargestCollateral = (
 	collaterals: Collateral[],
-	prices: Map<string, number>,
+	prices: Map<string, BigNumber>,
 ): Collateral => {
 	return sortAssetArrayByAmount(collaterals, prices)[0] as Collateral
 }
 
-export const getLargestDebt = (debts: Debt[], prices: Map<string, number>): AssetResponse => {
+export const getLargestDebt = (debts: Debt[], prices: Map<string, BigNumber>): AssetResponse => {
 	return sortAssetArrayByAmount(debts, prices)[0]
 }

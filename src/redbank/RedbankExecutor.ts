@@ -17,14 +17,10 @@ import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
 import { PoolDataProvider } from '../query/amm/PoolDataProviderInterface'
 import { Exchange } from '../execute/ExchangeInterface.js'
-import { AssetParamsBaseForAddr } from '../types/marsParams.js'
-import { OsmosisPriceSourceForString } from '../types/marsOracleOsmosis.types'
-import { OsmosisOraclePriceFetcher as MarsOraclePriceFetcher } from '../query/oracle/OsmosisOraclePriceFetcher'
-import { PythPriceFetcher } from '../query/oracle/PythPriceFetcher'
-import { WasmPriceSourceForString } from '../types/marsOracleWasm.types'
-import { OraclePrice } from '../query/oracle/PriceFetcherInterface'
+
 import { calculateCollateralRatio, calculateLiquidationBonus, calculateMaxDebtRepayable, getLiquidationThresholdHealthFactor } from './LiquidationHelpers'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
+import { AssetParamsBaseForAddr } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types'
 
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
@@ -33,11 +29,6 @@ export interface RedbankExecutorConfig extends BaseExecutorConfig {
 	liquidationFiltererAddress: string
 	safetyMargin: number
 	liquidationProfitMarginPercent: number
-}
-
-export interface PriceSourceResponse {
-	denom: string,
-	price_source: OsmosisPriceSourceForString | WasmPriceSourceForString
 }
 
 export const XYX_PRICE_SOURCE = "xyk_liquidity_token"
@@ -57,12 +48,6 @@ export class RedbankExecutor extends BaseExecutor {
 	private assetParams : Map<string, AssetParamsBaseForAddr> = new Map()
 	private targetHealthFactor : number = 0
 
-	private priceSources : PriceSourceResponse[] = []
-	private oraclePrices : Map<string, BigNumber> = new Map()
-
-	private marsOraclePriceFetcher : MarsOraclePriceFetcher = new MarsOraclePriceFetcher(this.queryClient)
-	private pythOraclePriceFetcher : PythPriceFetcher = new PythPriceFetcher()
-
 	constructor(
 		config: RedbankExecutorConfig,
 		client: SigningStargateClient,
@@ -76,10 +61,9 @@ export class RedbankExecutor extends BaseExecutor {
 	}
 
 	async start() {
-		await this.updatePriceSources()
-		await this.updateOraclePrices()
 		await this.fetchAssetParams()
 		await this.fetchTargetHealthFactor()
+		await this.refreshData()
 
 		setInterval(this.fetchAssetParams, 10 * this.MINUTE)
 		setInterval(this.updatePriceSources, 10 * this.MINUTE)
@@ -143,108 +127,6 @@ export class RedbankExecutor extends BaseExecutor {
 		}
 	}
 
-	updatePriceSources = async () => {
-		let priceSources : PriceSourceResponse[] = []
-		let fetching = true
-		let start_after = ""
-		let retries = 0
-
-		const maxRetries = 5
-		const limit = 10
-
-		while (fetching) {
-			try {
-				const response = await this.queryClient.queryContractSmart(this.config.oracleAddress, {
-					price_sources: {
-						limit,
-						start_after,
-					},
-				})
-				start_after = response[response.length - 1] ? response[response.length - 1].denom : ""
-				priceSources = priceSources.concat(response)
-				fetching = response.length === limit
-				retries = 0
-			} catch(e) {
-				console.warn(e)
-				retries++
-				if (retries >= maxRetries) {
-					console.warn("Max retries exceeded, exiting", maxRetries)
-					fetching = false
-				} else {
-					await sleep(5000)
-					console.info("Retrying...")
-				}
-			}
-		}
-
-		// don't override if we did not fetch all data.
-		if (retries < maxRetries) {
-			this.priceSources = priceSources
-		}
-	}
-
-	updateOraclePrices = async () => {
-		try {
-			// settle all price sources
-			const priceResults : PromiseSettledResult<OraclePrice>[] = await Promise.allSettled(this.priceSources.map(async (priceSource) => await this.fetchOraclePrice(priceSource.denom)))
-
-			priceResults.forEach((oraclePriceResult) => {
-				const successfull = oraclePriceResult.status === 'fulfilled'
-				const oraclePrice = successfull ? oraclePriceResult.value : null
-
-				// push successfull price results
-				if (successfull && oraclePrice) {
-					this.oraclePrices.set(oraclePrice.denom, oraclePrice.price)
-				}
-			})
-		} catch (e) {
-			console.error(e)
-		}
-	}
-
-	private fetchOraclePrice = async (denom: string) : Promise<OraclePrice> => {
-		const priceSource : PriceSourceResponse | undefined = this.priceSources.find(ps => ps.denom === denom)
-		if (!priceSource) {
-			console.error(`No price source found for ${denom}`)
-		}
-
-		switch (priceSource?.[Object.keys(priceSource)[0]]) {
-			case 'fixed':
-			case 'spot':
-				// todo - support via pool query. But is this ever used? 
-			case 'arithmetic_twap':
-			case 'geometric_twap':
-			case 'xyk_liquidity_token':
-			case 'lsd':
-			case 'staked_geometric_twap':
-				return await this.marsOraclePriceFetcher.fetchPrice({
-					oracleAddress: this.config.oracleAddress,
-					priceDenom: denom
-				})
-			case 'pyth':
-
-				const pyth : {
-					price_feed_id: string,
-					denom_decimals : number
-				//@ts-expect-error - our generated types don't handle this case
-				} =  priceSource.price_source.pyth
-				
-				return await this.pythOraclePriceFetcher.fetchPrice({
-					priceFeedId:pyth.price_feed_id,
-					denomDecimals: pyth.denom_decimals,
-					denom: denom
-				})
-			  // Handle other cases for different price source types	  
-			default:
-				// Handle unknown or unsupported price source types
-				return await this.marsOraclePriceFetcher.fetchPrice({
-					oracleAddress: this.config.oracleAddress,
-					priceDenom: denom
-				})
-			// iterate, fetch price source correctly
-		}
-	}
-
 	async produceLiquidationTxs(positionData: DataResponse[]): Promise<{
 		txs: LiquidationTx[]
 		debtsToRepay: Map<string, BigNumber>
@@ -256,7 +138,6 @@ export class RedbankExecutor extends BaseExecutor {
 		const availableValue = new BigNumber(
 			this.balances.get(this.config.neutralAssetDenom) || 0,
 		).multipliedBy(this.prices.get(this.config.neutralAssetDenom) || 0)
-
 		if (availableValue.isZero()) {
 			throw new Error('No neutral asset available')
 		}
@@ -541,6 +422,7 @@ export class RedbankExecutor extends BaseExecutor {
 			throw new Error("Instantiate your clients before calling 'run()'")
 
 		await this.refreshData()
+		
 		const collateralsBefore: Collateral[] = await this.queryClient?.queryContractSmart(
 			this.config.redbankAddress,
 			{ user_collaterals: { user: liquidatorAddress } },
@@ -550,7 +432,7 @@ export class RedbankExecutor extends BaseExecutor {
 			liquidatorAddress,
 			collateralsBefore
 		)
-		console.log('Checking for liquidations')
+
 		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/redbank`
 		const response = await fetch(url);
 		let positionObjects: {
@@ -561,8 +443,9 @@ export class RedbankExecutor extends BaseExecutor {
 
 		let positions: Position[] = positionObjects
 			.filter(position =>
-					Number(position.health_factor) < 0.98 &&
+					Number(position.health_factor) < 0.97 &&
 					Number(position.health_factor) > 0.3 &&
+					// position.account_id === "neutron1u44598z3a8fdy9e6cu7rpl2eqvl2shjvfg4sqd" &&
 					position.total_debt.length > 5)
 					
 			.sort((a, b) => Number(a.total_debt) - Number(b.total_debt))
@@ -612,7 +495,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 			if (!firstMsgBatch || firstMsgBatch.length === 0 || txs.length === 0) continue
 
-			const firstFee = this.config.chainName.toLowerCase() === "osmosis" ? await this.getOsmosisFee(firstMsgBatch, this.config.liquidatorMasterAddress) : 'auto'
+			const firstFee = await this.getFee(firstMsgBatch, this.config.liquidatorMasterAddress, this.config.chainName.toLowerCase())
 
 			const result = await this.client.signAndBroadcast(
 				this.config.liquidatorMasterAddress,
@@ -662,20 +545,18 @@ export class RedbankExecutor extends BaseExecutor {
 
 		const balances = await this.client?.getAllBalances(liquidatorAddress)
 
-		const combinedCoins = this.combineBalances(collaterals, balances!)
+		const combinedCoins = this.combineBalances(collaterals, balances!).filter(
+			(coin) => this.prices.get(coin.denom) && 
+						new BigNumber(coin.amount).multipliedBy(this.prices.get(coin.denom)!).gt(1000000)
+		)
 
 		if (combinedCoins.length === 0) return
 
-		// this.appendWithdrawMessages(collaterals, liquidatorAddress, msgs)
+		this.appendWithdrawMessages(collaterals, liquidatorAddress, msgs)
 		await this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, msgs)
 		if (msgs.length === 0) return
 
-		const secondFee = this.config.chainName.toLowerCase() === "osmosis"
-			? await this.getOsmosisFee(msgs, this.config.liquidatorMasterAddress)
-			// todo support neutron
-			: 'auto'
-
-
+		const secondFee = await this.getFee(msgs, this.config.liquidatorMasterAddress, this.config.chainName.toLowerCase())
 		await this.client.signAndBroadcast(
 			this.config.liquidatorMasterAddress,
 			msgs,

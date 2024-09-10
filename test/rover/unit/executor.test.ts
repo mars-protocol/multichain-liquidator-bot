@@ -52,7 +52,18 @@ describe('Rover Executor Tests', () => {
 
 		//@ts-ignore - parameters not used for testing
 		const executor = new RoverExecutor({}, {}, {})
-		const collateralState = executor.findBestCollateral([collateral1], [], [collateral2, collateral3])
+		const collateralState = executor.findBestCollateral({
+			account_id: "1",
+			account_kind: "default",
+			debts: [],
+			deposits: [collateral1],
+			lends: [],
+			staked_astro_lps: [],
+			vaults: [
+				collateral2,
+				collateral3
+			]
+		})
 
 		expect(collateralState.amount).toBe(600)
 	}),
@@ -102,7 +113,18 @@ describe('Rover Executor Tests', () => {
 
 			// @ts-ignore - params are not used - TODO move `findBestCollateral()` to helper class
 			const executor = new RoverExecutor({}, {}, {})
-			const collateralState = executor.findBestCollateral([collateral1], [], [collateral2, collateral3])
+			const collateralState = executor.findBestCollateral({
+				account_id: "1",
+				account_kind: "default",
+				debts: [],
+				deposits: [collateral1],
+				lends: [],
+				staked_astro_lps: [],
+				vaults: [
+					collateral2,
+					collateral3
+				]
+			})
 
 			expect(collateralState.amount).toBe(800)
 			// find
@@ -155,7 +177,18 @@ describe('Rover Executor Tests', () => {
 
 		//@ts-ignore - parameters not used for testing - todo move to helper / logic class
 		const executor = new RoverExecutor({}, {}, {})
-		const collateralState = executor.findBestCollateral([collateral1], [], [collateral2, collateral3])
+		const collateralState = executor.findBestCollateral({
+			account_id: "1",
+			account_kind: "default",
+			debts: [],
+			deposits: [collateral1],
+			lends: [],
+			staked_astro_lps: [],
+			vaults: [
+				collateral2,
+				collateral3
+			]
+		})
 
 		expect(collateralState.amount).toBe(1500)
 		// find

@@ -4,8 +4,7 @@ import { DirectSecp256k1HdWallet, makeCosmoshubPath } from '@cosmjs/proto-signin
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from './helpers.js'
 import { RedbankExecutor, RedbankExecutorConfig } from './redbank/RedbankExecutor.js'
-import { getConfig as getRoverConfig } from './rover/config/osmosis.js'
-import { RoverExecutor } from './rover/RoverExecutor.js'
+import { RoverExecutor, RoverExecutorConfig } from './rover/RoverExecutor.js'
 import { getSecretManager } from './secretManager.js'
 import { Network } from './types/network.js'
 import { PoolDataProvider } from './query/amm/PoolDataProviderInterface.js'
@@ -14,6 +13,7 @@ import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
 import { Exchange } from './execute/ExchangeInterface.js'
 import { Osmosis } from './execute/Osmosis.js'
 import { getConfig } from './redbank/config/getConfig.js'
+import { getConfig as getRoverConfig } from './rover/config/getConfig.js'
 import { BaseExecutorConfig } from './BaseExecutor.js'
 import { AstroportCW } from './execute/AstroportCW.js'
 import { AstroportRouteRequester } from './query/routing/AstroportRouteRequester.js'
@@ -52,6 +52,7 @@ export const main = async () => {
 	const network  = networkEnv === "MAINNET" ? Network.MAINNET : networkEnv === "TESTNET" ? Network.TESTNET : Network.LOCALNET
 
 	const redbankConfig = getConfig(liquidatorMasterAddress, network, chainName)
+	const roverConfig = getRoverConfig(liquidatorMasterAddress, network, chainName)
 
 	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
 	const routeRequester = chainName === "neutron" ? new AstroportRouteRequester(process.env.ASTROPORT_API_URL!) : new OsmosisRouteRequester(process.env.API_URL!)
@@ -62,7 +63,7 @@ export const main = async () => {
 			await launchRedbank(client, queryClient, redbankConfig, poolProvider, exchangeInterface, routeRequester)
 			return
 		case ROVER:
-			await launchRover(client, queryClient, network, liquidatorMasterAddress, liquidator, poolProvider, routeRequester)
+			await launchRover(client, queryClient, roverConfig, liquidator, poolProvider, routeRequester)
 			return
 		default:
 			throw new Error(
@@ -86,14 +87,13 @@ const getPoolProvider = (chainName: string, config: BaseExecutorConfig) : PoolDa
 const launchRover = async (
 	client: SigningStargateClient,
 	wasmClient: CosmWasmClient,
-	network: Network,
-	liquidatorMasterAddress: string,
+	roverConfig: RoverExecutorConfig,
 	liquidatorWallet: DirectSecp256k1HdWallet,
 	poolProvider : PoolDataProvider,
 	routeRequester: RouteRequester,
 ) => {
 	await new RoverExecutor(
-		getRoverConfig(liquidatorMasterAddress, network),
+		roverConfig,
 		client,
 		wasmClient,
 		liquidatorWallet,

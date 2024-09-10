@@ -15,9 +15,9 @@ export const getConfig = (
 				gasDenom: 'untrn',
 				hiveEndpoint: process.env.HIVE_ENDPOINT!,
 				liquidatorMasterAddress: liquidatorMasterAddress,
-				logResults: false, // enable for debugging
-				marsParamsAddress: 'neutron144lvre6xy4eqz88aw4tkuaq8xl9w0yhqwhc6m82tjgud8mt8veuspydnqq',
-				neutralAssetDenom: 'ibc/F082B65C88E4B6D5EF1DB243CDA1D331D002759E938A0F5CD3FFDC5D53B3E349',
+				logResults: false,
+				marsParamsAddress: 'neutron1x4rgd7ry23v2n49y7xdzje0743c5tgrnqrqsvwyya2h6m48tz4jqqex06x',
+				neutralAssetDenom: 'ibc/B559A80D62249C8AA07A380E2A2BEA6E5CA9A6F079C912C3A9E9B494105E4F81',
 				oracleAddress: 'neutron1dwp6m7pdrz6rnhdyrx5ha0acsduydqcpzkylvfgspsz60pj2agxqaqrr7g',
 				redbankAddress: 'neutron1n97wnm7q6d2hrcna3rqlnyqw2we6k0l8uqvmyqq6gsml92epdu7quugyph',
 				liquidationProfitMarginPercent: 0.001,
@@ -30,7 +30,7 @@ export const getConfig = (
 			safetyMargin: 0.05,
 			chainName: "neutron",
 			lcdEndpoint: process.env.LCD_ENDPOINT!, // use env vars in order to be able to quickly change
-			gasDenom: 'uosmo',
+			gasDenom: 'untrn',
 			hiveEndpoint: process.env.HIVE_ENDPOINT!,
 			liquidatorMasterAddress: liquidatorMasterAddress,
 			logResults: false, // enable for debugging

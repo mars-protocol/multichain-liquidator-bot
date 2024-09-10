@@ -31,10 +31,10 @@ import { MsgSwapExactAmountIn } from 'osmojs/dist/codegen/osmosis/poolmanager/v1
 import { AminoTypes, GasPrice, MsgSendEncodeObject, SigningStargateClient, StdFee } from '@cosmjs/stargate'
 import { camelCase } from 'lodash'
 import { HdPath } from '@cosmjs/crypto'
-import { Pool } from './types/Pool'
 import { SwapAmountInRoute } from 'osmojs/dist/codegen/osmosis/poolmanager/v1beta1/swap_route'
 import { RouteHop } from './types/RouteHop'
 import { OsmoRoute } from './types/swapper'
+import { AssetInfoNative } from './query/amm/types/AstroportTypes'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -135,12 +135,24 @@ export const produceSigningCosmWasmClient = async (
 	})
 }
 
-export const findUnderlying = (lpToken: string, pools: Pool[]): string[] | undefined => {
-	const poolId = lpToken.split('/').pop()
-	const pool = pools.find((pool) => pool.id.toString() === poolId)
-	if (!pool) return undefined
+interface AstroportPairInfo {
+	data: {
+		asset_infos: AssetInfoNative[]
+	}
+}
 
-	return [pool.token0, pool.token1]
+export const queryAstroportLpUnderlyingTokens = async(lpToken: string): Promise<string[] | undefined> => {
+	const pairAddress = lpToken.split('/')[1]
+
+	// Build the url
+	const encodedMsg = Buffer.from(JSON.stringify({ pair: {} })).toString('base64')
+	const url = `${process.env.LCD_ENDPOINT}/cosmwasm/wasm/v1/contract/${pairAddress}/smart/${encodedMsg}`
+	
+	// Fetch pair info
+	const response = await fetch(url)
+	const pairInfo: AstroportPairInfo = await response.json()
+	
+	return pairInfo.data.asset_infos.map(assetInfo => assetInfo.native_token.denom)
 }
 
 export const setPrice = async (

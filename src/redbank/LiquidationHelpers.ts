@@ -1,11 +1,11 @@
 import BigNumber from "bignumber.js"
 import { Collateral, Debt } from "../query/types"
-import { AssetParamsBaseForAddr, Coin } from "../types/marsParams"
+import { AssetParamsBaseForAddr, Coin } from "marsjs-types/redbank/generated/mars-params/MarsParams.types"
 
 export const calculatePositionLtv = (
     debts: Debt[],
     collaterals: Collateral[],
-    prices: Map<string, number>,
+    prices: Map<string, BigNumber>,
     assetParams : Map<string, AssetParamsBaseForAddr>
 ) :number => {
 
@@ -21,7 +21,7 @@ export const calculatePositionLtv = (
 export const calculateCollateralRatio = (
     debts: Debt[],
     collaterals : Collateral[],
-    prices: Map<string, number>
+    prices: Map<string, BigNumber>
 ) : BigNumber => {
     const totalDebtValue = getTotalValueOfCoinArray(debts, prices)
     const totalCollateralValue = getTotalValueOfCoinArray(collaterals, prices)
@@ -39,7 +39,7 @@ export const calculateMaxDebtRepayable = (
     collaterals: Collateral[],
     assetParams: Map<string, AssetParamsBaseForAddr>,
     liquidationBonus: number,
-    prices: Map<string, number>,
+    prices: Map<string, BigNumber>,
     claimedCollateralDenom : string 
 ) : BigNumber => {
 
@@ -71,12 +71,12 @@ export const calculateLiquidationBonus = (
     return liquidationBonus
 }
 
-export const getTotalLtvValueOfCollateral = (collateral: Collateral[], prices: Map<string, number>, assetParams : Map<string, AssetParamsBaseForAddr>) => {
+export const getTotalLtvValueOfCollateral = (collateral: Collateral[], prices: Map<string, BigNumber>, assetParams : Map<string, AssetParamsBaseForAddr>) => {
     return  collateral.reduce((acc, collateral) => {
 
         if (collateral.enabled === false) return acc
         
-        const price = new BigNumber(prices.get(collateral.denom) || 0);
+        const price = prices.get(collateral.denom)!;
         const value = new BigNumber(collateral.amount).multipliedBy(price);
         const assetLtv = new BigNumber(assetParams.get(collateral.denom)?.max_loan_to_value || 0)
         
@@ -84,13 +84,13 @@ export const getTotalLtvValueOfCollateral = (collateral: Collateral[], prices: M
       }, new BigNumber(0));
 }
 
-export const getTotalLiquidationThresholdValueOfCollateral = (collateral: Collateral[], prices: Map<string, number>, assetParams : Map<string, AssetParamsBaseForAddr>) => {
+export const getTotalLiquidationThresholdValueOfCollateral = (collateral: Collateral[], prices: Map<string, BigNumber>, assetParams : Map<string, AssetParamsBaseForAddr>) => {
     return  collateral.reduce((acc, collateral) => {
 
         if (collateral.enabled === false) return acc
         
-        const price = new BigNumber(prices.get(collateral.denom) || 0);
-        const value = new BigNumber(collateral.amount).multipliedBy(price);
+        const price = prices.get(collateral.denom)!;
+        const value = price.multipliedBy(collateral.amount)
         const liquidationThreshold = new BigNumber(assetParams.get(collateral.denom)?.liquidation_threshold || 0)
         return acc.plus(value.multipliedBy(liquidationThreshold));
       }, new BigNumber(0));
@@ -99,7 +99,7 @@ export const getTotalLiquidationThresholdValueOfCollateral = (collateral: Collat
 export const getLiquidationThresholdHealthFactor = (
     collateral: Collateral[],
     debts: Debt[],
-    prices: Map<string, number>,
+    prices: Map<string, BigNumber>,
     assetParams : Map<string, AssetParamsBaseForAddr>
 ) : number => {
     
@@ -109,10 +109,10 @@ export const getLiquidationThresholdHealthFactor = (
         return totalCollateralValue.dividedBy(totalDebtValue).toNumber()
 }
 
-export const getTotalValueOfCoinArray = (coins: Coin[], prices: Map<string,number>) =>  {
+export const getTotalValueOfCoinArray = (coins: Coin[], prices: Map<string,BigNumber>) =>  {
     return  coins.reduce((acc, debt) => {
-        const price = new BigNumber(prices.get(debt.denom) || 0);
-        const value = new BigNumber(debt.amount).multipliedBy(price);
+        const price = prices.get(debt.denom)!;
+        const value = price.multipliedBy(debt.amount);
         return acc.plus(value); // Accumulate the total value
       }, new BigNumber(0));
 }
