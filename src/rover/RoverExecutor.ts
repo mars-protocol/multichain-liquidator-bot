@@ -114,11 +114,10 @@ export class RoverExecutor extends BaseExecutor {
 				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
 				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
 				// To target specific accounts, filter here
-				// account.account_id === "562" &&
+				// account.account_id === "1078" &&
 				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
-		
 		// Sleep to avoid spamming.
 		if (targetAccounts.length == 0) {
 			await sleep(2000)
@@ -202,7 +201,8 @@ export class RoverExecutor extends BaseExecutor {
 						await this.liquidationActionGenerator.generateSwapActions(
 							borrow.denom,
 							this.config.neutralAssetDenom,
-							bestDebt.amount.toFixed(0),
+							// todo estimate winnings
+							'100',
 							slippage
 					)]
 					: []

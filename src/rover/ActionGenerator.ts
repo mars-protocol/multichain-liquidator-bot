@@ -49,15 +49,13 @@ export class ActionGenerator {
 		let maxRepayValue = new BigNumber(collateral.value * collateral.closeFactor)
 		const maxDebtValue = debt.price.multipliedBy(debt.amount)
 		const debtCeiling = new BigNumber(1000000000)
-		if (maxDebtValue > debtCeiling) {
+		if (maxDebtValue.isGreaterThan(debtCeiling)) {
 			maxRepayValue = debtCeiling
 		}
-
 		const debtToRepayRatio = maxDebtValue <= maxRepayValue ? new BigNumber(1) : maxRepayValue.dividedBy(maxDebtValue)
 
 		// debt amount is a number, not a value (e.g in dollar / base asset denominated terms)
 		let debtAmount = debtToRepayRatio.multipliedBy(debt.amount)
-
 		const debtCoin: Coin = {
 			amount: debtAmount.toFixed(0),
 			denom: debt.denom,
@@ -91,7 +89,6 @@ export class ActionGenerator {
 
 		const amountBN = BigNumber(amount)
 		const minReceive = amountBN.multipliedBy(1-Number(slippage))
-
 		const route = await this.routeRequester.requestRoute(assetInDenom, assetOutDenom, amount);
 
 		const swapperRoute: SwapperRoute = {
@@ -212,7 +209,6 @@ export class ActionGenerator {
 
 			// find underlying tokens and swap to borrowed asset
 			const underlyingDenoms = await queryAstroportLpUnderlyingTokens(collateralDenom)
-			console.log(underlyingDenoms)
 			for (const denom of underlyingDenoms!) {
 				if (denom !== borrowed.denom) {
 					const assetOutPrice = prices.get(borrowed.denom)!
@@ -222,11 +218,8 @@ export class ActionGenerator {
 				}
 			}
 		} else {
-			const assetOutPrice = prices.get(borrowed.denom)!
-			const assetInPrice = prices.get(collateralDenom)!
-			const amountIn = new BigNumber(assetOutPrice.dividedBy(assetInPrice)).multipliedBy(Number(borrowed.amount))
 			actions = actions.concat(
-				await this.generateSwapActions(collateralDenom, borrowed.denom, amountIn.toFixed(0), slippage),
+				await this.generateSwapActions(collateralDenom, borrowed.denom, borrowed.amount, slippage),
 			)
 		}
 
