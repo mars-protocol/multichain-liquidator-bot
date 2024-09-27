@@ -80,7 +80,6 @@ export class BaseExecutor {
 	}
 
 	async initiateAstroportPoolProvider(): Promise<void> {
-		
 		const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
 		await astroportPoolProvider.initiate()
 	}

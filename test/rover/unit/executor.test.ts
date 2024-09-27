@@ -1,11 +1,64 @@
 import {
 	Coin,
+	PerpPosition,
+	// PnlAmounts,
+	Positions,
+	SignedUint,
+	// PerpPosition,
+	// PnlAmounts,
+	// Positions,
+	// SignedUint,
 	VaultPosition,
 	VaultUnlockingPosition,
-} from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+} from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import { RoverExecutor } from '../../../src/rover/RoverExecutor'
+import { addPnlToPositions } from '../../../src/helpers'
 
 describe('Rover Executor Tests', () => {
+	test('Combine perp negative pnl with debt', () => {
+		const baseDenom = 'uusd'
+		const perpPnlAmounts = {
+			accrued_funding: '0' as unknown as SignedUint,
+			closing_fee: '0' as unknown as SignedUint,
+			opening_fee: '0' as unknown as SignedUint,
+			pnl: '-200' as unknown as SignedUint,
+			price_pnl: '-200' as unknown as SignedUint,
+		}
+
+		const perpPosition: PerpPosition = {
+			denom: 'btc',
+			base_denom: baseDenom,
+			current_exec_price: '100',
+			current_price: '100',
+			entry_exec_price: '100',
+			entry_price: '100',
+			realised_pnl: perpPnlAmounts,
+			size: '100' as unknown as SignedUint,
+			unrealised_pnl: perpPnlAmounts,
+		}
+
+		const positions: Positions = {
+			account_id: '1',
+			account_kind: 'default',
+			debts: [
+				{
+					amount: '1000',
+					denom:  baseDenom,
+					shares: '1000',
+				},
+			],
+			deposits: [],
+			lends: [],
+			staked_astro_lps: [],
+			vaults: [],
+			perps: [perpPosition],
+		}
+
+		// calculate the debts, deposits
+		const details = addPnlToPositions(positions, baseDenom);
+		console.log(details)
+	}),
+
 	test('Can find largest collateral when it is an unlocking position', () => {
 		// construct multiple collaterals - coins and vaults
 		const collateral1: Coin = {
@@ -62,7 +115,8 @@ describe('Rover Executor Tests', () => {
 			vaults: [
 				collateral2,
 				collateral3
-			]
+			],
+			perps: []
 		})
 
 		expect(collateralState.amount).toBe(600)
@@ -123,7 +177,8 @@ describe('Rover Executor Tests', () => {
 				vaults: [
 					collateral2,
 					collateral3
-				]
+				],
+				perps: []
 			})
 
 			expect(collateralState.amount).toBe(800)
@@ -187,7 +242,8 @@ describe('Rover Executor Tests', () => {
 			vaults: [
 				collateral2,
 				collateral3
-			]
+			],
+			perps: []
 		})
 
 		expect(collateralState.amount).toBe(1500)

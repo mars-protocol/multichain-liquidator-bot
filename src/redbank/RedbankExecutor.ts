@@ -20,7 +20,7 @@ import { Exchange } from '../execute/ExchangeInterface.js'
 
 import { calculateCollateralRatio, calculateLiquidationBonus, calculateMaxDebtRepayable, getLiquidationThresholdHealthFactor } from './LiquidationHelpers'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
-import { AssetParamsBaseForAddr } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types'
+import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types'
 
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl

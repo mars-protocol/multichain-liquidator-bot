@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js'
-import { VaultPositionType } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+import { VaultPositionType } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 
 export interface RoverPosition {
 	collaterals: Collateral[]

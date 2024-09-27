@@ -31,24 +31,33 @@ export const getConfig = (
 		}
 	}
 
+	// redBank: 'neutron14zjmuel0t8q9rqezp2vtj706ckl8eqtrkc2cjexsssh8vgpuzxdqjuqydr',
+    // incentives: 'neutron1lkk4e6y9pjkev9patc3t6lwey7032f3eqh577v8dvk9ws8awsv4sk0t45a',
+    // oracle: 'neutron1hkggq76w07x53z9hu2hhq8kn8n9e77vc0nztrl2h3sn4cgz9v0ps577a53',
+    // params: 'neutron15tdtcemvkj3g7vuuz83twcekg86j3f58jet9lv08u0j7j8ztymsqd47l9z',
+    // creditManager: 'neutron1gtqq647nrkgwxr3anrdty6fqfvfqav9kkwuu7el0gw754yx42dgs0s92zx',
+    // accountNft: 'neutron128pgfadzvmck5qccgpcjwew4lgsn5e4ha82cu7rrnyg45rrpxessuqdnmt',
+    // perps: 'neutron1mmjd5gz5943s4nnd5929s5hxfzw6lv3jrp3zthkxkanve70qax4qwyyzt5',
+    // pyth: 'neutron15ldst8t80982akgr8w8ekcytejzkmfpgdkeq4xgtge48qs7435jqp87u3t',
+
 	// Not mainnet
 	return {
 		gasDenom: 'untrn',
 		chainName : "neutron",
 		hiveEndpoint: process.env.HIVE_ENDPOINT!,
 		lcdEndpoint: process.env.LCD_ENDPOINT!,
-		neutralAssetDenom: 'untrn', // no usdc pools on testnet so we use osmo
+		neutralAssetDenom: 'factory/neutron1ke0vqqzyymlp5esr8gjwuzh94ysnpvj8er5hm7/USDC', // no usdc pools on testnet so we use osmo
 		swapperAddress: process.env.SWAPPER_ADDRESS || 'osmo17c4retwuyxjxzv9f2q9r0272s8smktpzhjetssttxxdavarjtujsjqafa2',
-		oracleAddress: process.env.ORACLE_ADDRESS || 'osmo1dh8f3rhg4eruc9w7c9d5e06eupqqrth7v32ladwkyphvnn66muzqxcfe60',
-		redbankAddress: process.env.REDBANK_ADDRESS || 'osmo1pvrlpmdv3ee6lgmxd37n29gtdahy4tec7c5nyer9aphvfr526z6sff9zdg',
-		accountNftAddress: process.env.ACCOUNT_NFT_ADDRESS || 'osmo1j0m37hqpaeh79cjrdna4sep6yfyu278rrm4qta6s4hjq6fv3njxqsvhcex',
-		marsParamsAddress: process.env.MARS_PARAMS_ADDRESS || 'osmo1dpwu03xc45vpqur6ry69xjhltq4v0snrhaukcp4fvhucx0wypzhs978lnp',
-		creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS || 'osmo12wd0rwuvu7wwujztkww5c7sg4fw4e6t235jyftwy5ydc48uxd24q4s9why',
+		oracleAddress: process.env.ORACLE_ADDRESS || 'neutron1hkggq76w07x53z9hu2hhq8kn8n9e77vc0nztrl2h3sn4cgz9v0ps577a53',
+		redbankAddress: process.env.REDBANK_ADDRESS || 'neutron14zjmuel0t8q9rqezp2vtj706ckl8eqtrkc2cjexsssh8vgpuzxdqjuqydr',
+		accountNftAddress: process.env.ACCOUNT_NFT_ADDRESS || 'neutron128pgfadzvmck5qccgpcjwew4lgsn5e4ha82cu7rrnyg45rrpxessuqdnmt',
+		marsParamsAddress: process.env.MARS_PARAMS_ADDRESS || 'neutron15tdtcemvkj3g7vuuz83twcekg86j3f58jet9lv08u0j7j8ztymsqd47l9z',
+		creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS || 'neutron1gtqq647nrkgwxr3anrdty6fqfvfqav9kkwuu7el0gw754yx42dgs0s92zx',
 		liquidatorMasterAddress: liquidatorMasterAddress,
 		minGasTokens: 10000000,
 		logResults: false,
 		poolsRefreshWindow: 60000,
-		maxLiquidators: 100,
+		maxLiquidators: process.env.MAX_LIQUIDATORS ? parseInt(process.env.MAX_LIQUIDATORS) : 10,
 		stableBalanceThreshold : 5000000,
 		sqsUrl: "https://sqs.osmosis.zone/"
 	}

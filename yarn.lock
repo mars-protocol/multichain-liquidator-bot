@@ -5126,10 +5126,10 @@ map-obj@^4.3.0:
   resolved "https://registry.npmjs.org/map-obj/-/map-obj-4.3.0.tgz"
   integrity sha512-hdN1wVrZbb29eBGiGjJbeP8JbKjq1urkHJ/LIP/NY48MZ1QVXUsQBV1G1zvYFHn1XE06cwjBsOI2K3Ulnj1YXQ==
 
-marsjs-types@^1.0.6:
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/marsjs-types/-/marsjs-types-1.0.6.tgz#280f06c807a03c7be4db2e52a43b1066e8b7098d"
-  integrity sha512-fwJNNWvo88u+ixr/nU3VB+9S3pc4yEyFb6gddzSP8Jtpbzrmd9Zi/rlBcM9BO0ezRsAskID8JMWxfcwDznGYvA==
+marsjs-types@2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/marsjs-types/-/marsjs-types-2.0.1.tgz#591041fd1a8ab1ec56b96b18dadefa1b8b674d5b"
+  integrity sha512-a7n4zGv95qgT0Yr0a0HrxdK66NDMVN/w69oIZmDe8s6xhZrf5RmQgSVN0hqAB5ix5/JrEJRp47U5/2LmySbDlA==
   dependencies:
     "@cosmjs/amino" "^0.29.4"
 

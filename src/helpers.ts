@@ -35,6 +35,8 @@ import { SwapAmountInRoute } from 'osmojs/dist/codegen/osmosis/poolmanager/v1bet
 import { RouteHop } from './types/RouteHop'
 import { OsmoRoute } from './types/swapper'
 import { AssetInfoNative } from './query/amm/types/AstroportTypes'
+import { PerpPosition, Positions } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
+import BigNumber from 'bignumber.js'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -201,7 +203,7 @@ export const seedAddresses = async (
 				amount: [{ denom: 'uosmo', amount: '1000000' }],
 			},
 		}
-		
+
 		sendTokenMsgs.push(gasMsg)
 		sendTokenMsgs.push({
 			typeUrl: '/cosmos.bank.v1beta1.MsgSend',
@@ -331,13 +333,118 @@ export const produceWithdrawMessage = (
 	redBankContractAddress: string,
 ): MsgExecuteContractEncodeObject => {
 	const msg = toUtf8(`
-      { 
-        "withdraw": { 
+      {
+        "withdraw": {
           "denom": "${assetDenom}"
-        } 
+        }
       }`)
 	return produceExecuteContractMessage(sender, redBankContractAddress, msg, [])
 }
+
+export const calculateTotalPerpPnl = (
+	perpPositions: PerpPosition[],
+) : BigNumber => {
+	return perpPositions.reduce((acc, position) => {
+		return acc.plus(position.unrealised_pnl.pnl.toString())
+	}, BigNumber(0))
+}
+
+export const addPnlToPositions = (
+	positions: Positions,
+	baseDenom: string,
+) : Positions => {
+	const totalPerpPnl: BigNumber = calculateTotalPerpPnl(positions.perps)
+	const baseDenomDeposits = positions.deposits.find((deposit) => deposit.denom === baseDenom)
+	const baseDenomDebts = positions.debts.find((debt) => debt.denom === baseDenom)
+
+	// If positive, deduct from debt first then add to deposits
+	// if negative, deduct from deposits first then add to debt
+	if (totalPerpPnl.isPositive()) {
+		if (baseDenomDebts) {
+
+			// new debt = old debt - totalPerpPnl  (because pnl is positive)
+			const newBaseDenomDebt = BigNumber(baseDenomDebts.amount).minus(totalPerpPnl)
+
+			// If the debt is negative, the positive pnl is > than the debt, so set to 0 and increment deposits
+			if (newBaseDenomDebt.isNegative()) {
+				baseDenomDebts.amount = '0'
+
+				// If there are deposits, add the remaining to the existing deposit, otherwise create a new deposit
+				if (baseDenomDeposits) {
+					const newDepositsAmount = BigNumber(baseDenomDeposits.amount).plus(newBaseDenomDebt.abs())
+					baseDenomDeposits.amount = newDepositsAmount.toString()
+				} else {
+					positions.deposits.push({
+						amount: newBaseDenomDebt.abs.toString(),
+						denom: baseDenom,
+						shares: newBaseDenomDebt.abs.toString(), // do we care about shares?
+					})
+				}
+			// If the debt is still positive, we simply update the debt
+			} else {
+				baseDenomDebts.amount = newBaseDenomDebt.toString()
+			}
+		// If the debt doesn't exist, we add to the deposit
+		} else {
+			// TODO - make this generalised
+			// If there are deposits, add the remaining to the existing deposit, otherwise create a new deposit
+			if (baseDenomDeposits) {
+				const newDepositsAmount = BigNumber(baseDenomDeposits.amount).plus(totalPerpPnl.abs())
+				baseDenomDeposits.amount = newDepositsAmount.toString()
+			} else {
+				positions.deposits.push({
+					amount: totalPerpPnl.abs.toString(),
+					denom: baseDenom,
+					shares: totalPerpPnl.abs.toString(), // do we care about shares?
+				})
+			}
+		}
+	// If negative, deduct from deposits first then add to debt
+	} else {
+		if (baseDenomDeposits) {
+
+			// new deposits = old deposits - totalPerpPnl.abs()  (because pnl is negative)
+			const newBaseDenomDeposit = BigNumber(baseDenomDeposits.amount).minus(totalPerpPnl.abs())
+
+			// If the deposit is negative, the negative pnl is > than the deposit, so set to 0 and increment debts
+			if (newBaseDenomDeposit.isNegative()) {
+				baseDenomDeposits.amount = '0'
+
+				// If there are debts, add the remaining to the existing debt, otherwise create a new debt
+				if (baseDenomDebts) {
+					const newDebtAmount = BigNumber(baseDenomDebts.amount).plus(newBaseDenomDeposit.abs())
+					baseDenomDebts.amount = newDebtAmount.toString()
+				} else {
+					positions.debts.push({
+						amount: newBaseDenomDeposit.abs().toString(),
+						denom: baseDenom,
+						shares: newBaseDenomDeposit.abs().toString(), // do we care about shares?
+					})
+				}
+			// If the deposit is still positive, we simply update the deposit
+			} else {
+				baseDenomDeposits.amount = newBaseDenomDeposit.toString()
+			}
+		// If the deposit doesn't exist, we add to the debt
+		} else {
+			// TODO - make this generalised
+			// If there are debts, add the remaining to the existing debt, otherwise create a new debt
+			if (baseDenomDebts) {
+				const newDebtAmount = BigNumber(baseDenomDebts.amount).plus(totalPerpPnl.abs())
+				baseDenomDebts.amount = newDebtAmount.toString()
+			} else {
+				positions.debts.push({
+					amount: totalPerpPnl.abs().toString(),
+					denom: baseDenom,
+					shares: totalPerpPnl.abs().toString(), // do we care about shares?
+				})
+			}
+		}
+	}
+
+	return positions
+}
+
 
 interface MsgSwapEncodeObject {
 	typeUrl: string

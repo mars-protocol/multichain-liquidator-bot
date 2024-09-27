@@ -1,12 +1,12 @@
 import { SigningStargateClient } from '@cosmjs/stargate'
 import { getAddress, getWallet, produceSigningStargateClient, Seed } from '../../../src/helpers.js'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
-import { MarsCreditManagerClient } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.client'
-import { MarsAccountNftQueryClient } from 'marsjs-types/creditmanager/generated/mars-account-nft/MarsAccountNft.client'
+import { MarsCreditManagerClient } from 'marsjs-types/mars-credit-manager/MarsCreditManager.client'
+import { MarsAccountNftQueryClient } from 'marsjs-types/mars-account-nft/MarsAccountNft.client'
 import {
 	Action,
 	Coin,
-} from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+} from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import { difference } from 'lodash'
 
 export enum PositionCollectionType {

@@ -1,5 +1,5 @@
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { Coin } from "marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types";
+import { Coin } from "marsjs-types/mars-credit-manager/MarsCreditManager.types";
 import { RouteHop } from "../types/RouteHop";
 import { Exchange } from "./ExchangeInterface";
 import { osmosis } from "osmojs";

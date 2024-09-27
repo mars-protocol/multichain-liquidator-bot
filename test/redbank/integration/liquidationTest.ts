@@ -29,8 +29,8 @@
 // import { ExchangeInterface } from '../../../../src/query/routing/RouteRequesterInterface.js
 // import { Osmosis } from '../../../src/../../../src/query/routing/AstroportRouteRequester.js
 // import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
-// import { AssetParamsUpdate } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types.js'
-// import { Coin } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types.js'
+// import { AssetParamsUpdate } from 'marsjs-types/mars-params/MarsParams.types.js'
+// import { Coin } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types.js'
 // import { LiquidationBonus } from '../../../src/types/marsParams.js'
 // import * as fs from 'fs';
 // import BigNumber from 'bignumber.js'
