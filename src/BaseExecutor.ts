@@ -176,19 +176,16 @@ export class BaseExecutor {
 	}
 
 	updateOraclePrices = async () => {
-		console.log("Updating oracle prices")
 		try {
 			// Fetch all price sources
 			const priceResults : PromiseSettledResult<OraclePrice>[] = await Promise.allSettled(this.priceSources.map(async (priceSource) => await this.fetchOraclePrice(priceSource.denom)))
 
 			priceResults.forEach((oraclePriceResult) => {
-				console.log(JSON.stringify(oraclePriceResult))
 				const successfull = oraclePriceResult.status === 'fulfilled'
 				const oraclePrice = successfull ? oraclePriceResult.value : null
 
 				// push successfull price results
 				if (successfull && oraclePrice) {
-					console.log(`Setting price for ${oraclePrice.denom} to ${oraclePrice.price}`)
 					this.prices.set(oraclePrice.denom, oraclePrice.price)
 				}
 			})

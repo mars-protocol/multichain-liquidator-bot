@@ -77,19 +77,30 @@ export class ActionGenerator {
 	 *
 	 * @param assetInDenom
 	 * @param assetOutDenom
-	 * @param amount`
+	 * @param amountIn
 	 * @returns An array of swap actions that convert the asset from collateral to the debt.
 	 */
 	generateSwapActions = async(
 		assetInDenom: string,
 		assetOutDenom: string,
-		amount: string,
+		assetInPrice: BigNumber,
+		assetOutPrice: BigNumber,
+		amountIn: string,
 		slippage: string
 	): Promise<Action> => {
 
-		const amountBN = BigNumber(amount)
-		const minReceive = amountBN.multipliedBy(1-Number(slippage))
-		const route = await this.routeRequester.requestRoute(assetInDenom, assetOutDenom, amount);
+		const amountBN = BigNumber(amountIn)
+
+		// We need the price ratio to determine the min output
+		// For example, if the price of asset in is 10, and the price of asset out is 2,
+		// we will get 5 asset out for 1 asset in
+		// assetInPrice = 10
+		// assetOutPrice = 2
+		// priceRatio = assetInPrice / assetOutPrice = 5
+		const priceRatio = assetInPrice.dividedBy(assetOutPrice)
+
+		const minReceive = amountBN.multipliedBy(priceRatio).multipliedBy(1-Number(slippage))
+		const route = await this.routeRequester.requestRoute(assetInDenom, assetOutDenom, amountIn);
 
 		const swapperRoute: SwapperRoute = {
 			astro: {
@@ -146,6 +157,8 @@ export class ActionGenerator {
 				await this.generateSwapActions(
 					poolAsset.token.denom,
 					borrow.denom,
+					assetInPrice,
+					assetOutPrice,
 					amountIn.toFixed(0),
 					slippage
 				),
@@ -203,23 +216,52 @@ export class ActionGenerator {
 	 */
 	swapCollateralCoinToDebtActions = async(collateralDenom: string, borrowed: Coin, slippage: string, prices: Map<string, BigNumber>): Promise<Action[]> => {
 		let actions: Action[] = []
+
+		const assetInPrice = prices.get(collateralDenom)!
+		const assetOutPrice = prices.get(borrowed.denom)!
+
 		// Check if is LP token
 		if (collateralDenom.startsWith('gamm/') || collateralDenom.endsWith('astroport/share')) {
 			actions.push(this.produceWithdrawLiquidityAction(collateralDenom))
-
+			
 			// find underlying tokens and swap to borrowed asset
-			const underlyingDenoms = await queryAstroportLpUnderlyingTokens(collateralDenom)
-			for (const denom of underlyingDenoms!) {
+			const underlyingDenoms = (await queryAstroportLpUnderlyingTokens(collateralDenom))!
+			for (const denom of underlyingDenoms) {
 				if (denom !== borrowed.denom) {
-					const assetOutPrice = prices.get(borrowed.denom)!
-					const assetInPrice = prices.get(collateralDenom)!
-					const amountIn = new BigNumber(assetOutPrice.dividedBy(assetInPrice)).multipliedBy(Number(borrowed.amount))
-					actions = actions.concat(await this.generateSwapActions(denom, borrowed.denom, amountIn.toFixed(0), slippage))
+					
+					// TODO This is a very rough approximation. We could optimise and make more accurate
+					const amountIn = assetOutPrice
+						.dividedBy(assetInPrice)
+						.multipliedBy(borrowed.amount)
+						.dividedBy(underlyingDenoms.length)
+						// This could be a source of bugs, if the amount of underlying tokens in the pools
+						// are not even. So we err on the side of caution. 
+						.multipliedBy(0.5)
+					actions = actions.concat(await this.generateSwapActions(
+						denom,
+						borrowed.denom,
+						assetInPrice,
+						assetOutPrice,
+						amountIn.toFixed(0),
+						slippage))
 				}
 			}
 		} else {
+			// TODO thios is a rough approximation
+			let amountIn = assetOutPrice
+				.dividedBy(assetInPrice)
+				.multipliedBy(borrowed.amount)
+				.multipliedBy(0.8)
+
+			console.log(slippage)
 			actions = actions.concat(
-				await this.generateSwapActions(collateralDenom, borrowed.denom, borrowed.amount, slippage),
+				await this.generateSwapActions(
+					collateralDenom,
+					borrowed.denom,
+					assetInPrice,
+					assetOutPrice,
+					amountIn.toFixed(0),
+					slippage),
 			)
 		}
 

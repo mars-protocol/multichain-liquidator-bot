@@ -137,7 +137,7 @@ export class RoverExecutor extends BaseExecutor {
 			for (const account of chunk) {
 				const nextLiquidator = liquidatorAddressesIterator.next()
 				console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
-				liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value))
+				liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value!))
 			}
 			await Promise.all(liquidationPromises)
 			await sleep(4000)
@@ -194,16 +194,21 @@ export class RoverExecutor extends BaseExecutor {
 				: []
 
 			const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
-			// todo estimate amount based on repay to prevent slippage.
+
 			const swapToStableMsg =
 				borrow.denom !== this.config.neutralAssetDenom && swapWinnings
 					? [
 						await this.liquidationActionGenerator.generateSwapActions(
 							borrow.denom,
 							this.config.neutralAssetDenom,
-							// todo estimate winnings
-							'100',
-							slippage
+							this.prices.get(borrow.denom)!,
+							this.prices.get(this.config.neutralAssetDenom)!,
+							// todo optimize this. Right now we are estimating a min profit of 0.05% here.
+							// We can optimise, which means we are less vulnerable to slippage / sandwhich attacks,
+							// but the trade off here is that if our profit is less than 0.05% tx will fail.
+							// For safety, we should set this low for now.
+							new BigNumber(borrow.amount).multipliedBy(0.005).toFixed(0),
+							slippage,
 					)]
 					: []
 			const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
