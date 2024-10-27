@@ -1,3 +1,5 @@
+# We use a multi-stage build to keep the final image as small as possible
+#
 # Stage 1: Build the application
 FROM node:18-alpine AS build
 
@@ -25,5 +27,5 @@ COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 
-# Start the application
+# Start the liquidator
 CMD ["node", "./build/src/main.js"]
