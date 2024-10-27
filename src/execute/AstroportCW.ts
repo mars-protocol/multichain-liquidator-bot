@@ -3,22 +3,22 @@ import { Coin } from "marsjs-types/creditmanager/generated/mars-credit-manager/M
 import { RouteHop } from "../types/RouteHop";
 import { Exchange } from "./ExchangeInterface";
 import { AssetInfoCW, AssetInfoNative } from "../query/amm/types/AstroportTypes";
-import { camelToSnake, produceExecuteContractMessage } from "../helpers";
+import { produceExecuteContractMessage } from "../helpers";
 import { toUtf8 } from '@cosmjs/encoding'
 
 interface AstroSwap {
-    offerAssetInfo: AssetInfoCW | AssetInfoNative
-    askAssetInfo: AssetInfoCW | AssetInfoNative
+    offer_asset_info: AssetInfoCW | AssetInfoNative
+    ask_asset_info: AssetInfoCW | AssetInfoNative
 }
 
 interface SwapOperation {
-     astroSwap: AstroSwap
+     astro_swap: AstroSwap
 }
 
 interface SwapMsg {
-    executeSwapOperations : {
+    execute_swap_operations : {
         operations: SwapOperation[]
-        minimumReceive: string
+        minimum_receive: string
     },
 }
 
@@ -40,28 +40,39 @@ export class AstroportCW implements Exchange {
         const executeSwapOperations = route.map((route) => this.produceSwapOperation(route))
 
         const msg : SwapMsg = {
-            executeSwapOperations: {
+            execute_swap_operations: {
                 operations: executeSwapOperations,
-                minimumReceive
+                minimum_receive: minimumReceive
             },
         }
 
+        // console.log(JSON.stringify(msg))
         return produceExecuteContractMessage(
             sender,
             this.astroportRouterContract,
-            toUtf8(camelToSnake(JSON.stringify(msg))),
+            toUtf8(JSON.stringify(msg)),
             [tokenIn]
         )
     }
 
     produceSwapOperation(routeHop : RouteHop) : SwapOperation {
         return {
-            astroSwap : {
-                offerAssetInfo : this.produceAssetInfo(routeHop.tokenInDenom),
-                askAssetInfo: this.produceAssetInfo(routeHop.tokenOutDenom)
+            astro_swap : {
+                offer_asset_info : this.produceAssetInfo(routeHop.tokenInDenom),
+                ask_asset_info: this.produceAssetInfo(routeHop.tokenOutDenom)
             }
         }
     }
+
+    // Astroport requires the second part of the ibc denom to be capitalised
+    // capitaliseIbcDenom(denom: string) : string {
+    //     if (denom.startsWith('ibc/')) {
+    //         console.log("capitalising:", denom)
+    //         const [ibc, hash] = denom.split('/')
+    //         return ibc + '/' + hash.toUpperCase()
+    //     }            
+    //     return denom
+    // }
 
     produceAssetInfo(denom: string) : AssetInfoCW | AssetInfoNative {
         // if we start with a prefix, we assume a cw20 asset
