@@ -7,7 +7,7 @@
 
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
 BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD)
-BASE_IMAGE_NAME := 073581867161.dkr.ecr.ap-southeast-1.amazonaws.com/lbexecutorsm-apsoutheast1
+BASE_IMAGE_NAME := 073581867161.dkr.ecr.ap-southeast-1.amazonaws.com/lbexecutor-apsoutheast1
 IMAGE_NAME := $(BASE_IMAGE_NAME):$(BRANCH_NAME)-$(GIT_COMMIT)
 
 # Required contract addresses. Refer to mars github documentation for mainnet addresses
