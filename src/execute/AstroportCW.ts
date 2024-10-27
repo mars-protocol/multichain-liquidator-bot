@@ -64,16 +64,6 @@ export class AstroportCW implements Exchange {
         }
     }
 
-    // Astroport requires the second part of the ibc denom to be capitalised
-    // capitaliseIbcDenom(denom: string) : string {
-    //     if (denom.startsWith('ibc/')) {
-    //         console.log("capitalising:", denom)
-    //         const [ibc, hash] = denom.split('/')
-    //         return ibc + '/' + hash.toUpperCase()
-    //     }            
-    //     return denom
-    // }
-
     produceAssetInfo(denom: string) : AssetInfoCW | AssetInfoNative {
         // if we start with a prefix, we assume a cw20 asset
         if (denom.startsWith(this.prefix)) {
