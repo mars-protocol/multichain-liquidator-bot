@@ -1,22 +1,22 @@
 import { SigningStargateClient, StdFee } from '@cosmjs/stargate'
 import { Coin, EncodeObject, coins } from '@cosmjs/proto-signing'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { AMMRouter } from './AmmRouter.js'
-import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from "./types/Pool.js"
+import { AMMRouter } from './AmmRouter'
+import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from "./types/Pool"
 import 'dotenv/config.js'
-import { MarketInfo } from './rover/types/MarketInfo.js'
-import { CSVWriter, Row } from './CsvWriter.js'
+import { MarketInfo } from './rover/types/MarketInfo'
+import { CSVWriter, Row } from './CsvWriter'
 
 import BigNumber from 'bignumber.js'
-import { fetchRedbankData } from './query/hive.js'
-import { PoolDataProvider } from './query/amm/PoolDataProviderInterface.js'
-import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider.js'
-import { RouteRequester } from './query/routing/RouteRequesterInterface.js'
-import { sleep } from './helpers.js'
-import { OraclePriceFetcher as MarsOraclePriceFetcher } from './query/oracle/OraclePriceFetcher.js'
+import { fetchRedbankData } from './query/hive'
+import { PoolDataProvider } from './query/amm/PoolDataProviderInterface'
+import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider'
+import { RouteRequester } from './query/routing/RouteRequesterInterface'
+import { sleep } from './helpers'
+import { OraclePriceFetcher as MarsOraclePriceFetcher } from './query/oracle/OraclePriceFetcher'
 import { PythPriceFetcher } from './query/oracle/PythPriceFetcher'
-import { OraclePrice } from './query/oracle/PriceFetcherInterface.js'
-import { PriceSourceResponse } from './types/oracle.js'
+import { OraclePrice } from './query/oracle/PriceFetcherInterface'
+import { PriceSourceResponse } from './types/oracle'
 
 export interface BaseExecutorConfig {
 	lcdEndpoint: string
@@ -80,7 +80,6 @@ export class BaseExecutor {
 	}
 
 	async initiateAstroportPoolProvider(): Promise<void> {
-		
 		const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
 		await astroportPoolProvider.initiate()
 	}

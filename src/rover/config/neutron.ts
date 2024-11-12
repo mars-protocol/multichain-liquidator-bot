@@ -37,19 +37,21 @@ export const getConfig = (
 		chainName : "neutron",
 		hiveEndpoint: process.env.HIVE_ENDPOINT!,
 		lcdEndpoint: process.env.LCD_ENDPOINT!,
-		neutralAssetDenom: 'untrn', // no usdc pools on testnet so we use osmo
-		swapperAddress: process.env.SWAPPER_ADDRESS || 'osmo17c4retwuyxjxzv9f2q9r0272s8smktpzhjetssttxxdavarjtujsjqafa2',
-		oracleAddress: process.env.ORACLE_ADDRESS || 'osmo1dh8f3rhg4eruc9w7c9d5e06eupqqrth7v32ladwkyphvnn66muzqxcfe60',
-		redbankAddress: process.env.REDBANK_ADDRESS || 'osmo1pvrlpmdv3ee6lgmxd37n29gtdahy4tec7c5nyer9aphvfr526z6sff9zdg',
-		accountNftAddress: process.env.ACCOUNT_NFT_ADDRESS || 'osmo1j0m37hqpaeh79cjrdna4sep6yfyu278rrm4qta6s4hjq6fv3njxqsvhcex',
-		marsParamsAddress: process.env.MARS_PARAMS_ADDRESS || 'osmo1dpwu03xc45vpqur6ry69xjhltq4v0snrhaukcp4fvhucx0wypzhs978lnp',
-		creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS || 'osmo12wd0rwuvu7wwujztkww5c7sg4fw4e6t235jyftwy5ydc48uxd24q4s9why',
+		neutralAssetDenom: 'factory/neutron1ke0vqqzyymlp5esr8gjwuzh94ysnpvj8er5hm7/UUSDC', // no usdc pools on testnet so we use osmo
+		swapperAddress: process.env.SWAPPER_ADDRESS || 'neutron12xuseg6l3q6g6e928chmvzqus92m9tw6ajns88yg9ww5crx58djshwlqya',
+		oracleAddress: process.env.ORACLE_ADDRESS || 'neutron1pev35y62g6vte0s9t67gsf6m8d60x36t7wr0p0ghjl9r3h5mwl0q4h2zwc',
+		redbankAddress: process.env.REDBANK_ADDRESS || 'neutron1f8ag222s4rnytkweym7lfncrxhtee3za5uk54r5n2rjxvsl9slzq36f66d',
+		accountNftAddress: process.env.ACCOUNT_NFT_ADDRESS || 'neutron1hx27cs7jjuvwq4hqgxn4av8agnspy2nwvrrq8e9f80jkeyrwrh8s8x645z',
+		marsParamsAddress: process.env.MARS_PARAMS_ADDRESS || 'neutron1q66e3jv2j9r0duzwzt37fwl7h5njhr2kqs0fxmaa58sfqke80a2ss5hrz7',
+		creditManagerAddress: process.env.CREDIT_MANAGER_ADDRESS || 'neutron13vyqc4efsnc357ze97ppv9h954zjasuj9d0w8es3mk9ea8sg6mvsr3xkjg',
 		liquidatorMasterAddress: liquidatorMasterAddress,
-		minGasTokens: 10000000,
+		minGasTokens: 1000000,
 		logResults: false,
 		poolsRefreshWindow: 60000,
-		maxLiquidators: 100,
+		maxLiquidators: process.env.MAX_LIQUIDATORS ? parseInt(process.env.MAX_LIQUIDATORS) : 1,
 		stableBalanceThreshold : 5000000,
+		marsEndpoint:"https://testnet-api.marsprotocol.io",
+
 		sqsUrl: "https://sqs.osmosis.zone/"
 	}
 }

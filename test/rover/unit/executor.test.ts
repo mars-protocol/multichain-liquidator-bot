@@ -1,117 +1,283 @@
 import {
 	Coin,
-	VaultPosition,
-	VaultUnlockingPosition,
-} from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+	Positions,
+} from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import { RoverExecutor } from '../../../src/rover/RoverExecutor'
+import { calculatePositionStateAfterPerpClosure } from '../../../src/helpers'
+import { generateBlankPerpPositionWithPnl } from './helpers'
 
 describe('Rover Executor Tests', () => {
-	test('Can find largest collateral when it is an unlocking position', () => {
-		// construct multiple collaterals - coins and vaults
-		const collateral1: Coin = {
-			amount: '500',
-			denom: 'testcoin1',
-		}
+	describe('Update Position State For Perp Closure', () => {
 
-		const collateral2: VaultPosition = {
-			amount: {
-				unlocked: '400',
-			},
-			vault: {
-				address: 'vault1',
-			},
-		}
+		test('Has no debt, no usdc deposit, positive pnl', () => {
+			const baseDenom = 'uusd'
+			const perpPositionETH = generateBlankPerpPositionWithPnl(baseDenom, 'eth', '100')
 
-		const unlocking1: VaultUnlockingPosition = {
-			coin: {
-				denom: 'coin1',
-				amount: '100',
-			},
-			id: 0,
-		}
+			const positions: Positions = {
+				account_id: '1',
+				account_kind: 'default',
+				debts: [
+					{
+						amount: '0',
+						denom:  baseDenom,
+						shares: '0',
+					},
+				],
+				deposits: [],
+				lends: [],
+				staked_astro_lps: [],
+				vaults: [],
+				perps: [
+					perpPositionETH,
+				],
+			}
 
-		const unlocking2: VaultUnlockingPosition = {
-			coin: {
-				denom: 'coin1',
-				amount: '600',
-			},
-			id: 0,
-		}
+			// calculate the debts, deposits
+			const details = calculatePositionStateAfterPerpClosure(positions, baseDenom);
 
-		const collateral3: VaultPosition = {
-			amount: {
-				locking: {
-					locked: '100',
-					unlocking: [unlocking1, unlocking2],
-				},
-			},
-			vault: {
-				address: 'vault1',
-			},
-		}
+			expect(details.debts[0].amount).toBe('0')
+			expect(details.debts[0].denom).toBe('uusd')
+			expect(details.deposits[0].amount).toBe('100')
+			expect(details.deposits[0].denom).toBe('uusd')
+		}),
 
-		//@ts-ignore - parameters not used for testing
-		const executor = new RoverExecutor({}, {}, {})
-		const collateralState = executor.findBestCollateral({
-			account_id: "1",
-			account_kind: "default",
-			debts: [],
-			deposits: [collateral1],
-			lends: [],
-			staked_astro_lps: [],
-			vaults: [
-				collateral2,
-				collateral3
-			]
+		test('Has no debt, no usdc deposit, negative pnl', () => {
+			const baseDenom = 'uusd'
+			const perpPositionETH = generateBlankPerpPositionWithPnl(baseDenom, 'eth', '-100')
+
+			const positions: Positions = {
+				account_id: '1',
+				account_kind: 'default',
+				debts: [
+					{
+						amount: '0',
+						denom:  baseDenom,
+						shares: '0',
+					},
+				],
+				deposits: [],
+				lends: [],
+				staked_astro_lps: [],
+				vaults: [],
+				perps: [
+					perpPositionETH,
+				],
+			}
+
+			// calculate the debts, deposits
+			const details = calculatePositionStateAfterPerpClosure(positions, baseDenom);
+
+			expect(details.debts[0].amount).toBe('100')
+			expect(details.debts[0].denom).toBe('uusd')
+		}),
+
+		test('Has debt, Single negative pnl, network negative', () => {
+			const baseDenom = 'uusd'
+			
+			const btcPerpPosition = generateBlankPerpPositionWithPnl(baseDenom, 'btc', '-200')
+
+			const positions: Positions = {
+				account_id: '1',
+				account_kind: 'default',
+				debts: [
+					{
+						amount: '1000',
+						denom:  baseDenom,
+						shares: '1000',
+					},
+				],
+				deposits: [],
+				lends: [],
+				staked_astro_lps: [],
+				vaults: [],
+				perps: [btcPerpPosition],
+			}
+
+			// calculate the debts, deposits
+			const details = calculatePositionStateAfterPerpClosure(positions, baseDenom);
+			expect(details.debts[0].amount).toBe('1200')
+			expect(details.debts[0].denom).toBe('uusd')
+		}),
+		test('Has debt, One negative pnl, One positive pnl, pnl net negative, networth negative', () => {
+			const baseDenom = 'uusd'
+			const perpPositionBTC = generateBlankPerpPositionWithPnl(baseDenom, 'btc', '-200')
+			const perpPositionETH = generateBlankPerpPositionWithPnl(baseDenom, 'eth', '100')
+
+			const positions: Positions = {
+				account_id: '1',
+				account_kind: 'default',
+				debts: [
+					{
+						amount: '1000',
+						denom:  baseDenom,
+						shares: '1000',
+					},
+				],
+				deposits: [],
+				lends: [],
+				staked_astro_lps: [],
+				vaults: [],
+				perps: [perpPositionBTC, perpPositionETH],
+			}
+
+			// calculate the debts, deposits
+			const details = calculatePositionStateAfterPerpClosure(positions, baseDenom);
+			expect(details.debts[0].amount).toBe('1100')
+			expect(details.debts[0].denom).toBe('uusd')
 		})
 
-		expect(collateralState.amount).toBe(600)
+		test('Has debt, One negative pnl, two positive pnl, pnl net positive', () => {
+			const baseDenom = 'uusd'
+			const perpPositionBTC = generateBlankPerpPositionWithPnl(baseDenom, 'btc', '-200')
+			const perpPositionETH = generateBlankPerpPositionWithPnl(baseDenom, 'eth', '100')
+			const perpPositionDOGE = generateBlankPerpPositionWithPnl(baseDenom, 'doge', '200')
+
+			const positions: Positions = {
+				account_id: '1',
+				account_kind: 'default',
+				debts: [
+					{
+						amount: '1000',
+						denom:  baseDenom,
+						shares: '0',
+					},
+				],
+				deposits: [],
+				lends: [],
+				staked_astro_lps: [],
+				vaults: [],
+				perps: [
+					perpPositionBTC,
+					perpPositionETH,
+					perpPositionDOGE
+				],
+			}
+
+			// calculate the debts, deposits
+			const details = calculatePositionStateAfterPerpClosure(positions, baseDenom);
+			expect(details.debts[0].amount).toBe('1000')
+			expect(details.debts[0].denom).toBe('uusd')
+		})
+
+		test('Has debt, One negative pnl, two positive pnl, pnl net positive, networth positive', () => {
+			const baseDenom = 'uusd'
+			const perpPositionBTC = generateBlankPerpPositionWithPnl(baseDenom, 'btc', '-200')
+			const perpPositionETH = generateBlankPerpPositionWithPnl(baseDenom, 'eth', '100')
+			const perpPositionDOGE = generateBlankPerpPositionWithPnl(baseDenom, 'doge', '2000')
+
+			const positions: Positions = {
+				account_id: '1',
+				account_kind: 'default',
+				debts: [
+					{
+						amount: '1000',
+						denom:  baseDenom,
+						shares: '0',
+					},
+				],
+				deposits: [],
+				lends: [],
+				staked_astro_lps: [],
+				vaults: [],
+				perps: [
+					perpPositionBTC,
+					perpPositionETH,
+					perpPositionDOGE
+				],
+			}
+
+			// calculate the debts, deposits
+			const details = calculatePositionStateAfterPerpClosure(positions, baseDenom);
+
+			expect(details.debts[0].amount).toBe('1000')
+			expect(details.debts[0].denom).toBe('uusd')
+			expect(details.deposits[0].amount).toBe('1900')
+			expect(details.deposits[0].denom).toBe('uusd')
+		}),
+
+		test('No debt, some lends, some deposits, some negative pnl', () => {
+			const baseDenom = 'uusd'
+			const perpPositionBTC = generateBlankPerpPositionWithPnl(baseDenom, 'btc', '-200')
+
+			const positions: Positions = {
+				account_id: '1',
+				account_kind: 'default',
+				debts: [],
+				deposits: [{
+					amount: '100',
+					denom:  baseDenom,
+				}],
+				lends: [{
+					amount: '1000',
+					denom:  baseDenom,
+				}],
+				staked_astro_lps: [],
+				vaults: [],
+				perps: [
+					perpPositionBTC,
+				],
+			}
+
+			const details = calculatePositionStateAfterPerpClosure(positions, baseDenom);
+
+			// We first deduct from deposits, then unlend, then borrow
+			// Because we have 1k lend and 1 deposit with 200 negative pnl, we should have 
+			// 900 lend and 0 deposit 
+			expect(details.debts[0].amount).toBe('0')
+			expect(details.debts[0].denom).toBe('uusd')
+			expect(details.deposits[0].amount).toBe('0')
+			expect(details.deposits[0].denom).toBe('uusd')
+			expect(details.lends[0].amount).toBe('900')
+			expect(details.lends[0].denom).toBe('uusd')
+		}),
+
+		test('Negative pnl > deposits and lends', () => {
+			const baseDenom = 'uusd'
+			const perpPositionBTC = generateBlankPerpPositionWithPnl(baseDenom, 'btc', '-1200')
+
+			const positions: Positions = {
+				account_id: '1',
+				account_kind: 'default',
+				debts: [],
+				deposits: [{
+					amount: '100',
+					denom:  baseDenom,
+				}],
+				lends: [{
+					amount: '1000',
+					denom:  baseDenom,
+				}],
+				staked_astro_lps: [],
+				vaults: [],
+				perps: [
+					perpPositionBTC,
+				],
+			}
+
+			const details = calculatePositionStateAfterPerpClosure(positions, baseDenom);
+
+			// We first deduct from deposits, then unlend, then borrow
+			// Because we have 1k lend and 100 deposit with -1200 negative pnl, we should have 
+			// 0 lend and 0 deposit and 100 debt 
+			expect(details.debts[0].amount).toBe('100')
+			expect(details.debts[0].denom).toBe('uusd')
+			expect(details.deposits[0].amount).toBe('0')
+			expect(details.deposits[0].denom).toBe('uusd')
+			expect(details.lends[0].amount).toBe('0')
+			expect(details.lends[0].denom).toBe('uusd')
+		})
 	}),
-		test('Can find largest collateral when it is an unlocked position', () => {
+
+	describe('Find Best Collateral', () => {
+
+		test('Can find largest collateral when it is a coin', () => {
 			// construct multiple collaterals - coins and vaults
 			const collateral1: Coin = {
-				amount: '500',
+				amount: '1500',
 				denom: 'testcoin1',
 			}
 
-			const collateral2: VaultPosition = {
-				amount: {
-					unlocked: '800',
-				},
-				vault: {
-					address: 'vault1',
-				},
-			}
-
-			const unlocking1: VaultUnlockingPosition = {
-				coin: {
-					denom: 'coin1',
-					amount: '100',
-				},
-				id: 0,
-			}
-
-			const unlocking2: VaultUnlockingPosition = {
-				coin: {
-					denom: 'coin1',
-					amount: '300',
-				},
-				id: 0,
-			}
-
-			const collateral3: VaultPosition = {
-				amount: {
-					locking: {
-						locked: '100',
-						unlocking: [unlocking1, unlocking2],
-					},
-				},
-				vault: {
-					address: 'vault1',
-				},
-			}
-
-			// @ts-ignore - params are not used - TODO move `findBestCollateral()` to helper class
+			//@ts-ignore - parameters not used for testing - todo move to helper / logic class
 			const executor = new RoverExecutor({}, {}, {})
 			const collateralState = executor.findBestCollateral({
 				account_id: "1",
@@ -120,81 +286,15 @@ describe('Rover Executor Tests', () => {
 				deposits: [collateral1],
 				lends: [],
 				staked_astro_lps: [],
-				vaults: [
-					collateral2,
-					collateral3
-				]
+				vaults: [],
+				perps: []
 			})
 
-			expect(collateralState.amount).toBe(800)
+			expect(collateralState.amount).toBe(1500)
 			// find
 			// ensure its the correct one
 		})
-
-	test('Can find largest collateral when it is a coin', () => {
-		// construct multiple collaterals - coins and vaults
-		const collateral1: Coin = {
-			amount: '1500',
-			denom: 'testcoin1',
-		}
-
-		const collateral2: VaultPosition = {
-			amount: {
-				unlocked: '800',
-			},
-			vault: {
-				address: 'vault1',
-			},
-		}
-
-		const unlocking1: VaultUnlockingPosition = {
-			coin: {
-				denom: 'coin1',
-				amount: '100',
-			},
-			id: 0,
-		}
-
-		const unlocking2: VaultUnlockingPosition = {
-			coin: {
-				denom: 'coin1',
-				amount: '300',
-			},
-			id: 0,
-		}
-
-		const collateral3: VaultPosition = {
-			amount: {
-				locking: {
-					locked: '100',
-					unlocking: [unlocking1, unlocking2],
-				},
-			},
-			vault: {
-				address: 'vault1',
-			},
-		}
-
-		//@ts-ignore - parameters not used for testing - todo move to helper / logic class
-		const executor = new RoverExecutor({}, {}, {})
-		const collateralState = executor.findBestCollateral({
-			account_id: "1",
-			account_kind: "default",
-			debts: [],
-			deposits: [collateral1],
-			lends: [],
-			staked_astro_lps: [],
-			vaults: [
-				collateral2,
-				collateral3
-			]
-		})
-
-		expect(collateralState.amount).toBe(1500)
-		// find
-		// ensure its the correct one
-	})
-
+	}),
 	test('Can find largest debt', () => {
 		// construct multiple collaterals - coins and vaults
 		const debt1: Coin = {

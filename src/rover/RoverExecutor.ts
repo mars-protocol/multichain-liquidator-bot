@@ -1,7 +1,7 @@
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
-import { produceExecuteContractMessage, produceSendMessage, sleep } from '../helpers'
+import { calculatePositionStateAfterPerpClosure, produceExecuteContractMessage, produceSendMessage, sleep } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
-import { fetchBalances, fetchRoverData, fetchRoverPosition } from '../query/hive'
+import { fetchBalances } from '../query/hive'
 import { ActionGenerator } from './ActionGenerator'
 import {
 	Coin,
@@ -9,7 +9,7 @@ import {
 	VaultPosition,
 	VaultPositionType,
 	VaultUnlockingPosition,
-} from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+} from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import { VaultInfo } from '../query/types'
 import BigNumber from 'bignumber.js'
 import { Collateral, Debt, PositionType } from './types/RoverPosition'
@@ -18,9 +18,8 @@ import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/errors'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { PoolDataProvider } from '../query/amm/PoolDataProviderInterface'
-import { QueryMsg, VaultConfigBaseForString } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types'
+import { QueryMsg, VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
-
 interface CreateCreditAccountResponse {
 	tokenId : number
 	liquidatorAddress : string
@@ -43,7 +42,6 @@ export class RoverExecutor extends BaseExecutor {
 	private liquidatorAccounts: Map<string, number> = new Map()
 	private liquidatorBalances : Map<string, Coin[]> = new Map()
 
-	private vaults: string[] = []
 	private vaultInfo: Map<string, VaultInfo> = new Map()
 	private lastFetchedVaultTime = 0
 
@@ -93,14 +91,18 @@ export class RoverExecutor extends BaseExecutor {
 		// check for and dispatch liquidations
 		while (true) {
 			await sleep(200)
-			await this.run()
+			try {
+				await this.run()
+			} catch(ex) {
+				console.error(ex)
+			}
 		}
 	}
 
 	run = async () => {
 
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/creditmanager`
+		const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=neutron&product=creditmanager`
 
 		const response = await fetch(url);
 		let targetAccountObjects: {
@@ -112,13 +114,12 @@ export class RoverExecutor extends BaseExecutor {
 		const  targetAccounts = targetAccountObjects.filter(
 			(account) =>
 				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
-				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
+				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV)
 				// To target specific accounts, filter here
-				// account.account_id === "1078" &&
-				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
 		// Sleep to avoid spamming.
+
 		if (targetAccounts.length == 0) {
 			await sleep(2000)
 			return
@@ -129,7 +130,6 @@ export class RoverExecutor extends BaseExecutor {
 		for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {
 			unhealthyAccountChunks.push(targetAccounts.slice(i, i + this.liquidatorAccounts.size))
 		}
-
 		// iterate over chunks and liquidate
 		for (const chunk of unhealthyAccountChunks) {
 			const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
@@ -146,17 +146,18 @@ export class RoverExecutor extends BaseExecutor {
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
 		try {
-			const roverPosition = await fetchRoverPosition(
-				accountId,
+			const roverPosition: Positions = await this.queryClient.queryContractSmart(
 				this.config.creditManagerAddress,
-				this.config.hiveEndpoint,
+				{ positions: { account_id: accountId } }
 			)
+			const updatedPositions = calculatePositionStateAfterPerpClosure(roverPosition, this.config.neutralAssetDenom)
 
 			// Find best collateral to claim
-			const bestCollateral: Collateral = this.findBestCollateral(roverPosition)
+			const bestCollateral: Collateral = this.findBestCollateral(updatedPositions)
+
 			// Find best debt to liquidate
 			const bestDebt: Debt = this.findBestDebt(
-				roverPosition.debts.map((debtAmount) => {
+				updatedPositions.debts.map((debtAmount) => {
 					return { amount: debtAmount.amount, denom: debtAmount.denom }
 				}),
 			)
@@ -171,12 +172,12 @@ export class RoverExecutor extends BaseExecutor {
 
 			// variables
 			const { borrow } = borrowActions[0] as { borrow: Coin }
-			const swapWinnings = this.prices.get(bestDebt.denom)!.multipliedBy(bestDebt.amount).toNumber() > 1000000
+			// const swapWinnings = true
 			const slippage =  process.env.SLIPPAGE ||  '0.005'
 
 			const liquidateAction = this.liquidationActionGenerator.produceLiquidationAction(
 				bestCollateral.type,
-				{ denom: bestDebt.denom, amount: (Number(borrow.amount) * 0.995).toFixed(0) },
+				{ denom: bestDebt.denom, amount: "0" },
 				roverPosition.account_id,
 				bestCollateral.denom,
 				bestCollateral.vaultType,
@@ -194,32 +195,27 @@ export class RoverExecutor extends BaseExecutor {
 				: []
 
 			const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
-
-			const swapToStableMsg =
-				borrow.denom !== this.config.neutralAssetDenom && swapWinnings
-					? [
-						await this.liquidationActionGenerator.generateSwapActions(
-							borrow.denom,
-							this.config.neutralAssetDenom,
-							this.prices.get(borrow.denom)!,
-							this.prices.get(this.config.neutralAssetDenom)!,
-							// todo optimize this. Right now we are estimating a min profit of 0.05% here.
-							// We can optimise, which means we are less vulnerable to slippage / sandwhich attacks,
-							// but the trade off here is that if our profit is less than 0.05% tx will fail.
-							// For safety, we should set this low for now.
-							new BigNumber(borrow.amount).multipliedBy(0.005).toFixed(0),
-							slippage,
-					)]
-					: []
-			const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
+			// todo estimate amount based on repay to prevent slippage.
+			// const swapToStableMsg = []
+				// borrow.denom !== this.config.neutralAssetDenom && swapWinnings
+				// 	? [
+				// 		await this.liquidationActionGenerator.generateSwapActions(
+				// 			borrow.denom,
+				// 			this.config.neutralAssetDenom,
+				// 			// todo estimate winnings
+				// 			'100',
+				// 			slippage
+				// 	)]
+				// 	: []
+			// const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
 
 			const actions = [
 				...borrowActions,
 				liquidateAction,
 				...collateralToDebtActions,
 				...repayMsg,
-				...swapToStableMsg,
-				refundAll,
+				// ...swapToStableMsg,
+				// refundAll,
 			]
 			if (process.env.DEBUG) {
 				actions.forEach((action) => console.log(JSON.stringify(action)))
@@ -278,7 +274,7 @@ export class RoverExecutor extends BaseExecutor {
 
 	ensureWorkerMinBalance = async(addresses: string[]) => {
 		try {
-			const balances = await fetchBalances(this.config.hiveEndpoint, addresses)
+			const balances = await fetchBalances(this.queryClient, addresses, this.config.gasDenom)
 			this.liquidatorBalances= balances
 			const sendMsgs : MsgSendEncodeObject[] = []
 			const amountToSend = this.config.minGasTokens * 2
@@ -334,28 +330,27 @@ export class RoverExecutor extends BaseExecutor {
 			// Periodically refresh the vaults we have
 			const currentTimeMs = Date.now()
 			if (this.lastFetchedVaultTime + this.VAULT_RELOAD_WINDOW < currentTimeMs) {
-				const vaultsData: VaultConfigBaseForString[] = await this.fetchVaults()
-				this.vaults = vaultsData.map((vaultData) => vaultData.addr)
 				this.lastFetchedVaultTime = currentTimeMs
 			}
 
-			// dispatch hive request and parse it
-			const roverData = await fetchRoverData(
-				this.config.hiveEndpoint,
-				this.config.liquidatorMasterAddress,
-				this.config.redbankAddress,
-				this.config.swapperAddress,
-				this.vaults,
-				this.config.marsParamsAddress,
-			)
+			// TODO
+			// // dispatch hive request and parse it
+			// const roverData = await fetchRoverData(
+			// 	this.config.hiveEndpoint,
+			// 	this.config.liquidatorMasterAddress,
+			// 	this.config.redbankAddress,
+			// 	this.config.swapperAddress,
+			// 	this.vaults,
+			// 	this.config.marsParamsAddress,
+			// )
 
 			await this.refreshMarketData()
 			await this.updatePriceSources()
 			await this.updateOraclePrices()
-
-			roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
-			this.vaultInfo = roverData.vaultInfo
+			// roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
+			// this.vaultInfo = roverData.vaultInfo
 		} catch(ex) {
+			console.error('Failed to refresh data')
 			console.error(JSON.stringify(ex))
 		}
 	}
@@ -402,7 +397,7 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	findBestCollateral = (positions: Positions): Collateral => {
-		
+
 		const largestDeposit = positions
 				.deposits
 				.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
@@ -417,7 +412,7 @@ export class RoverExecutor extends BaseExecutor {
 				.staked_astro_lps
 				.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
 				.pop()
-		
+
 		const largestCollateralVault = positions.vaults
 			.sort(
 				(vaultA, vaultB) =>
@@ -469,7 +464,6 @@ export class RoverExecutor extends BaseExecutor {
 
 	calculateCoinValue = (coin: Coin | undefined): number => {
 		if (!coin) return 0
-
 		const amountBn = new BigNumber(coin.amount)
 		const price = new BigNumber(this.prices.get(coin.denom) || 0)
 		return amountBn.multipliedBy(price).toNumber()

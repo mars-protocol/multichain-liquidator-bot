@@ -6,7 +6,7 @@
 	"license": "MIT",
 	"scripts": {
 		"test:integration": "yarn build && node build/test/redbank/integration/liquidationTest",
-	"test:rover-integration": "yarn build && node build/test/rover/integration/liquidationTest",
+		"test:rover-integration": "yarn build && node build/test/rover/integration/liquidationTest",
 		"build": "tsc",
 		"start": "yarn build && node build/src/main",
 		"test": "jest",
@@ -33,11 +33,12 @@
 		"csv-writer": "^1.6.0",
 		"dotenv": "^16.0.2",
 		"lodash": "^4.17.21",
-		"marsjs-types": "^1.0.6",
+		"marsjs-types": "2.0.2",
 		"osmojs": "^16.5.1",
 		"redis": "^4.3.0",
 		"request": "^2.88.2",
 		"requests": "^0.3.0",
+		"ts-jest": "^29.2.5",
 		"ts-node": "^10.9.1",
 		"uuid": "^9.0.0"
 	},

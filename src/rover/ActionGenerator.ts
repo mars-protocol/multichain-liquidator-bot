@@ -1,21 +1,21 @@
 import { MarketInfo } from './types/MarketInfo.js'
-import { Collateral, Debt, PositionType } from './types/RoverPosition.js'
+import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import {
 	Action,
 	Coin,
 	VaultPositionType,
 	SwapperRoute,
 	LiquidateRequestForVaultBaseForString,
-} from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+} from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
 import {
 	POOL_NOT_FOUND,
 	UNSUPPORTED_VAULT,
-} from './constants/errors.js'
-import { queryAstroportLpUnderlyingTokens } from '../helpers.js'
-import { VaultInfo } from '../query/types.js'
-import { PoolType, XYKPool } from '../types/Pool.js'
-import { RouteRequester } from '../query/routing/RouteRequesterInterface.js'
+} from './constants/errors'
+import { queryAstroportLpUnderlyingTokens } from '../helpers'
+import { VaultInfo } from '../query/types'
+import { PoolType, XYKPool } from '../types/Pool'
+import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 
 export class ActionGenerator {
 
@@ -45,19 +45,23 @@ export class ActionGenerator {
 		//@ts-ignore - to be used for todos in method
 		markets: MarketInfo[],
 	): Action[] => {
-		// estimate our debt to repay - this depends on collateral amount and close factor
-		let maxRepayValue = new BigNumber(collateral.value * collateral.closeFactor)
-		const maxDebtValue = debt.price.multipliedBy(debt.amount)
-		const debtCeiling = new BigNumber(1000000000)
-		if (maxDebtValue.isGreaterThan(debtCeiling)) {
-			maxRepayValue = debtCeiling
+		// TODO
+		if (false) {
+			console.log(collateral)
 		}
-		const debtToRepayRatio = maxDebtValue <= maxRepayValue ? new BigNumber(1) : maxRepayValue.dividedBy(maxDebtValue)
+		// estimate our debt to repay - this depends on collateral amount and close factor
+		// let maxRepayValue = new BigNumber(collateral.value * collateral.closeFactor)
+		// const maxDebtValue = debt.price.multipliedBy(debt.amount)
+		// const debtCeiling = new BigNumber(1000000000)
+		// if (maxDebtValue.isGreaterThan(debtCeiling)) {
+		// 	maxRepayValue = debtCeiling
+		// }
+		// const debtToRepayRatio = maxDebtValue <= maxRepayValue ? new BigNumber(1) : maxRepayValue.dividedBy(maxDebtValue)
 
-		// debt amount is a number, not a value (e.g in dollar / base asset denominated terms)
-		let debtAmount = debtToRepayRatio.multipliedBy(debt.amount)
+		// // debt amount is a number, not a value (e.g in dollar / base asset denominated terms)
+		// let debtAmount = debtToRepayRatio.multipliedBy(debt.amount)
 		const debtCoin: Coin = {
-			amount: debtAmount.toFixed(0),
+			amount: debt.amount.toFixed(0),
 			denom: debt.denom,
 		}
 

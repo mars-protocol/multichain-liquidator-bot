@@ -1,6 +1,6 @@
 import { Position } from '../types/position'
 import fetch from 'cross-fetch'
-import { Coin, Positions } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+import { Coin, Positions } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import { MarketInfo } from '../rover/types/MarketInfo'
 import { NO_ROVER_DATA } from '../rover/constants/errors'
 import BigNumber from 'bignumber.js'
@@ -10,16 +10,16 @@ import {
 	produceVaultQuery,
 } from './queries/rover'
 import { REDEEM_BASE } from '../constants'
-import { produceBalanceQuery, produceRedbankGeneralQuery, produceUserPositionQuery } from './queries/redbank'
+import { produceRedbankGeneralQuery, produceUserPositionQuery } from './queries/redbank'
 import {
 	CoreDataResponse,
 	DataResponse,
-	LiquidatorBalanceResponse,
 	RoverData,
 	VaultDataResponse,
 	VaultInfo,
 	VaultInfoWasm,
 } from './types'
+import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 
 const produceVaultInfo = (vaultResponseData: VaultDataResponse): VaultInfo => {
 	// get the keys - note that our keys will either be the vault address (for the bank module) or 'wasm' for the wasm module
@@ -132,6 +132,8 @@ export const fetchRoverPosition = async (
 		}
 	}
 
+	
+
 	return result.data.wasm.position
 }
 
@@ -155,27 +157,22 @@ export const fetchRedbankBatch = async (
 	return (await response.json()) as DataResponse[]
 }
 
-export const fetchBalances = async (hiveEndpoint: string, addresses: string[]) : Promise<Map<string, Coin[]>> => {
+export const fetchBalances = async (
+	client: CosmWasmClient,
+	addresses: string[],
+	gasDenom: string
+) : Promise<Map<string, Coin[]>> => {
 
-	const queries = addresses.map((address) => {
-		return {
-			query: produceBalanceQuery(address),
-		}
+	const promises = addresses.map(async (address) => {
+		return {address, coin: await client.getBalance(address, gasDenom)}
 	})
 
-	const response = await fetch(hiveEndpoint, {
-		method: 'post',
-		body: JSON.stringify(queries),
-		headers: { 'Content-Type': 'application/json' },
-	})
+	const balances = await Promise.all(promises)
+	const balancesMap : Map<string, Coin[]> = new Map()
 
-	const resultJson = await response.json() as {data : LiquidatorBalanceResponse} []
-	const balancesMap : Map<string, Coin[]>= new Map()
-	
-	resultJson.forEach((result) => {
-		const liquidatorAddress : string = Object.keys(result.data).pop()!
-		const coins : Coin[] = result.data[liquidatorAddress].balance
-		balancesMap.set(liquidatorAddress, coins)
+	balances.forEach((balance) => {
+		// @ts-ignore
+		balancesMap.set(balance.address, [balance.coin])
 	})
 
 	return balancesMap

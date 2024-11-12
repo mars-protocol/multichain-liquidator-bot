@@ -15,7 +15,7 @@
 		"forceConsistentCasingInFileNames": true,
 		"strict": true,
 		"noEmit": false,
-		"moduleResolution": "node",
+		"moduleResolution": "NodeNext",
 		"isolatedModules": true,
 		"resolveJsonModule": true,
 		"noUnusedLocals": true,
@@ -23,7 +23,6 @@
 		"noImplicitReturns": true,
 		"noImplicitThis": true,
 		"strictNullChecks": true,
-		"suppressImplicitAnyIndexErrors": true,
 		"allowSyntheticDefaultImports": true,
 		"skipLibCheck": true
 	},

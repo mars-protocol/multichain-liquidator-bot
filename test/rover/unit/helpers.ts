@@ -1,7 +1,8 @@
 import {
 	UserDebtResponse,
-} from 'marsjs-types/redbank/generated/mars-red-bank/MarsRedBank.types'
+} from 'marsjs-types/mars-red-bank/MarsRedBank.types'
 import { MarketInfo } from '../../../src/rover/types/MarketInfo'
+import { PerpPosition } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 
 export const generateRandomMarket = (denom?: string): MarketInfo => {
 	return {
@@ -35,4 +36,41 @@ export const generateRandomCreditLine = (
 		denom,
 		uncollateralized: true,
 	}
+}
+
+export const generateBlankPerpPositionWithPnl = (
+	baseDenom: string,
+	perpDenom: string,
+	pnl: string
+): PerpPosition => {
+
+	const unrealizedPnl = {
+		accrued_funding: '0',
+		closing_fee: '0',
+		opening_fee: '0',
+		pnl: pnl,
+		price_pnl: '0',
+	}
+
+	const realizedPnl = {
+		accrued_funding: '0',
+		closing_fee: '0',
+		opening_fee: '0',
+		pnl: '0',
+		price_pnl: '0',
+	}
+
+	const perpPosition = {
+		denom: perpDenom,
+		base_denom: baseDenom,
+		current_exec_price: '0',
+		current_price: '0',
+		entry_exec_price: '0',
+		entry_price: '0',
+		realized_pnl: realizedPnl,
+		size: '0',
+		unrealized_pnl: unrealizedPnl,
+	}
+
+	return perpPosition
 }

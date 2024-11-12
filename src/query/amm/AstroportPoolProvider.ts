@@ -50,13 +50,14 @@ export class AstroportPoolProvider implements PoolDataProvider {
                     body: JSON.stringify(poolQueries),
                 });
          
-                const responseData : PoolResponseData[] =await response.json()
+                const responseData : PoolResponseData[] = await response.json()
         
                 return responseData.map((poolResponse, index) => {
         
                     // Our address is our key. We add this in to our graphql queries so we can identify the correct pool
                     const address : string = Object.keys(poolResponse.data)[0]
         
+                    //@ts-ignore
                     const queryData : ContractQueryPool = poolResponse.data[address]!.contractQuery
                     const poolAssets = this.producePoolAssets(queryData.assets)
                     const pool : XYKPool = {
