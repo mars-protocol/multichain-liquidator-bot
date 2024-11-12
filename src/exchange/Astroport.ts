@@ -46,7 +46,6 @@ export class AstroportCW implements Exchange {
             },
         }
 
-        // console.log(JSON.stringify(msg))
         return produceExecuteContractMessage(
             sender,
             this.astroportRouterContract,

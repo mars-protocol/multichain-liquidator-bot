@@ -9,6 +9,7 @@ export const getConfig = (
 		return {
 			gasDenom: 'uosmo',
 			chainName: "osmosis",
+			productName: "creditmanager",
 			hiveEndpoint: process.env.HIVE_ENDPOINT!,
 			lcdEndpoint: process.env.LCD_ENDPOINT!,
 			neutralAssetDenom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4',
@@ -35,6 +36,7 @@ export const getConfig = (
 	return {
 		gasDenom: 'uosmo',
 		chainName : "osmosis",
+		productName: "creditmanager",
 		hiveEndpoint: process.env.HIVE_ENDPOINT!,
 		lcdEndpoint: process.env.LCD_ENDPOINT!,
 		neutralAssetDenom: 'uosmo', // no usdc pools on testnet so we use osmo

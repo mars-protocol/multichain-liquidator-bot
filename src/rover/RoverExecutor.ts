@@ -1,4 +1,4 @@
-import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
+import { BaseExecutor, BaseConfig as BaseConfig } from '../BaseExecutor'
 import { calculatePositionStateAfterPerpClosure, produceExecuteContractMessage, produceSendMessage, sleep } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
 import { fetchBalances } from '../query/hive'
@@ -24,7 +24,7 @@ interface CreateCreditAccountResponse {
 	liquidatorAddress : string
 }
 
-export interface RoverExecutorConfig extends BaseExecutorConfig {
+export interface RoverExecutorConfig extends BaseConfig {
 	creditManagerAddress: string
 	swapperAddress: string
 	accountNftAddress: string
@@ -82,25 +82,18 @@ export class RoverExecutor extends BaseExecutor {
 
 		// We set up 3 separate tasks to run in parallel
 		//
-		// Refresh the data such as pool data, vaults,
+		// Periodically  fetch the different pieces of data we need,
 		setInterval(this.refreshData, 30*1000)
 		// Ensure our liquidator wallets have more than enough funds to operate
 		setInterval(this.updateLiquidatorBalances, 20*1000)
 		// check for and dispatch liquidations
-		while (true) {
-			await sleep(200)
-			try {
-				await this.run()
-			} catch(ex) {
-				console.error(ex)
-			}
-		}
+		setInterval(this.run, 1000)
 	}
 
 	run = async () => {
 
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-		const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=neutron&product=creditmanager`
+		const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=${this.config.chainName}&product=${this.config.productName}`
 
 		const response = await fetch(url);
 		let targetAccountObjects: {
@@ -144,6 +137,7 @@ export class RoverExecutor extends BaseExecutor {
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
 		try {
+			// TODO mock query
 			const roverPosition: Positions = await this.queryClient.queryContractSmart(
 				this.config.creditManagerAddress,
 				{ positions: { account_id: accountId } }

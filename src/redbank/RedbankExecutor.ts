@@ -11,11 +11,11 @@ import 'dotenv/config.js'
 import { fetchRedbankBatch } from '../query/hive'
 
 import BigNumber from 'bignumber.js'
-import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
+import { BaseExecutor, BaseConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
-import { Exchange } from '../execute/ExchangeInterface.js'
+import { Exchange } from '../exchange/ExchangeInterface.js'
 
 import { calculateCollateralRatio, calculateLiquidationBonus, calculateMaxDebtRepayable, getLiquidationThresholdHealthFactor } from './LiquidationHelpers'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
@@ -23,8 +23,7 @@ import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.type
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
-export interface RedbankExecutorConfig extends BaseExecutorConfig {
-	liquidationFiltererAddress: string
+export interface RedbankExecutorConfig extends BaseConfig {
 	safetyMargin: number
 	liquidationProfitMarginPercent: number
 }
@@ -397,21 +396,6 @@ export class RedbankExecutor extends BaseExecutor {
 		)
 	}
 
-	executeViaFilterer = (
-		txs: LiquidationTx[],
-		debtCoins: Coin[],
-	): MsgExecuteContractEncodeObject => {
-
-		const msg = toUtf8(JSON.stringify({ liquidate_many: { liquidations: txs } }))
-
-		return produceExecuteContractMessage(
-			this.config.liquidatorMasterAddress,
-			this.config.liquidationFiltererAddress,
-			msg,
-			debtCoins,
-		)
-	}
-
 	async run(): Promise<void> {
 		const liquidatorAddress = this.config.liquidatorMasterAddress
 
@@ -485,9 +469,7 @@ export class RedbankExecutor extends BaseExecutor {
 			// When using the liquidation filterer contract, transactions with no successfull liquidations
 			// will still succeed, meaning that we will still swap to the debt and have to swap back again.
 			// If liquidating via redbank, unsucessfull liquidations will error, preventing the swap
-			const execute: MsgExecuteContractEncodeObject =
-				// index [0] is safe as we know the length is 1 from the conditional
-				txs.length == 1 ? this.executeViaRedbankMsg(txs[0]) : this.executeViaFilterer(txs, debtCoins)
+			const execute: MsgExecuteContractEncodeObject = this.executeViaRedbankMsg(txs[0])
 			firstMsgBatch.push(execute)
 
 			if (!firstMsgBatch || firstMsgBatch.length === 0 || txs.length === 0) continue

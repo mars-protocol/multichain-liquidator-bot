@@ -7,11 +7,11 @@ import { RedbankExecutor, RedbankExecutorConfig } from './redbank/RedbankExecuto
 import { RoverExecutor, RoverExecutorConfig } from './rover/RoverExecutor.js'
 import { getSecretManager } from './secretManager.js'
 import { Network } from './types/network.js'
-import { Exchange } from './execute/ExchangeInterface.js'
-import { Osmosis } from './execute/Osmosis.js'
-import { getConfig } from './redbank/config/getConfig.js'
+import { Exchange } from './exchange/ExchangeInterface.js'
+import { Osmosis } from './exchange/Osmosis.js'
+import { getRedbankConfig } from './redbank/config/getConfig.js'
 import { getConfig as getRoverConfig } from './rover/config/getConfig.js'
-import { AstroportCW } from './execute/AstroportCW.js'
+import { AstroportCW } from './exchange/Astroport.js'
 import { AstroportRouteRequester } from './query/routing/AstroportRouteRequester.js'
 import { OsmosisRouteRequester } from './query/routing/OsmosisRouteRequester.js'
 import { RouteRequester } from './query/routing/RouteRequesterInterface.js'
@@ -23,6 +23,8 @@ export const main = async () => {
 
 	// Define if we are launching a rover executor or a redbank executor
 	const executorType = process.env.EXECUTOR_TYPE!
+
+	// get config
 
 	const sm = getSecretManager()
 	// produce paths for the number of addresses we want under our seed
@@ -41,14 +43,14 @@ export const main = async () => {
 	})
 	const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
 
+	// Produce config
+	const network  = process.env.NETWORK === "MAINNET" ? Network.MAINNET : process.env.NETWORK === "TESTNET" ? Network.TESTNET : Network.LOCALNET
+	const redbankConfig = getRedbankConfig(liquidatorMasterAddress, network, chainName)
+	const roverConfig = getRoverConfig(liquidatorMasterAddress, network, chainName)
+
 	// Produce clients
 	const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!)
 	const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
-	const networkEnv = process.env.NETWORK || "LOCALNET"
-	const network  = networkEnv === "MAINNET" ? Network.MAINNET : networkEnv === "TESTNET" ? Network.TESTNET : Network.LOCALNET
-
-	const redbankConfig = getConfig(liquidatorMasterAddress, network, chainName)
-	const roverConfig = getRoverConfig(liquidatorMasterAddress, network, chainName)
 
 	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
 	const routeRequester = chainName === "neutron" ? new AstroportRouteRequester(process.env.ASTROPORT_API_URL!) : new OsmosisRouteRequester(process.env.API_URL!)

@@ -7,9 +7,9 @@ export const getConfig = (
 ): RedbankExecutorConfig => {
 	return network === Network.MAINNET
 		? {
-				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
 				safetyMargin: 0.05,
 				chainName: "osmosis",
+				productName: "redbank",
 				lcdEndpoint: process.env.LCD_ENDPOINT!, // use env vars in order to be able to quickly change
 				gasDenom: 'uosmo',
 				hiveEndpoint: process.env.HIVE_ENDPOINT!,
@@ -25,8 +25,8 @@ export const getConfig = (
 				sqsUrl: process.env.SQS_URL!,
 		  }
 		: {
-				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!,
 				chainName: "osmosis",
+				productName: "redbank",
 				safetyMargin: 0.05,
 				lcdEndpoint: process.env.LCD_ENDPOINT!,
 				gasDenom: 'uosmo',

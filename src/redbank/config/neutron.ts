@@ -8,7 +8,7 @@ export const getConfig = (
 	return network === Network.MAINNET
 		? {
 				chainName: "neutron",
-				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!, // todo hardcode here
+				productName: "redbank",
 				safetyMargin: 0.05,
 				astroportRouter: "neutron1rwj6mfxzzrwskur73v326xwuff52vygqk73lr7azkehnfzz5f5wskwekf4",
 				lcdEndpoint: process.env.LCD_ENDPOINT!, // use env vars in order to be able to quickly change
@@ -26,9 +26,9 @@ export const getConfig = (
 				astroportFactory : 'neutron1hptk0k5kng7hjy35vmh009qd5m6l33609nypgf2yc6nqnewduqasxplt4e'
 		  }
 		: {
-			liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!, // todo hardcode here
 			safetyMargin: 0.05,
 			chainName: "neutron",
+			productName: "redbank",
 			lcdEndpoint: process.env.LCD_ENDPOINT!, // use env vars in order to be able to quickly change
 			gasDenom: 'untrn',
 			hiveEndpoint: process.env.HIVE_ENDPOINT!,

@@ -16,9 +16,10 @@ import { PythPriceFetcher } from './query/oracle/PythPriceFetcher'
 import { OraclePrice } from './query/oracle/PriceFetcherInterface'
 import { PriceSourceResponse } from './types/oracle'
 
-export interface BaseExecutorConfig {
+export interface BaseConfig {
 	lcdEndpoint: string
 	chainName: string
+	productName: string
 	hiveEndpoint: string
 	oracleAddress: string
 	redbankAddress: string
@@ -62,7 +63,7 @@ export class BaseExecutor {
 	])
 
 	constructor(
-		public config: BaseExecutorConfig,
+		public config: BaseConfig,
 		public client: SigningStargateClient,
 		public queryClient: CosmWasmClient,
 		public routeRequester: RouteRequester,

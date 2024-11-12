@@ -1,14 +1,16 @@
 import { Network } from '../../types/network'
-import { RoverExecutorConfig } from '../RoverExecutor'
+import { RoverExecutorConfig as CreditManagerConfig } from '../RoverExecutor'
 
 export const getConfig = (
 	liquidatorMasterAddress: string,
 	network: Network,
-): RoverExecutorConfig => {
+): CreditManagerConfig => {
 	if (network === Network.MAINNET) {
 		return {
 			gasDenom: 'untrn',
 			chainName: "neutron",
+			// Rover is called creditmanager in the api
+			productName: "creditmanager",
 			hiveEndpoint: process.env.HIVE_ENDPOINT!,
 			lcdEndpoint: process.env.LCD_ENDPOINT!,
 			neutralAssetDenom: 'ibc/B559A80D62249C8AA07A380E2A2BEA6E5CA9A6F079C912C3A9E9B494105E4F81',
@@ -35,6 +37,7 @@ export const getConfig = (
 	return {
 		gasDenom: 'untrn',
 		chainName : "neutron",
+		productName: "creditmanager",
 		hiveEndpoint: process.env.HIVE_ENDPOINT!,
 		lcdEndpoint: process.env.LCD_ENDPOINT!,
 		neutralAssetDenom: 'factory/neutron1ke0vqqzyymlp5esr8gjwuzh94ysnpvj8er5hm7/UUSDC', // no usdc pools on testnet so we use osmo
@@ -51,7 +54,6 @@ export const getConfig = (
 		maxLiquidators: process.env.MAX_LIQUIDATORS ? parseInt(process.env.MAX_LIQUIDATORS) : 1,
 		stableBalanceThreshold : 5000000,
 		marsEndpoint:"https://testnet-api.marsprotocol.io",
-
 		sqsUrl: "https://sqs.osmosis.zone/"
 	}
 }
