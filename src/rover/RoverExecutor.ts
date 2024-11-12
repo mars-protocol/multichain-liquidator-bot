@@ -114,7 +114,7 @@ export class RoverExecutor extends BaseExecutor {
 		const  targetAccounts = targetAccountObjects.filter(
 			(account) =>
 				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
-				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
+				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV)
 				// To target specific accounts, filter here
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
@@ -137,7 +137,7 @@ export class RoverExecutor extends BaseExecutor {
 			for (const account of chunk) {
 				const nextLiquidator = liquidatorAddressesIterator.next()
 				console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
-				liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value))
+				liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value!))
 			}
 			await Promise.all(liquidationPromises)
 			await sleep(4000)

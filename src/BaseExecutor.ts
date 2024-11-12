@@ -175,7 +175,6 @@ export class BaseExecutor {
 	}
 
 	updateOraclePrices = async () => {
-		console.log("Updating oracle prices")
 		try {
 			// Fetch all price sources
 			const priceResults : PromiseSettledResult<OraclePrice>[] = await Promise.allSettled(this.priceSources.map(async (priceSource) => await this.fetchOraclePrice(priceSource.denom)))
