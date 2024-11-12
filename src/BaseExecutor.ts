@@ -9,8 +9,6 @@ import { CSVWriter, Row } from './CsvWriter'
 
 import BigNumber from 'bignumber.js'
 import { fetchRedbankData } from './query/hive'
-import { PoolDataProvider } from './query/amm/PoolDataProviderInterface'
-import { AstroportPoolProvider } from './query/amm/AstroportPoolProvider'
 import { RouteRequester } from './query/routing/RouteRequesterInterface'
 import { sleep } from './helpers'
 import { OraclePriceFetcher as MarsOraclePriceFetcher } from './query/oracle/OraclePriceFetcher'
@@ -43,8 +41,6 @@ export interface BaseExecutorConfig {
  * @param config holds the neccessary configuration for the executor to operate
  */
 export class BaseExecutor {
-
-
 	private priceSources : PriceSourceResponse[] = []
 
 	private marsOraclePriceFetcher : MarsOraclePriceFetcher = new MarsOraclePriceFetcher(this.queryClient)
@@ -54,9 +50,6 @@ export class BaseExecutor {
 	public prices: Map<string, BigNumber> = new Map()
 	public balances: Map<string, number> = new Map()
 	public markets: MarketInfo[] = []
-
-	// variables
-	private poolsNextRefresh = 0
 
 	// logging
 	private csvLogger = new CSVWriter('./results.csv', [
@@ -72,16 +65,10 @@ export class BaseExecutor {
 		public config: BaseExecutorConfig,
 		public client: SigningStargateClient,
 		public queryClient: CosmWasmClient,
-		public poolProvider: PoolDataProvider,
 		public routeRequester: RouteRequester,
 		public ammRouter : AMMRouter = new AMMRouter(),
 	) {
 		console.log({config})
-	}
-
-	async initiateAstroportPoolProvider(): Promise<void> {
-		const astroportPoolProvider = this.poolProvider as AstroportPoolProvider;
-		await astroportPoolProvider.initiate()
 	}
 
 	applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {
@@ -255,19 +242,6 @@ export class BaseExecutor {
 		this.markets = markets.map((market: MarketInfo) =>
 			this.applyAvailableLiquidity(market),
 		)
-	}
-
-	refreshPoolData = async (prices: Map<string, number>, markets: MarketInfo[]) => {
-		const currentTime = Date.now()
-
-		if (this.poolsNextRefresh < currentTime) {
-
-			let pools = await this.poolProvider.loadPools()
-			pools = this.validatePools(pools, markets, prices)
-
-			this.ammRouter.setPools(pools)
-			this.poolsNextRefresh = Date.now() + this.config.poolsRefreshWindow
-		}
 	}
 
 	// Filter out pools that are invalid

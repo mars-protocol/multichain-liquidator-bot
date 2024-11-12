@@ -15,13 +15,11 @@ import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
-import { PoolDataProvider } from '../query/amm/PoolDataProviderInterface'
 import { Exchange } from '../execute/ExchangeInterface.js'
 
 import { calculateCollateralRatio, calculateLiquidationBonus, calculateMaxDebtRepayable, getLiquidationThresholdHealthFactor } from './LiquidationHelpers'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types'
-
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
@@ -52,11 +50,10 @@ export class RedbankExecutor extends BaseExecutor {
 		config: RedbankExecutorConfig,
 		client: SigningStargateClient,
 		queryClient: CosmWasmClient,
-		poolProvider: PoolDataProvider,
 		private exchangeInterface: Exchange,
 		routeRequester: RouteRequester
 	) {
-		super(config, client, queryClient, poolProvider, routeRequester)
+		super(config, client, queryClient, routeRequester)
 		this.config = config
 	}
 

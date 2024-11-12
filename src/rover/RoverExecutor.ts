@@ -17,7 +17,6 @@ import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/errors'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
-import { PoolDataProvider } from '../query/amm/PoolDataProviderInterface'
 import { QueryMsg, VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 interface CreateCreditAccountResponse {
@@ -52,10 +51,9 @@ export class RoverExecutor extends BaseExecutor {
 		client: SigningStargateClient,
 		queryClient: CosmWasmClient,
 		wallet: DirectSecp256k1HdWallet,
-		poolProvider: PoolDataProvider,
 		routeRequester: RouteRequester,
 	) {
-		super(config, client, queryClient, poolProvider, routeRequester)
+		super(config, client, queryClient, routeRequester)
 		this.config = config
 		this.liquidationActionGenerator = new ActionGenerator(routeRequester)
 		this.wallet = wallet
