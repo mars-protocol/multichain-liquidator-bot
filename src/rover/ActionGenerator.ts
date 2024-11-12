@@ -1,5 +1,5 @@
 import { MarketInfo } from './types/MarketInfo.js'
-import { Collateral, Debt, PositionType } from './types/RoverPosition.js'
+import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import {
 	Action,
 	Coin,
@@ -11,11 +11,11 @@ import BigNumber from 'bignumber.js'
 import {
 	POOL_NOT_FOUND,
 	UNSUPPORTED_VAULT,
-} from './constants/errors.js'
-import { queryAstroportLpUnderlyingTokens } from '../helpers.js'
-import { VaultInfo } from '../query/types.js'
-import { PoolType, XYKPool } from '../types/Pool.js'
-import { RouteRequester } from '../query/routing/RouteRequesterInterface.js'
+} from './constants/errors'
+import { queryAstroportLpUnderlyingTokens } from '../helpers'
+import { VaultInfo } from '../query/types'
+import { PoolType, XYKPool } from '../types/Pool'
+import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 
 export class ActionGenerator {
 
@@ -45,8 +45,10 @@ export class ActionGenerator {
 		//@ts-ignore - to be used for todos in method
 		markets: MarketInfo[],
 	): Action[] => {
-		console.log('debt', debt)
-		console.log('collateral', collateral)
+		// TODO
+		if (false) {
+			console.log(collateral)
+		}
 		// estimate our debt to repay - this depends on collateral amount and close factor
 		// let maxRepayValue = new BigNumber(collateral.value * collateral.closeFactor)
 		// const maxDebtValue = debt.price.multipliedBy(debt.amount)

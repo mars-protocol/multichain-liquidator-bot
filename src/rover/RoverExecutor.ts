@@ -1,7 +1,7 @@
 import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
-import { addPnlToPositions, produceExecuteContractMessage, produceSendMessage, sleep } from '../helpers'
+import { calculatePositionStateAfterPerpClosure, produceExecuteContractMessage, produceSendMessage, sleep } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
-import { fetchBalances, fetchRoverData } from '../query/hive'
+import { fetchBalances } from '../query/hive'
 import { ActionGenerator } from './ActionGenerator'
 import {
 	Coin,
@@ -20,7 +20,6 @@ import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { PoolDataProvider } from '../query/amm/PoolDataProviderInterface'
 import { QueryMsg, VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
-
 interface CreateCreditAccountResponse {
 	tokenId : number
 	liquidatorAddress : string
@@ -43,7 +42,6 @@ export class RoverExecutor extends BaseExecutor {
 	private liquidatorAccounts: Map<string, number> = new Map()
 	private liquidatorBalances : Map<string, Coin[]> = new Map()
 
-	private vaults: string[] = []
 	private vaultInfo: Map<string, VaultInfo> = new Map()
 	private lastFetchedVaultTime = 0
 
@@ -93,43 +91,35 @@ export class RoverExecutor extends BaseExecutor {
 		// check for and dispatch liquidations
 		while (true) {
 			await sleep(200)
-			await this.run()
+			try {
+				await this.run()
+			} catch(ex) {
+				console.error(ex)
+			}
 		}
 	}
 
 	run = async () => {
 
 		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-		// const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=neutron&product=creditmanager`
+		const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=neutron&product=creditmanager`
 
-		// const response = await fetch(url);
-		// let targetAccountObjects: {
-		// 	account_id: string,
-		// 	health_factor: string,
-		// 	total_debt: string
-		// }[] = (await response.json())['data']
-
-		const targetAccountObjects = []
-		let count = 1
-		while (targetAccountObjects.length <20) {
-			targetAccountObjects.push({
-				account_id: count.toString(),
-				health_factor: '0.9',
-				total_debt: '10000'
-			})
-			count += 1
-		}
+		const response = await fetch(url);
+		let targetAccountObjects: {
+			account_id: string,
+			health_factor: string,
+			total_debt: string
+		}[] = (await response.json())['data']
 
 		const  targetAccounts = targetAccountObjects.filter(
 			(account) =>
 				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
 				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
 				// To target specific accounts, filter here
-				// account.account_id === "1078" &&
-				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
 		// Sleep to avoid spamming.
+
 		if (targetAccounts.length == 0) {
 			await sleep(2000)
 			return
@@ -140,7 +130,6 @@ export class RoverExecutor extends BaseExecutor {
 		for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {
 			unhealthyAccountChunks.push(targetAccounts.slice(i, i + this.liquidatorAccounts.size))
 		}
-
 		// iterate over chunks and liquidate
 		for (const chunk of unhealthyAccountChunks) {
 			const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
@@ -157,19 +146,11 @@ export class RoverExecutor extends BaseExecutor {
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
 		try {
-			const roverPosition = await this.queryClient.queryContractSmart(
+			const roverPosition: Positions = await this.queryClient.queryContractSmart(
 				this.config.creditManagerAddress,
 				{ positions: { account_id: accountId } }
 			)
-			// const roverPosition = await fetchRoverPosition(
-			// 	accountId,
-			// 	this.config.creditManagerAddress,
-			// 	this.config.hiveEndpoint,
-			// )
-
-			console.log(JSON.stringify(roverPosition))
-			console.log(this.config.neutralAssetDenom)
-			const updatedPositions = addPnlToPositions(roverPosition, this.config.neutralAssetDenom) // todo make sure this is correct
+			const updatedPositions = calculatePositionStateAfterPerpClosure(roverPosition, this.config.neutralAssetDenom)
 
 			// Find best collateral to claim
 			const bestCollateral: Collateral = this.findBestCollateral(updatedPositions)
@@ -180,8 +161,6 @@ export class RoverExecutor extends BaseExecutor {
 					return { amount: debtAmount.amount, denom: debtAmount.denom }
 				}),
 			)
-
-			console.log(bestDebt)
 
 			//  - do message construction
 			// borrow messages will include the swap if we cannot borrow debt asset directly
@@ -198,7 +177,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			const liquidateAction = this.liquidationActionGenerator.produceLiquidationAction(
 				bestCollateral.type,
-				{ denom: bestDebt.denom, amount: (Number(borrow.amount) * 0.995).toFixed(0) },
+				{ denom: bestDebt.denom, amount: "0" },
 				roverPosition.account_id,
 				bestCollateral.denom,
 				bestCollateral.vaultType,
@@ -351,28 +330,27 @@ export class RoverExecutor extends BaseExecutor {
 			// Periodically refresh the vaults we have
 			const currentTimeMs = Date.now()
 			if (this.lastFetchedVaultTime + this.VAULT_RELOAD_WINDOW < currentTimeMs) {
-				const vaultsData: VaultConfigBaseForString[] = await this.fetchVaults()
-				this.vaults = vaultsData.map((vaultData) => vaultData.addr)
 				this.lastFetchedVaultTime = currentTimeMs
 			}
 
-			// dispatch hive request and parse it
-			const roverData = await fetchRoverData(
-				this.config.hiveEndpoint,
-				this.config.liquidatorMasterAddress,
-				this.config.redbankAddress,
-				this.config.swapperAddress,
-				this.vaults,
-				this.config.marsParamsAddress,
-			)
+			// TODO
+			// // dispatch hive request and parse it
+			// const roverData = await fetchRoverData(
+			// 	this.config.hiveEndpoint,
+			// 	this.config.liquidatorMasterAddress,
+			// 	this.config.redbankAddress,
+			// 	this.config.swapperAddress,
+			// 	this.vaults,
+			// 	this.config.marsParamsAddress,
+			// )
 
 			await this.refreshMarketData()
 			await this.updatePriceSources()
 			await this.updateOraclePrices()
-
-			roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
-			this.vaultInfo = roverData.vaultInfo
+			// roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
+			// this.vaultInfo = roverData.vaultInfo
 		} catch(ex) {
+			console.error('Failed to refresh data')
 			console.error(JSON.stringify(ex))
 		}
 	}
@@ -486,7 +464,6 @@ export class RoverExecutor extends BaseExecutor {
 
 	calculateCoinValue = (coin: Coin | undefined): number => {
 		if (!coin) return 0
-
 		const amountBn = new BigNumber(coin.amount)
 		const price = new BigNumber(this.prices.get(coin.denom) || 0)
 		return amountBn.multipliedBy(price).toNumber()
