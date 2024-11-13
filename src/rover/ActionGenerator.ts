@@ -3,9 +3,10 @@ import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import {
 	Action,
 	Coin,
-	VaultPositionType,
 	SwapperRoute,
 	LiquidateRequestForVaultBaseForString,
+	Positions,
+	DebtAmount,
 } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
 import {
@@ -24,6 +25,78 @@ export class ActionGenerator {
 	constructor(routeRequester: RouteRequester) {
 		this.routeRequester = routeRequester
 	}
+
+	generateLiquidationActions = async (
+		account: Positions,
+		oraclePrices: Map<string, BigNumber>,
+		redbankMarkets: MarketInfo[],
+	) => {
+		
+		// Find highest value collateral. Note that is merely the largest collateral by oracle price.
+		// TODO: We should be taking into account the close factor and underlying market liquidity
+		const collateral: Collateral = this.findHighestValueCollateral(account, oraclePrices)
+
+		// Find best debt to liquidate
+		const debt = this.findBestDebt(account.debts, oraclePrices)
+
+		// borrow messages will include the swap if we cannot borrow debt asset directly
+		const borrowActions = this.produceBorrowActions(
+			debt,
+			collateral,
+			redbankMarkets,
+		)
+
+		// variables
+		const { borrow } = borrowActions[0] as { borrow: Coin }
+
+		const slippage =  process.env.SLIPPAGE ||  '0.005'
+
+		const liquidateAction = this.produceLiquidationAction(
+			collateral.type,
+			{ denom: debt.denom, amount: "0" },
+			account.account_id,
+			collateral.denom,
+		)
+
+		const collateralToDebtActions = collateral.denom !== borrow.denom
+			? await this.swapCollateralCoinToDebtActions(
+				collateral.denom,
+				borrow,
+				slippage,
+				oraclePrices
+			)
+			: []
+
+		const repayMsg = this.generateRepayActions(borrow.denom)
+		// todo estimate amount based on repay to prevent slippage.
+		// const swapToStableMsg = []
+			// borrow.denom !== this.config.neutralAssetDenom && swapWinnings
+			// 	? [
+			// 		await this.liquidationActionGenerator.generateSwapActions(
+			// 			borrow.denom,
+			// 			this.config.neutralAssetDenom,
+			// 			// todo estimate winnings
+			// 			'100',
+			// 			slippage
+			// 	)]
+			// 	: []
+		// const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
+
+		const actions = [
+			...borrowActions,
+			liquidateAction,
+			...collateralToDebtActions,
+			...repayMsg,
+			// ...swapToStableMsg,
+			// refundAll,
+		]
+		if (process.env.DEBUG) {
+			actions.forEach((action) => console.log(JSON.stringify(action)))
+		}
+
+		return actions
+	}
+
 
 	/**
 	 * Produce the borrow actions.
@@ -191,18 +264,6 @@ export class ActionGenerator {
 		return [this.produceRepayAction(debtDenom)]
 	}
 
-	convertCollateralToDebt = async (
-		collateralDenom: string,
-		borrow: Coin,
-		vault: VaultInfo | undefined,
-		slippage: string,
-		prices: Map<string, BigNumber>,
-	): Promise<Action[]> => {
-		return vault !== undefined
-			? await this.produceVaultToDebtActions(vault!, borrow, slippage, prices)
-			: await this.swapCollateralCoinToDebtActions(collateralDenom, borrow, slippage, prices)
-	}
-
 	/**
 	 * Swap the collateral we won to repay the debt we borrowed. This method calculates the
 	 * best route and returns an array of swap actions (on action per route hop) to execute
@@ -286,13 +347,12 @@ export class ActionGenerator {
 		debtCoin: Coin,
 		liquidateeAccountId: string,
 		requestCoinDenom: string,
-		vaultPositionType?: VaultPositionType,
 	) : Action => {
 		return { 
 			liquidate: {
 				debt_coin: debtCoin,
 				liquidatee_account_id: liquidateeAccountId,
-				request: this.produceLiquidationRequest(positionType, requestCoinDenom,vaultPositionType)
+				request: this.produceLiquidationRequest(positionType, requestCoinDenom)
 			},
 		}
 	}
@@ -300,20 +360,12 @@ export class ActionGenerator {
 	private produceLiquidationRequest = (
 		positionType: PositionType,
 		collateralRequestDenom: string,
-		vaultPositionType?: VaultPositionType,
 	): LiquidateRequestForVaultBaseForString => {
 		switch (positionType) {
 			case PositionType.DEPOSIT:
 				return { deposit: collateralRequestDenom! }
 			case PositionType.LEND:
 				return { lend: collateralRequestDenom! }
-			case PositionType.VAULT:
-				return { 
-					vault : {
-						position_type: vaultPositionType!,
-						request_vault: { address: collateralRequestDenom }
-					}
-				}
 			case PositionType.STAKED_ASTRO_LP:
 				return { staked_astro_lp: collateralRequestDenom! }
 			default:
@@ -361,5 +413,63 @@ export class ActionGenerator {
 		}
 
 		return borrow
+	}
+
+	findHighestValueCollateral = (positions: Positions, oraclePrices: Map<string, BigNumber>): Collateral => {
+
+		// Combine all the users assets
+		const allCollaterals: Collateral[] = [
+			...positions.deposits.map((deposit) => {
+				return { 
+					type: PositionType.DEPOSIT,
+					value: new BigNumber(deposit.amount).multipliedBy(oraclePrices.get(deposit.denom) || 0),
+					amount: new BigNumber(deposit.amount),
+					denom: deposit.denom,
+				 }
+			}),
+			...positions.lends.map((lend) => {
+				return {
+					type: PositionType.LEND,
+					value: new BigNumber(lend.amount).multipliedBy(oraclePrices.get(lend.denom) || 0),
+					amount: new BigNumber(lend.amount),
+					denom: lend.denom,
+				}
+			}),
+			...positions.staked_astro_lps.map((stakedAstroLp) => {
+				return {
+					type: PositionType.STAKED_ASTRO_LP,
+					value: new BigNumber(stakedAstroLp.amount).multipliedBy(oraclePrices.get(stakedAstroLp.denom) || 0),
+					amount: new BigNumber(stakedAstroLp.amount),
+					denom: stakedAstroLp.denom,
+				}
+			}),
+			// add other collaterals here
+		]
+
+		if (allCollaterals.length === 0) throw new Error('Error: No collateral found')
+		
+		return allCollaterals
+				.sort((collateralA, collateralB) => collateralA.value.minus(collateralB.value).toNumber())
+				.pop()! 
+
+	}
+
+	calculateCoinValue = (coin: Coin, oraclePrice: BigNumber): number => {
+		const amountBn = new BigNumber(coin.amount)
+		return amountBn.multipliedBy(oraclePrice).toNumber()
+	}
+
+	findBestDebt = (debts: DebtAmount[], oraclePrices: Map<string, BigNumber>): Debt => {
+		if (debts.length === 0) throw new Error('Error: No debts found')
+		return debts
+					.map((debtAmount) => {
+						return { 
+							amount: new BigNumber(debtAmount.amount), 
+							denom: debtAmount.denom,
+							value: new BigNumber(debtAmount.amount).multipliedBy(oraclePrices.get(debtAmount.denom) || 0)
+						}
+					})
+					.sort((debtA, debtB) => debtA.value.minus(debtB.value).toNumber())
+					.pop()!
 	}
 }

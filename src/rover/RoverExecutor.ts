@@ -6,16 +6,10 @@ import { ActionGenerator } from './ActionGenerator'
 import {
 	Coin,
 	Positions,
-	VaultPosition,
-	VaultPositionType,
-	VaultUnlockingPosition,
 } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
-import { VaultInfo } from '../query/types'
 import BigNumber from 'bignumber.js'
-import { Collateral, Debt, PositionType } from './types/RoverPosition'
 import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
-import { UNSUPPORTED_ASSET, UNSUPPORTED_VAULT } from './constants/errors'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { QueryMsg, VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
@@ -41,7 +35,6 @@ export class RoverExecutor extends BaseExecutor {
 	private liquidatorAccounts: Map<string, number> = new Map()
 	private liquidatorBalances : Map<string, Coin[]> = new Map()
 
-	private vaultInfo: Map<string, VaultInfo> = new Map()
 	private lastFetchedVaultTime = 0
 
 	private wallet: DirectSecp256k1HdWallet
@@ -137,86 +130,23 @@ export class RoverExecutor extends BaseExecutor {
 
 	liquidate = async (accountId: string, liquidatorAddress : string) => {
 		try {
-			// TODO mock query
-			const roverPosition: Positions = await this.queryClient.queryContractSmart(
+			const account: Positions = await this.queryClient.queryContractSmart(
 				this.config.creditManagerAddress,
 				{ positions: { account_id: accountId } }
 			)
-			const updatedPositions = calculatePositionStateAfterPerpClosure(roverPosition, this.config.neutralAssetDenom)
 
-			// Find best collateral to claim
-			const bestCollateral: Collateral = this.findBestCollateral(updatedPositions)
+			const updatedAccount: Positions = calculatePositionStateAfterPerpClosure(account, this.config.neutralAssetDenom)
 
-			// Find best debt to liquidate
-			const bestDebt: Debt = this.findBestDebt(
-				updatedPositions.debts.map((debtAmount) => {
-					return { amount: debtAmount.amount, denom: debtAmount.denom }
-				}),
-			)
-
-			//  - do message construction
-			// borrow messages will include the swap if we cannot borrow debt asset directly
-			const borrowActions = this.liquidationActionGenerator.produceBorrowActions(
-				bestDebt,
-				bestCollateral,
-				this.markets,
-			)
-
-			// variables
-			const { borrow } = borrowActions[0] as { borrow: Coin }
-			// const swapWinnings = true
-			const slippage =  process.env.SLIPPAGE ||  '0.005'
-
-			const liquidateAction = this.liquidationActionGenerator.produceLiquidationAction(
-				bestCollateral.type,
-				{ denom: bestDebt.denom, amount: "0" },
-				roverPosition.account_id,
-				bestCollateral.denom,
-				bestCollateral.vaultType,
-			)
-			const vault = this.vaultInfo.get(bestCollateral.denom)
-
-			const collateralToDebtActions = bestCollateral.denom !== borrow.denom
-				? await this.liquidationActionGenerator.convertCollateralToDebt(
-					bestCollateral.denom,
-					borrow,
-					vault,
-					slippage,
-					this.prices
-				)
-				: []
-
-			const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
-			// todo estimate amount based on repay to prevent slippage.
-			// const swapToStableMsg = []
-				// borrow.denom !== this.config.neutralAssetDenom && swapWinnings
-				// 	? [
-				// 		await this.liquidationActionGenerator.generateSwapActions(
-				// 			borrow.denom,
-				// 			this.config.neutralAssetDenom,
-				// 			// todo estimate winnings
-				// 			'100',
-				// 			slippage
-				// 	)]
-				// 	: []
-			// const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
-
-			const actions = [
-				...borrowActions,
-				liquidateAction,
-				...collateralToDebtActions,
-				...repayMsg,
-				// ...swapToStableMsg,
-				// refundAll,
-			]
-			if (process.env.DEBUG) {
-				actions.forEach((action) => console.log(JSON.stringify(action)))
-			}
+			const actions = this.liquidationActionGenerator.generateLiquidationActions(updatedAccount, this.prices, this.markets)
 
 			const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
 
+			// Produce message 
 			const msg = {
-				update_credit_account: { account_id: liquidatorAccountId, actions },
+				update_credit_account: { 
+					account_id: liquidatorAccountId, 
+					actions 
+				},
 			}
 
 			const msgs : EncodeObject[] = [
@@ -227,7 +157,7 @@ export class RoverExecutor extends BaseExecutor {
 				),
 			]
 
-			// add msg to send liquidators STABLE balance to master address. This will only send previously accrued 
+			// Add a msg to send liquidators STABLE balance to master address. This will only send previously accrued 
 			// winnings, but not those from the current liquidation (if successfull)
 			const liquidatorBalances = this.liquidatorBalances.get(liquidatorAddress)
 			const stable = liquidatorBalances?.find((coin)=> coin.denom === this.config.neutralAssetDenom)
@@ -386,158 +316,5 @@ export class RoverExecutor extends BaseExecutor {
 		}
 
 		return { liquidatorAddress, tokenId: tokens[0] }
-	}
-
-	findBestCollateral = (positions: Positions): Collateral => {
-
-		const largestDeposit = positions
-				.deposits
-				.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
-				.pop()
-
-		const largestLend = positions
-				.lends
-				.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
-				.pop()
-
-		const largestStakedLp = positions
-				.staked_astro_lps
-				.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
-				.pop()
-
-		const largestCollateralVault = positions.vaults
-			.sort(
-				(vaultA, vaultB) =>
-					this.calculateVaultValue(vaultA).value - this.calculateVaultValue(vaultB).value,
-			)
-			.pop()
-
-		let bestCollateral: Coin | VaultPosition | undefined = largestDeposit
-		let positionType = PositionType.DEPOSIT
-		let vaultType = undefined
-
-		if 	(largestLend && this.calculateCoinValue(largestLend) > this.calculateCoinValue(bestCollateral)) {
-			positionType = PositionType.LEND
-			bestCollateral = largestLend
-		}
-
-		if 	(largestStakedLp && this.calculateCoinValue(largestStakedLp) > this.calculateCoinValue(bestCollateral)) {
-			positionType = PositionType.STAKED_ASTRO_LP
-			bestCollateral = largestStakedLp
-		}
-
-		if 	(largestCollateralVault) {
-			let vaultResult = this.calculateVaultValue(largestCollateralVault)
-			if (vaultResult.value > this.calculateCoinValue(bestCollateral)) {
-				positionType = PositionType.VAULT
-				bestCollateral = largestCollateralVault;
-				vaultType = vaultResult.type
-			}
-		}
-
-		if (!bestCollateral) throw new Error('Failed to find a collateral')
-
-		const denom = positionType === PositionType.VAULT 
-				? (bestCollateral as VaultPosition).vault.address
-				: (bestCollateral as Coin).denom
-		const amount = Number(bestCollateral.amount)
-		const value = this.prices.get(denom)?.multipliedBy(amount).toNumber() || 0
-
-		return {
-			amount,
-			value,
-			denom,
-			closeFactor: 0.5, // todo
-			price: this.prices.get(denom)?.toNumber() || 0,
-			type: positionType,
-			vaultType
-		}
-	}
-
-	calculateCoinValue = (coin: Coin | undefined): number => {
-		if (!coin) return 0
-		const amountBn = new BigNumber(coin.amount)
-		const price = new BigNumber(this.prices.get(coin.denom) || 0)
-		return amountBn.multipliedBy(price).toNumber()
-	}
-
-	calculateVaultSharesValue = (shares: BigNumber, vaultAddress: string): BigNumber => {
-		const vault = this.vaultInfo.get(vaultAddress)
-		if (!vault) throw new Error(UNSUPPORTED_VAULT)
-		const positionLpShares = shares.multipliedBy(vault.lpShareToVaultShareRatio)
-		const lpSharePrice = this.prices.get(vault.baseToken) || 0
-		if (lpSharePrice === 0) throw new Error(UNSUPPORTED_ASSET)
-		return positionLpShares.multipliedBy(lpSharePrice)
-	}
-
-	calculateVaultValue = (
-		vault: VaultPosition | undefined,
-	): { value: number; type: VaultPositionType } => {
-		if (!vault) return { value: 0, type: 'l_o_c_k_e_d' }
-
-		// VaultPositionAmounts can be either locking or unlocked, but we don't know what one
-		// until runtime, hence ts-ignore is used
-
-		//@ts-ignore
-		const vaultAmountLocked: BigNumber = new BigNumber(vault.amount.locking.locked)
-
-		//@ts-ignore
-		const vaultAmountUnlocked: BigNumber = new BigNumber(vault.amount.unlocked)
-
-		const unlockingAmounts: VaultUnlockingPosition[] = JSON.parse(
-			//@ts-ignore
-			JSON.stringify(vault.amount.locking.unlocking),
-		)
-
-		// Coin here will be an LP share
-		const largestUnlocking: Coin | undefined = unlockingAmounts
-			.sort(
-				(unlockA: VaultUnlockingPosition, unlockB: VaultUnlockingPosition) =>
-					this.calculateCoinValue(unlockA.coin) - this.calculateCoinValue(unlockB.coin),
-			)
-			.pop()?.coin
-
-		const safeLocked = vaultAmountLocked.isNaN() ? new BigNumber(0) : vaultAmountLocked
-		const safeUnlocked = vaultAmountUnlocked.isNaN() ? new BigNumber(0) : vaultAmountUnlocked
-
-		const vaultAmount = safeLocked.isGreaterThan(safeUnlocked)
-			? vaultAmountLocked
-			: vaultAmountUnlocked
-
-		let vaultType: VaultPositionType = safeLocked.isGreaterThan(safeUnlocked)
-			? 'l_o_c_k_e_d'
-			: 'u_n_l_o_c_k_e_d'
-
-		const largestVaultValue = this.calculateVaultSharesValue(vaultAmount, vault.vault.address)
-
-		const largestUnlockingValue = largestUnlocking
-			? new BigNumber(largestUnlocking.amount).multipliedBy(
-					this.prices.get(largestUnlocking.denom) || 0,
-			  )
-			: new BigNumber(0)
-
-		if (largestVaultValue.isNaN() || largestUnlockingValue.isGreaterThan(largestVaultValue)) {
-			vaultType = 'u_n_l_o_c_k_i_n_g'
-		}
-
-		const value = largestVaultValue.isGreaterThan(largestUnlockingValue)
-			? largestVaultValue.toNumber()
-			: largestUnlockingValue.toNumber()
-
-		return { value, type: vaultType }
-	}
-
-	findBestDebt = (debts: Coin[]): Debt => {
-		const largestDebt = debts
-			.sort((coinA, coinB) => this.calculateCoinValue(coinA) - this.calculateCoinValue(coinB))
-			.pop()
-
-		if (!largestDebt) throw new Error('Failed to find any debts')
-
-		return {
-			amount: Number((largestDebt as Coin).amount),
-			denom: (largestDebt as Coin).denom,
-			price: this.prices.get((largestDebt as Coin).denom)!,
-		}
 	}
 }

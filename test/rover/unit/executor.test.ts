@@ -1,8 +1,6 @@
 import {
-	Coin,
 	Positions,
 } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
-import { RoverExecutor } from '../../../src/rover/RoverExecutor'
 import { calculatePositionStateAfterPerpClosure } from '../../../src/helpers'
 import { generateBlankPerpPositionWithPnl } from './helpers'
 
@@ -266,51 +264,5 @@ describe('Rover Executor Tests', () => {
 			expect(details.lends[0].amount).toBe('0')
 			expect(details.lends[0].denom).toBe('uusd')
 		})
-	}),
-
-	describe('Find Best Collateral', () => {
-
-		test('Can find largest collateral when it is a coin', () => {
-			// construct multiple collaterals - coins and vaults
-			const collateral1: Coin = {
-				amount: '1500',
-				denom: 'testcoin1',
-			}
-
-			//@ts-ignore - parameters not used for testing - todo move to helper / logic class
-			const executor = new RoverExecutor({}, {}, {})
-			const collateralState = executor.findBestCollateral({
-				account_id: "1",
-				account_kind: "default",
-				debts: [],
-				deposits: [collateral1],
-				lends: [],
-				staked_astro_lps: [],
-				vaults: [],
-				perps: []
-			})
-
-			expect(collateralState.amount).toBe(1500)
-			// find
-			// ensure its the correct one
-		})
-	}),
-	test('Can find largest debt', () => {
-		// construct multiple collaterals - coins and vaults
-		const debt1: Coin = {
-			amount: '1500',
-			denom: 'testcoin1',
-		}
-
-		const debt2: Coin = {
-			amount: '1500',
-			denom: 'testcoin1',
-		}
-
-		//@ts-ignore - parameters not used for testing
-		const executor = new RoverExecutor({}, {}, {})
-		const bestDebt = executor.findBestDebt([debt1, debt2])
-
-		expect(bestDebt.amount).toBe(1500)
 	})
 })
