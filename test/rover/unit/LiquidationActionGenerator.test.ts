@@ -1,348 +1,140 @@
-// import { AMMRouter } from '../../../src/AmmRouter'
-// import { ActionGenerator } from '../../../src/rover/ActionGenerator'
-// import { MarketInfo } from '../../../src/rover/types/MarketInfo'
-// import {
-// 	generateRandomMarket,
-// } from './helpers'
-// import {
-// 	Coin,
-// 	Decimal,
-// } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
-// import { Collateral, Debt, PositionType } from '../../../src/rover/types/RoverPosition'
-// import { PoolType, XYKPool } from '../../../src/types/Pool'
-// import Long from 'long'
-// import { NO_ROUTE_FOR_SWAP } from '../../../src/rover/constants/errors'
-// import BigNumber from 'bignumber.js'
+import { Action, Coin } from "marsjs-types/mars-credit-manager/MarsCreditManager.types";
+import { RouteRequester } from "../../../src/query/routing/RouteRequesterInterface";
+import { ActionGenerator } from "../../../src/rover/ActionGenerator";
+import { StateMock } from "../mocks/stateMock";
+import Long from "long";
+import { Pool } from "../../../src/types/Pool";
 
-// describe('Liquidation Actions generator Unit Tests', () => {
-// 	const router: AMMRouter = new AMMRouter()
-// 	const debtDenom = Math.random().toString()
-// 	const collateralDenom = Math.random().toString()
-// 	const otherDenom = Math.random().toString()
+describe(('Liquidation Action Generator Tests'), () => {
 
-// 	const debtToRandomAssetPrice = 1.5
+    let mock = StateMock.default()
 
-// 	const randomAssetAmount = 10000000000
+    const mockRouteRequester: jest.Mocked<RouteRequester> = {
+        requestRoute: jest.fn(),
+        apiUrl: 'http://localhost:8080',
+    };
 
-// 	const poolA: XYKPool = {
-// 		address: 'abc',
-// 		id: new Long(Math.random() * 10000),
-// 		token0:otherDenom,
-// 		token1:debtDenom,
-// 		poolType: PoolType.XYK,
-// 		poolAssets: [
-// 			{
-// 				token: {
-// 					denom: otherDenom,
-// 					amount: randomAssetAmount.toString(),
-// 				},
-// 			},
-// 			{
-// 				token: {
-// 					denom: debtDenom,
-// 					amount: (randomAssetAmount * debtToRandomAssetPrice).toString(),
-// 				},
-// 			},
-// 		],
-// 		swapFee: '0.002',
-// 	}
+    const liquidationActionGenerator = new ActionGenerator(mockRouteRequester)
 
-// 	router.setPools([poolA])
+    describe(('uusd collateral; atom debt'), () => {
+        let actions: Action[] = []
+        beforeAll(async () => {
+            mock.setUserDeposits([
+                {
+                    denom: 'uusd',
+                    amount: '1000',
+                },
+            ])
 
-// 	describe('Test borrow action generation', () => {
-// 		describe('Direct Borrow', () => {
-// 			test('When we are liquid', () => {
-// 				const markets: MarketInfo[] = []
+            mock.setUserDebts([
+                {
+                    denom: 'uatom',
+                    amount: '80',
+                }
+            ])
 
-// 				const liquidationActionGenerator = new ActionGenerator(router)
-// 				const debtDenom = Math.random().toString()
-// 				const debtToRepay = 200
+            mockRouteRequester.requestRoute.mockResolvedValue({
+                route: [
+                        {
+                            poolId: Long.fromNumber(1),
+                            tokenInDenom: 'uusd',
+                            tokenOutDenom: 'uatom',
+                            pool: {} as Pool
+                        }
+                ],
+                expectedOutput: '100'
+            });
 
-// 				const collateralDenom = Math.random().toString()
-// 				const collateralAmount = 500
+            actions = await liquidationActionGenerator.generateLiquidationActions(
+                mock.account,
+                mock.prices,
+                mock.markets
+            )
+        })
 
-// 				const collateral: Collateral = {
-// 					type: PositionType.DEPOSIT,
-// 					amount: collateralAmount,
-// 					closeFactor: 0.5,
-// 					denom: collateralDenom,
-// 					price: 1.5,
-// 					value: 1.5 * collateralAmount,
-// 				}
-// 				const debt: Debt = {
-// 					amount: debtToRepay,
-// 					denom: debtDenom,
-// 					price: new BigNumber(1),
-// 				}
-// 				const market = generateRandomMarket(debtDenom)
-// 				market.available_liquidity = debtToRepay * 1000
-// 				markets.push(market)
-// 				const borrowActions = liquidationActionGenerator.produceBorrowActions(
-// 					debt,
-// 					collateral,
-// 					markets,
-// 					[debt.denom, market.denom],
-// 				)
-// 				console.log(borrowActions)
-// 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
-// 				expect(borrowActions.length).toBe(1)
-// 				expect(borrowAction.borrow.amount).toBe(debtToRepay.toFixed(0))
-// 				expect(borrowAction.borrow.denom).toBe(debtDenom)
-// 			})
+        it('Should borrow atom', () => {
+            // @ts-ignore
+            let amount : String = actions[0].borrow.amount
+            // @ts-ignore
+            let denom : String = actions[0].borrow.denom
 
-// 			test('When we are illiquid but > 50% ', () => {
-// 				const markets: MarketInfo[] = []
+            expect(amount).toBe('80')
+            expect(denom).toBe('uatom')
+        })
+        it('Should select deposit usd collateral', () => {
+            console.log(actions[1])
+            // @ts-ignore
+            let denom : String = actions[1].liquidate.request.deposit
+           
+            expect(denom).toBe('uusd')
+        });
+        it('Should select atom debt to repay', () => {
+            //@ts-ignore
+            let debtCoin : Coin = actions[1].liquidate.debt_coin
 
-// 				const liquidationActionGenerator = new ActionGenerator(router)
-// 				const debtDenom = Math.random().toString()
-// 				const debtToRepay = 200
+            expect(debtCoin.denom).toBe('uatom')
+            expect(debtCoin.amount).toBe('80')
+        });
 
-// 				const collateralDenom = Math.random().toString()
-// 				const collateralAmount = 500
+        it('Should swap all won usd collateral to atom', () => {
+            console.log(actions[2])
+        })
 
-// 				const collateral: Collateral = {
-// 					type: PositionType.DEPOSIT,
-// 					amount: collateralAmount,
-// 					closeFactor: 0.5,
-// 					denom: collateralDenom,
-// 					price: 1.5,
-// 					value: 1.5 * collateralAmount,
-// 				}
-// 				const debt: Debt = {
-// 					amount: debtToRepay,
-// 					denom: debtDenom,
-// 					price: new BigNumber(1),
-// 				}
+        it('Should repay atom', () => {
+            console.log(actions[3])
 
-// 				const market = generateRandomMarket(debtDenom)
-// 				market.available_liquidity = debtToRepay / 1.5
-// 				markets.push(market)
-// 				const borrowActions = liquidationActionGenerator.produceBorrowActions(
-// 					debt,
-// 					collateral,
-// 					markets,
-// 					[debt.denom, market.denom],
-// 				)
-// 				console.log(borrowActions)
-// 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
-// 				expect(borrowActions.length).toBe(1)
-// 				expect(borrowAction.borrow.amount).toBe(((debtToRepay / 1.5) * 0.99).toFixed(0))
-// 				expect(borrowAction.borrow.denom).toBe(debtDenom)
-// 			})
+        })
 
-// 			test('Correctly calculate repay amount based on collateral reserve factor', () => {
-// 				const markets: MarketInfo[] = []
+        it('Should swap atom to usd', () => {
+            console.log(actions[4])
 
-// 				const liquidationActionGenerator = new ActionGenerator(router)
-// 				const debtDenom = Math.random().toString()
-// 				const debtToRepay = 200
+        })
+    });
+    // Single collateral, multiple debts
+    describe(('uusd collateral; usd debt(smaller), atom debt(larger)'), () => {
+        it('Should borrow atom', () => {
+            
+        })
+        it('Should pick the usd collateral', () => {
+        
+        });
+        it('Should pick the atom debt to repay', () => {
+        
+        });
 
-// 				const collateralDenom = Math.random().toString()
-// 				const collateralAmount = 150
-// 				const collateral: Collateral = {
-// 					type: PositionType.DEPOSIT,
-// 					amount: collateralAmount,
-// 					closeFactor: 0.5,
-// 					denom: collateralDenom,
-// 					price: 2,
-// 					value: collateralAmount * 2,
-// 				}
-// 				const debt: Debt = {
-// 					amount: debtToRepay,
-// 					denom: debtDenom,
-// 					price: new BigNumber(1),
-// 				}
-// 				const market = generateRandomMarket(debtDenom)
-// 				market.available_liquidity = debtToRepay * 1000
-// 				markets.push(market)
-// 				const borrowActions = liquidationActionGenerator.produceBorrowActions(
-// 					debt,
-// 					collateral,
-// 					markets,
-// 					[debt.denom, collateral.denom],
-// 				)
-// 				console.log(borrowActions)
-// 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
-// 				expect(borrowActions.length).toBe(1)
-// 				expect(borrowAction.borrow.amount).toBe((150).toFixed(0))
-// 				expect(borrowAction.borrow.denom).toBe(debtDenom)
-// 			})
-// 		})
+        it('Should swap all won usd collateral to atom', () => {
+            
+        })
 
-// 		describe('Indirect Borrow', () => {
-// 			test('Debt asset unavailable', () => {
-// 				const markets: MarketInfo[] = []
+        it('Should repay atom', () => {
+            
+        })
 
-// 				const liquidationActionGenerator = new ActionGenerator(router)
+        it('Should swap atom to usd', () => {
+            
+        })
+    });
 
-// 				const debtToRepay = 200
-// 				const collateralAmount = 500
+    describe(('uusd collateral; usd debt(larger), atom debt(smaller),'), () => {
+        it('Should borrow usd', () => {
+            
+        })
+        it('Should pick the usd collateral', () => {
+        
+        });
+        it('Should pick the usd debt to repay', () => {
+        
+        });
 
-// 				const collateral: Collateral = {
-// 					type: PositionType.DEPOSIT,
-// 					amount: collateralAmount,
-// 					closeFactor: 0.5,
-// 					denom: collateralDenom,
-// 					price: 1.5,
-// 					value: 1.5 * collateralAmount,
-// 				}
+        it('Should not do any swap of the collateral', () => {
+            
+        })
 
-// 				const debt: Debt = {
-// 					amount: debtToRepay,
-// 					denom: debtDenom,
-// 					price: new BigNumber(1),
-// 				}
-// 				const market = generateRandomMarket(otherDenom)
-// 				market.available_liquidity = debtToRepay * 1000
-
-// 				markets.push(market)
-
-// 				const borrowActions = liquidationActionGenerator.produceBorrowActions(
-// 					debt,
-// 					collateral,
-// 					markets,
-// 					[market.denom, debt.denom, collateral.denom],
-// 				)
-// 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
-
-// 				//@ts-ignore
-// 				const swapAction: {
-// 					swap_exact_in: {
-// 						denom_out: string
-// 						slippage: Decimal
-// 					}
-// 				} = borrowActions[1]
-
-// 				expect(borrowActions.length).toBe(2)
-
-// 				expect(Number(borrowAction.borrow.amount)).toBeGreaterThan(
-// 					debtToRepay / debtToRandomAssetPrice,
-// 				)
-// 				expect(swapAction.swap_exact_in.denom_out).toBe(debtDenom)
-// 				expect(borrowAction.borrow.denom).toBe(otherDenom)
-// 			})
-
-// 			test('Debt available but < 50% required liquidity', () => {
-// 				const markets: MarketInfo[] = []
-
-// 				const liquidationActionGenerator = new ActionGenerator(router)
-// 				const debtToRepay = 200
-
-// 				const collateralDenom = Math.random().toString()
-// 				const collateralAmount = 500
-// 				const collateral: Collateral = {
-// 					type: PositionType.DEPOSIT,
-// 					amount: collateralAmount,
-// 					closeFactor: 0.5,
-// 					denom: collateralDenom,
-// 					price: 1.5,
-// 					value: collateralAmount * 1.5,
-// 				}
-// 				const debt: Debt = {
-// 					amount: debtToRepay,
-// 					denom: debtDenom,
-// 					price: new BigNumber(1),
-// 				}
-
-// 				const market = generateRandomMarket(debtDenom)
-// 				market.available_liquidity = debtToRepay / 2.1
-// 				markets.push(market)
-
-// 				const market2 = generateRandomMarket(otherDenom)
-// 				market2.available_liquidity = debtToRepay
-// 				markets.push(market2)
-
-// 				const borrowActions = liquidationActionGenerator.produceBorrowActions(
-// 					debt,
-// 					collateral,
-// 					markets,
-// 					[debt.denom, market.denom, market2.denom],
-// 				)
-// 				console.log(borrowActions)
-// 				const borrowAction: { borrow: Coin } = borrowActions[0] as { borrow: Coin }
-// 				expect(borrowActions.length).toBe(2)
-// 				expect(borrowAction.borrow.denom).toBe(otherDenom)
-// 			})
-
-// 			test('If no swap route possible for borrow we throw error', () => {
-// 				const markets: MarketInfo[] = []
-
-// 				const liquidationActionGenerator = new ActionGenerator(router)
-// 				const debtToRepay = 200
-// 				const collateralAmount = 500
-
-// 				const collateral: Collateral = {
-// 					type: PositionType.DEPOSIT,
-// 					amount: collateralAmount,
-// 					closeFactor: 0.5,
-// 					denom: 'does not exist',
-// 					price: 1.5,
-// 					value: collateralAmount * 1.5,
-// 				}
-
-// 				const debt: Debt = {
-// 					amount: debtToRepay,
-// 					denom: 'doesnotexist',
-// 					price: new BigNumber(1),
-// 				}
-
-// 				expect(() => {
-// 					liquidationActionGenerator.produceBorrowActions(
-// 						debt,
-// 						collateral,
-// 						markets,
-// 						[debtDenom],
-// 					)
-// 				}).toThrow(NO_ROUTE_FOR_SWAP)
-// 			})
-// 		})
-// 	})
-// })
+        it('Should repay usd', () => {
+            
+        })
+    });
 
 
 
-// describe('Find Best Collateral', () => {
-
-//     test('Can find largest collateral when it is a coin', () => {
-//         // construct multiple collaterals - coins and vaults
-//         const collateral1: Coin = {
-//             amount: '1500',
-//             denom: 'testcoin1',
-//         }
-
-//         //@ts-ignore - parameters not used for testing - todo move to helper / logic class
-//         const executor = new RoverExecutor({}, {}, {})
-//         const collateralState = executor.findBestCollateral({
-//             account_id: "1",
-//             account_kind: "default",
-//             debts: [],
-//             deposits: [collateral1],
-//             lends: [],
-//             staked_astro_lps: [],
-//             vaults: [],
-//             perps: []
-//         })
-
-//         expect(collateralState.amount).toBe(1500)
-//         // find
-//         // ensure its the correct one
-//     })
-// }),
-// test('Can find largest debt', () => {
-//     // construct multiple collaterals - coins and vaults
-//     const debt1: Coin = {
-//         amount: '1500',
-//         denom: 'testcoin1',
-//     }
-
-//     const debt2: Coin = {
-//         amount: '1500',
-//         denom: 'testcoin1',
-//     }
-
-//     //@ts-ignore - parameters not used for testing
-//     const executor = new RoverExecutor({}, {}, {})
-//     const bestDebt = executor.findBestDebt([debt1, debt2])
-
-//     expect(bestDebt.amount).toBe(1500)
-// })
+})
