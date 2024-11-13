@@ -29,9 +29,8 @@ export class ActionGenerator {
 	generateLiquidationActions = async (
 		account: Positions,
 		oraclePrices: Map<string, BigNumber>,
-		redbankMarkets: MarketInfo[],
-	) => {
-		
+		redbankMarkets: Map<string, MarketInfo>,
+	): Promise<Action[]> => {
 		// Find highest value collateral. Note that is merely the largest collateral by oracle price.
 		// TODO: We should be taking into account the close factor and underlying market liquidity
 		const collateral: Collateral = this.findHighestValueCollateral(account, oraclePrices)
@@ -116,7 +115,7 @@ export class ActionGenerator {
 		debt: Debt,
 		collateral: Collateral,
 		//@ts-ignore - to be used for todos in method
-		markets: MarketInfo[],
+		markets: map<string, MarketInfo[]>,
 	): Action[] => {
 		// TODO
 		if (false) {
@@ -282,6 +281,9 @@ export class ActionGenerator {
 	swapCollateralCoinToDebtActions = async(collateralDenom: string, borrowed: Coin, slippage: string, prices: Map<string, BigNumber>): Promise<Action[]> => {
 		let actions: Action[] = []
 
+		console.log(JSON.stringify(prices.keys()))
+		console.log(collateralDenom)
+		console.log(borrowed.denom)
 		const assetInPrice = prices.get(collateralDenom)!
 		const assetOutPrice = prices.get(borrowed.denom)!
 
@@ -312,7 +314,7 @@ export class ActionGenerator {
 				}
 			}
 		} else {
-			// TODO thios is a rough approximation
+			// TODO this is a rough approximation
 			let amountIn = assetOutPrice
 				.dividedBy(assetInPrice)
 				.multipliedBy(borrowed.amount)

@@ -6,7 +6,7 @@ import { RouteHop } from "../../types/RouteHop"
  * possible pool type on the various chains.
  */
 export abstract class RouteRequester {
-    protected apiUrl: string;
+    apiUrl: string;
 
     constructor(apiUrl: string) {
         this.apiUrl = apiUrl;

@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"target": "ES2021",
 		"lib": ["ES2021"],
-		"types": ["node"],
+		"types": ["node", "jest"],
 		"module": "NodeNext",
 		"declaration": true,
 		"noImplicitAny": true,
