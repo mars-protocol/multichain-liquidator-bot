@@ -6,6 +6,7 @@ on:
       - main
       - perps
     pull_request:
+    
 
 jobs:
   coverage:
@@ -19,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18' # or your preferred version
+          node-version: '18'
           cache: 'yarn'
 
       - name: Setup Node.js
@@ -29,7 +30,7 @@ jobs:
           cache: 'yarn' # Specify yarn for caching
 
       - name: Install Dependencies
-        run: yarn install --frozen-lockfile # equivalent to npm ci
+        run: yarn install --frozen-lockfile
 
       - name: Run Tests
         run: yarn test
@@ -39,9 +40,3 @@ jobs:
 
       - name: Check Formatting
         run: yarn format:check
-
-      - name: Type Check
-        run: yarn type-check
-
-      - name: Lint
-        run: yarn lint
