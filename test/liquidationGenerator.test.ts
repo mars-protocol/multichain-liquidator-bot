@@ -14,7 +14,7 @@ describe('Liquidation Tx Generator Tests..', () => {
 		const assets = [collateralA, collateralB]
 		const largestIndex = collateralA.amount > collateralB.amount ? 0 : 1
 		const largestCollateral = getLargestCollateral(assets, prices)
-		expect(largestCollateral).toBe(assets[largestIndex].denom)
+		expect(largestCollateral.denom).toBe(assets[largestIndex].denom)
 	}),
 		test('Can get largest debt correctly', () => {
 			const debtA: Debt = { ...generateRandomAsset(), uncollateralised: false }
@@ -24,8 +24,8 @@ describe('Liquidation Tx Generator Tests..', () => {
 			prices.set(debtB.denom, new BigNumber(2))
 			const assets = [debtA, debtB]
 			const largestIndex = debtA.amount > debtB.amount ? 0 : 1
-			const largestCollateral = getLargestDebt(assets, prices).denom
+			const largestDebt = getLargestDebt(assets, prices).denom
 
-			expect(largestCollateral).toBe(assets[largestIndex].denom)
+			expect(largestDebt).toBe(assets[largestIndex].denom)
 		})
 })
