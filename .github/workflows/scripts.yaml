@@ -1,0 +1,48 @@
+# .github/workflows/pr-checks.yml
+name: Coverage
+
+on:
+   push:
+    branches:
+      - main
+      - perps
+  pull_request:
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Required for coverage comparison
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18' # or your preferred version
+        cache: 'yarn'
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'yarn'  # Specify yarn for caching
+
+    - name: Install Dependencies
+      run: yarn install --frozen-lockfile  # equivalent to npm ci
+
+    - name: Run Tests
+      run: yarn test
+
+    - name: Check Coverage
+      run: yarn test:coverage
+
+    - name: Check Formatting
+      run: yarn format:check
+
+    - name: Type Check
+      run: yarn type-check
+
+    - name: Lint
+      run: yarn lint
