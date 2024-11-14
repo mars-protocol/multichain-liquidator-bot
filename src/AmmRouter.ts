@@ -1,7 +1,7 @@
 import BigNumber from 'bignumber.js'
 import { calculateOutputXYKPool, calculateRequiredInputXYKPool } from './math'
 import { RouteHop } from './types/RouteHop'
-import { ConcentratedLiquidityPool, Pool, PoolType,  XYKPool } from './types/Pool'
+import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from './types/Pool'
 // import { ConcentratedLiquidityMath } from "./amm/osmosis/math/concentrated"
 
 import { Coin, Dec, Int } from '@keplr-wallet/unit'
@@ -52,13 +52,11 @@ export class AMMRouter implements AMMRouterInterface {
 		try {
 			// for each hop
 			route.forEach((routeHop) => {
-
 				const pool = routeHop.pool
 
 				switch (pool.poolType) {
 					case PoolType.XYK:
-
-						const xykPool= pool as XYKPool
+						const xykPool = pool as XYKPool
 						const x1 = new BigNumber(
 							xykPool.poolAssets.find(
 								(poolAsset) => poolAsset.token.denom === routeHop.tokenInDenom,
@@ -72,34 +70,38 @@ export class AMMRouter implements AMMRouterInterface {
 						)
 
 						if (tokenInAmount.dividedBy(x1).isGreaterThan(0.005)) {
-							throw new Error(`Pool with id : ${pool.id} is too illiquid. X1: ${x1.toString()} tokenInAmount: ${tokenInAmount.toString()}`)
+							throw new Error(
+								`Pool with id : ${
+									pool.id
+								} is too illiquid. X1: ${x1.toString()} tokenInAmount: ${tokenInAmount.toString()}`,
+							)
 						}
 
-						const amountBeforeFees = calculateOutputXYKPool(
-							x1,
-							y1,
-							tokenInAmount,
-						)
+						const amountBeforeFees = calculateOutputXYKPool(x1, y1, tokenInAmount)
 
 						if (amountBeforeFees.isLessThanOrEqualTo(0)) {
 							throw new Error('amount in before fees is less than 0')
 						}
 
-						amountAfterFees = amountBeforeFees.minus(amountBeforeFees.multipliedBy(routeHop.pool.swapFee))
+						amountAfterFees = amountBeforeFees.minus(
+							amountBeforeFees.multipliedBy(routeHop.pool.swapFee),
+						)
 						tokenInAmount = amountAfterFees
 						break
 					case PoolType.CONCENTRATED_LIQUIDITY:
-
 						const clPool = pool as ConcentratedLiquidityPool
 
-						const tokenIn : Coin = {
+						const tokenIn: Coin = {
 							denom: routeHop.tokenInDenom,
-							amount: new Int(tokenInAmount.toFixed(0))
+							amount: new Int(tokenInAmount.toFixed(0)),
 						}
 
 						const tokenDenom0 = clPool.token0
 						const poolLiquidity = new Dec(clPool.currentTickLiquidity)
-						const inittedTicks = tokenIn.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
+						const inittedTicks =
+							tokenIn.denom === tokenDenom0
+								? clPool.liquidityDepths.zeroToOne
+								: clPool.liquidityDepths.oneToZero
 						const curSqrtPrice = new BigDec(clPool.currentSqrtPrice)
 						const swapFee = new Dec(clPool.swapFee)
 						const result = ConcentratedLiquidityMath.calcOutGivenIn({
@@ -108,11 +110,11 @@ export class AMMRouter implements AMMRouterInterface {
 							poolLiquidity,
 							inittedTicks,
 							curSqrtPrice,
-							swapFee
-						});
+							swapFee,
+						})
 
-						if (result === "no-more-ticks") {
-							throw new Error('no more ticks');
+						if (result === 'no-more-ticks') {
+							throw new Error('no more ticks')
 						}
 
 						const { amountOut } = result
@@ -123,7 +125,6 @@ export class AMMRouter implements AMMRouterInterface {
 						tokenInAmount = amountAfterFees
 						break
 					case PoolType.STABLESWAP:
-
 						// const ssPool = pool as StableswapPool
 
 						// // Produce scaling tokens
@@ -148,10 +149,10 @@ export class AMMRouter implements AMMRouterInterface {
 
 						// tokenInAmount = new BigNumber(ssOutGivenInIncludingFees.toString())
 						// tokenInAmount = new BigNumber(0)
-						throw new Error("stable swap not supported")
+						throw new Error('stable swap not supported')
 				}
 			})
-		} catch(ex) {
+		} catch (ex) {
 			return new BigNumber(0)
 		}
 
@@ -170,7 +171,7 @@ export class AMMRouter implements AMMRouterInterface {
 				const pool = routeHop.pool
 				switch (routeHop.pool.poolType) {
 					case PoolType.XYK:
-						const xykPool=  pool as XYKPool
+						const xykPool = pool as XYKPool
 						const x1 = new BigNumber(
 							xykPool.poolAssets.find(
 								(poolAsset) => poolAsset.token.denom === routeHop.tokenInDenom,
@@ -184,9 +185,12 @@ export class AMMRouter implements AMMRouterInterface {
 						)
 
 						if (tokenOutRequired.dividedBy(y1).isGreaterThan(0.005)) {
-							throw new Error(`Pool with id : ${pool.id} is too illiquid. X1: ${x1.toString()} tokenInAmount: ${tokenOutRequired.toString()}`)
+							throw new Error(
+								`Pool with id : ${
+									pool.id
+								} is too illiquid. X1: ${x1.toString()} tokenInAmount: ${tokenOutRequired.toString()}`,
+							)
 						}
-
 
 						const amountInBeforeFees = calculateRequiredInputXYKPool(
 							new BigNumber(x1),
@@ -198,21 +202,25 @@ export class AMMRouter implements AMMRouterInterface {
 							throw new Error('amount in before fees is less than 0')
 						}
 
-						amountAfterFees = amountInBeforeFees.plus(tokenOutRequired.multipliedBy(routeHop.pool.swapFee))
+						amountAfterFees = amountInBeforeFees.plus(
+							tokenOutRequired.multipliedBy(routeHop.pool.swapFee),
+						)
 						tokenOutRequired = amountAfterFees
 						break
 					case PoolType.CONCENTRATED_LIQUIDITY:
-
 						const clPool = pool as ConcentratedLiquidityPool
 
-						const tokenOut : Coin = {
+						const tokenOut: Coin = {
 							denom: routeHop.tokenOutDenom,
-							amount: new Int(tokenOutRequired.toFixed(0))
+							amount: new Int(tokenOutRequired.toFixed(0)),
 						}
 
 						const tokenDenom0 = clPool.token0
 						const poolLiquidity = new Dec(clPool.currentTickLiquidity)
-						const inittedTicks = tokenOut.denom === tokenDenom0 ? clPool.liquidityDepths.zeroToOne : clPool.liquidityDepths.oneToZero
+						const inittedTicks =
+							tokenOut.denom === tokenDenom0
+								? clPool.liquidityDepths.zeroToOne
+								: clPool.liquidityDepths.oneToZero
 						const curSqrtPrice = new BigDec(clPool.currentSqrtPrice)
 						const swapFee = new Dec(clPool.swapFee)
 
@@ -229,15 +237,12 @@ export class AMMRouter implements AMMRouterInterface {
 							swapFee,
 						})
 
-
-						if (result === "no-more-ticks") {
+						if (result === 'no-more-ticks') {
 							tokenOutRequired = new BigNumber(10000000000000)
 							break
 						}
 
-
 						const { amountIn } = result
-
 
 						amountAfterFees = new BigNumber(amountIn.toString())
 						if (amountAfterFees.isLessThanOrEqualTo(0)) {
@@ -247,7 +252,6 @@ export class AMMRouter implements AMMRouterInterface {
 						break
 
 					case PoolType.STABLESWAP:
-
 						// const ssPool = pool as StableswapPool
 
 						// // Produce scaling tokens
@@ -276,7 +280,7 @@ export class AMMRouter implements AMMRouterInterface {
 				}
 			})
 		} catch (ex) {
-			return new BigNumber("100000000000000000000")
+			return new BigNumber('100000000000000000000')
 		}
 
 		return amountAfterFees
@@ -293,7 +297,7 @@ export class AMMRouter implements AMMRouterInterface {
 
 	getRouteWithHighestOutput(amountIn: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
-			.filter(route => this.getOutput(amountIn, route).isGreaterThan(0) && route.length <=1)
+			.filter((route) => this.getOutput(amountIn, route).isGreaterThan(0) && route.length <= 1)
 			.sort((routeA, routeB) => {
 				if (routeA.length < routeB.length) {
 					return 1
@@ -309,7 +313,7 @@ export class AMMRouter implements AMMRouterInterface {
 
 	getRouteWithLowestInput(amountOut: BigNumber, routes: RouteHop[][]): RouteHop[] {
 		const bestRoute = routes
-			.filter(route => {
+			.filter((route) => {
 				return this.getRequiredInput(amountOut, route).isGreaterThan(0)
 			})
 			.sort((routeA, routeB) => {
@@ -327,7 +331,6 @@ export class AMMRouter implements AMMRouterInterface {
 		tokenOutDenom: string,
 		amountOut: BigNumber,
 	): RouteHop[] {
-
 		const routeOptions = this.getRoutes(tokenInDenom, tokenOutDenom)
 		return this.getRouteWithLowestInput(amountOut, routeOptions)
 	}
@@ -346,14 +349,14 @@ export class AMMRouter implements AMMRouterInterface {
 		targetTokenOutDenom: string,
 		pools: Pool[],
 	): RouteHop[][] {
-
-		const completeRoutes : RouteHop[][]= []
-		let routesInProgress : RouteHop[][] = []
+		const completeRoutes: RouteHop[][] = []
+		let routesInProgress: RouteHop[][] = []
 		let maxRoutteLength = 3
 
 		// all pairs that have our sell asset
-		const startingPairs = pools.filter((pool) =>
-			pool.token0 === tokenInDenom || pool.token1 === tokenInDenom)
+		const startingPairs = pools.filter(
+			(pool) => pool.token0 === tokenInDenom || pool.token1 === tokenInDenom,
+		)
 
 		// create routes for each possible starting pair
 		startingPairs.forEach((pair) => {
@@ -375,7 +378,7 @@ export class AMMRouter implements AMMRouterInterface {
 		})
 
 		while (routesInProgress.length > 0) {
-			let updatedRoutes : RouteHop[][] = []
+			let updatedRoutes: RouteHop[][] = []
 			routesInProgress.forEach((route) => {
 				// Ids of pools we have previously used in this route
 				let usedPoolIds = this.findUsedPools(route)
@@ -385,10 +388,10 @@ export class AMMRouter implements AMMRouterInterface {
 				let lastDenom = route[route.length - 1].tokenOutDenom
 
 				pools.forEach((pool) => {
-					if ((pool.token0 === lastDenom ||
-						pool.token1 === lastDenom) &&
-						(usedDenoms.indexOf(pool.token0) === -1 &&
-						usedDenoms.indexOf(pool.token1) === -1) &&
+					if (
+						(pool.token0 === lastDenom || pool.token1 === lastDenom) &&
+						usedDenoms.indexOf(pool.token0) === -1 &&
+						usedDenoms.indexOf(pool.token1) === -1 &&
 						// ensure we don't use the same pools
 						usedPoolIds.indexOf(pool.id) === -1
 					) {
@@ -407,7 +410,7 @@ export class AMMRouter implements AMMRouterInterface {
 						// if we have reached the target token, add to complete routes, otherwise add to next routes
 						if (hop.tokenOutDenom === targetTokenOutDenom) {
 							completeRoutes.push(routeClone)
-						} else if (routeClone.length < maxRoutteLength){
+						} else if (routeClone.length < maxRoutteLength) {
 							updatedRoutes.push(routeClone)
 						}
 					}

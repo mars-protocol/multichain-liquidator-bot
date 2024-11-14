@@ -10,8 +10,8 @@
 // import {
 // 	MarsCreditManagerClient,
 // 	MarsCreditManagerQueryClient,
-// } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.client'
-// import { MarsAccountNftQueryClient } from 'marsjs-types/creditmanager/generated/mars-account-nft/MarsAccountNft.client'
+// } from 'marsjs-types/mars-credit-manager/MarsCreditManager.client'
+// import { MarsAccountNftQueryClient } from 'marsjs-types/mars-account-nft/MarsAccountNft.client'
 // import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 // import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 // import { SigningStargateClient } from '@cosmjs/stargate'
@@ -22,14 +22,14 @@
 // 	ActionCoin,
 // 	Coin,
 // 	VaultPositionType,
-// } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+// } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 // import { toUtf8 } from '@cosmjs/encoding'
 // import { TestConfig, testnetConfig } from './config'
 // import BigNumber from 'bignumber.js'
 // import { AMMRouter } from '../../../src/AmmRouter'
 // import { RedisInterface } from '../../../src/redis'
 // import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
-// import { AssetParamsBaseForAddr, AssetParamsUpdate } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types'
+// import { AssetParamsBaseForAddr, AssetParamsUpdate } from 'marsjs-types/mars-params/MarsParams.types'
 
 // const runTests = async (testConfig: TestConfig) => {
 // 	// Test results
@@ -272,7 +272,7 @@
 // 		)
 
 // 		await executor.start()
-		
+
 // 		let liquidated = false
 // 		let startTime = Date.now()
 // 		const second = 1000
@@ -284,7 +284,7 @@
 // 			if (liquidated) {
 // 				console.log(newHealthFactorResults)
 // 			}
-		
+
 // 			await sleep(1 * second)
 // 		}
 
@@ -1268,11 +1268,10 @@
 
 // main().then(() => process.exit())
 
-
 // const updateCoinsWhitelist = async(
 //     deployerAddress: string,
 //     marsParamsAddress : string,
-//     cosmWasmClient: SigningCosmWasmClient, 
+//     cosmWasmClient: SigningCosmWasmClient,
 //     denoms: Array<string>,
 //     whitelisted: boolean) => {
 
@@ -1292,14 +1291,14 @@
 // const createUpdateCMCoinStateMsg = async(
 //     deployerAddress: string,
 //     marsParamsAddress : string,
-//     cosmWasmClient: SigningCosmWasmClient, 
+//     cosmWasmClient: SigningCosmWasmClient,
 //     denom: string,
 //     enabled: boolean
 // ) => {
 
 //     // query the asset params with the config.
 //     let state : AssetParamsBaseForAddr = await cosmWasmClient.queryContractSmart(
-//         marsParamsAddress, 
+//         marsParamsAddress,
 //         {
 //             asset_params : {
 //                 denom

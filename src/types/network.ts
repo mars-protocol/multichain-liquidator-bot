@@ -1,5 +1,5 @@
 export enum Network {
 	MAINNET,
 	TESTNET,
-	LOCALNET
+	LOCALNET,
 }

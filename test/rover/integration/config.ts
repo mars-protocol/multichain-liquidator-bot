@@ -67,7 +67,7 @@ export const testnetConfig: TestConfig = {
 		lockedVault: true,
 		unlockingVault: true,
 		unlockedVault: true,
-		liquidateMany: true
+		liquidateMany: true,
 	},
 }
 
@@ -104,6 +104,6 @@ export const localnetConfig: TestConfig = {
 		lockedVault: false,
 		unlockingVault: false,
 		unlockedVault: false,
-		liquidateMany: true
+		liquidateMany: true,
 	},
 }

@@ -11,27 +11,29 @@ import 'dotenv/config.js'
 import { fetchRedbankBatch } from '../query/hive'
 
 import BigNumber from 'bignumber.js'
-import { BaseExecutor, BaseExecutorConfig } from '../BaseExecutor'
+import { BaseExecutor, BaseConfig } from '../BaseExecutor'
 import { CosmWasmClient, MsgExecuteContractEncodeObject } from '@cosmjs/cosmwasm-stargate'
 import { getLargestCollateral, getLargestDebt } from '../liquidationGenerator'
 import { Collateral, DataResponse } from '../query/types.js'
-import { PoolDataProvider } from '../query/amm/PoolDataProviderInterface'
-import { Exchange } from '../execute/ExchangeInterface.js'
+import { Exchange } from '../exchange/ExchangeInterface.js'
 
-import { calculateCollateralRatio, calculateLiquidationBonus, calculateMaxDebtRepayable, getLiquidationThresholdHealthFactor } from './LiquidationHelpers'
+import {
+	calculateCollateralRatio,
+	calculateLiquidationBonus,
+	calculateMaxDebtRepayable,
+	getLiquidationThresholdHealthFactor,
+} from './LiquidationHelpers'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
-import { AssetParamsBaseForAddr } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types'
-
+import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types'
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
-export interface RedbankExecutorConfig extends BaseExecutorConfig {
-	liquidationFiltererAddress: string
+export interface RedbankExecutorConfig extends BaseConfig {
 	safetyMargin: number
 	liquidationProfitMarginPercent: number
 }
 
-export const XYX_PRICE_SOURCE = "xyk_liquidity_token"
+export const XYX_PRICE_SOURCE = 'xyk_liquidity_token'
 
 /**
  * Executor class is the entry point for the executor service
@@ -42,21 +44,19 @@ export const XYX_PRICE_SOURCE = "xyk_liquidity_token"
  * @param queryClient A read only cosmwasm client for querying contracts
  */
 export class RedbankExecutor extends BaseExecutor {
-
 	private MINUTE = 1000 * 60
 	public config: RedbankExecutorConfig
-	private assetParams : Map<string, AssetParamsBaseForAddr> = new Map()
-	private targetHealthFactor : number = 0
+	private assetParams: Map<string, AssetParamsBaseForAddr> = new Map()
+	private targetHealthFactor: number = 0
 
 	constructor(
 		config: RedbankExecutorConfig,
 		client: SigningStargateClient,
 		queryClient: CosmWasmClient,
-		poolProvider: PoolDataProvider,
 		private exchangeInterface: Exchange,
-		routeRequester: RouteRequester
+		routeRequester: RouteRequester,
 	) {
-		super(config, client, queryClient, poolProvider, routeRequester)
+		super(config, client, queryClient, routeRequester)
 		this.config = config
 	}
 
@@ -67,7 +67,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 		setInterval(this.fetchAssetParams, 10 * this.MINUTE)
 		setInterval(this.updatePriceSources, 10 * this.MINUTE)
-		setInterval(this.updateOraclePrices, 1 * this.MINUTE )
+		setInterval(this.updateOraclePrices, 1 * this.MINUTE)
 		setInterval(this.fetchTargetHealthFactor, 10 * this.MINUTE)
 
 		// run
@@ -82,9 +82,12 @@ export class RedbankExecutor extends BaseExecutor {
 
 	async fetchTargetHealthFactor() {
 		try {
-			this.targetHealthFactor = await this.queryClient.queryContractSmart(this.config.marsParamsAddress, {
-				target_health_factor: {}
-			})
+			this.targetHealthFactor = await this.queryClient.queryContractSmart(
+				this.config.marsParamsAddress,
+				{
+					target_health_factor: {},
+				},
+			)
 		} catch (e) {
 			console.error(e)
 		}
@@ -93,10 +96,10 @@ export class RedbankExecutor extends BaseExecutor {
 	async fetchAssetParams() {
 		const maxRetries = 5
 		const limit = 5
-	
+
 		// while not returning empty, get all asset params
 		let fetching = true
-		let startAfter = ""
+		let startAfter = ''
 		let retries = 0
 		while (fetching) {
 			try {
@@ -104,24 +107,24 @@ export class RedbankExecutor extends BaseExecutor {
 					all_asset_params: {
 						limit,
 						start_after: startAfter,
-					  },
+					},
 				})
 
-				startAfter = response[response.length - 1] ? response[response.length - 1].denom : ""
-				response.forEach((assetParam : AssetParamsBaseForAddr) => {
+				startAfter = response[response.length - 1] ? response[response.length - 1].denom : ''
+				response.forEach((assetParam: AssetParamsBaseForAddr) => {
 					this.assetParams.set(assetParam.denom, assetParam)
 				})
 				fetching = response.length === 5
 				retries = 0
-			} catch(ex) {
+			} catch (ex) {
 				console.warn(ex)
 				retries++
 				if (retries > maxRetries) {
-					console.warn("Max retries exceeded, exiting", maxRetries)
+					console.warn('Max retries exceeded, exiting', maxRetries)
 					fetching = false
 				} else {
 					await sleep(5000)
-					console.info("Retrying...")
+					console.info('Retrying...')
 				}
 			}
 		}
@@ -148,7 +151,6 @@ export class RedbankExecutor extends BaseExecutor {
 			const position = positionResponse.data[positionAddress]
 
 			if (position.collaterals.length > 0 && position.debts.length > 0) {
-
 				// Build our params
 				const largestCollateral = getLargestCollateral(position.collaterals, this.prices)
 				const largestCollateralDenom = largestCollateral.denom
@@ -170,7 +172,7 @@ export class RedbankExecutor extends BaseExecutor {
 					position.collaterals,
 					position.debts,
 					this.prices,
-					this.assetParams
+					this.assetParams,
 				)
 
 				const liquidationBonus = calculateLiquidationBonus(
@@ -179,11 +181,7 @@ export class RedbankExecutor extends BaseExecutor {
 					ltHealthFactor,
 					lbMax,
 					lbMin,
-					calculateCollateralRatio(
-						position.debts,
-						position.collaterals,
-						this.prices
-					).toNumber()
+					calculateCollateralRatio(position.debts, position.collaterals, this.prices).toNumber(),
 				)
 				// Neutral available to us for this specific liquidation
 				const remainingNeutral = availableValue.minus(totalDebtValue)
@@ -196,43 +194,47 @@ export class RedbankExecutor extends BaseExecutor {
 					this.assetParams,
 					liquidationBonus,
 					this.prices,
-					largestCollateralDenom
+					largestCollateralDenom,
 				)
 				// Cap the repay amount by the collateral we are claiming. We need to factor in the liquidation bonus - as that comes out of the available collateral
 				const largestCollateralValue = new BigNumber(largestCollateral.amount)
-					.multipliedBy(1-liquidationBonus)
+					.multipliedBy(1 - liquidationBonus)
 					.multipliedBy(collateralPrice)
 				if (
 					!largestCollateralValue ||
 					largestCollateralValue.isLessThanOrEqualTo(10000) ||
-					largestCollateralValue.isNaN()) continue
+					largestCollateralValue.isNaN()
+				)
+					continue
 
 				// todo Make sure that the max repayable is less than the debt
-				const maxRepayableValue = maxDebtRepayableValue.isGreaterThan(largestCollateralValue) ? largestCollateralValue : maxDebtRepayableValue
+				const maxRepayableValue = maxDebtRepayableValue.isGreaterThan(largestCollateralValue)
+					? largestCollateralValue
+					: maxDebtRepayableValue
 				const maxRepayableAmount = maxRepayableValue.dividedBy(this.prices.get(debtDenom) || 0)
-				
+
 				// Cap the repay amount by the remaining neutral asset we have
 				const amountToRepay = remainingNeutral.isGreaterThan(maxRepayableValue)
 					? maxRepayableAmount
-					: (remainingNeutral.multipliedBy(0.95)).dividedBy(debtPrice)
-
+					: remainingNeutral.multipliedBy(0.95).dividedBy(debtPrice)
 
 				// If our debt is the same as our neutral, we skip this step
-				const buyDebtRoute = this.config.neutralAssetDenom === debtDenom 
-					? []
-					: this.ammRouter.getBestRouteGivenOutput(
-							this.config.neutralAssetDenom,
-							debtDenom,
-						amountToRepay,
-					)
+				const buyDebtRoute =
+					this.config.neutralAssetDenom === debtDenom
+						? []
+						: this.ammRouter.getBestRouteGivenOutput(
+								this.config.neutralAssetDenom,
+								debtDenom,
+								amountToRepay,
+						  )
 
 				console.log({
 					amountToRepay: JSON.stringify(amountToRepay),
-					buyDebtRoute : JSON.stringify(buyDebtRoute),
+					buyDebtRoute: JSON.stringify(buyDebtRoute),
 					maxDebtRepayableValue: JSON.stringify(maxDebtRepayableValue),
 					maxRepayableAmount: JSON.stringify(maxRepayableAmount),
-					maxRepayableValue : JSON.stringify(maxRepayableValue),
-					remainingNeutral : JSON.stringify(remainingNeutral),
+					maxRepayableValue: JSON.stringify(maxRepayableValue),
+					remainingNeutral: JSON.stringify(remainingNeutral),
 					neutralAssetDenom: this.config.neutralAssetDenom,
 					debtDenom: debtDenom,
 					debtPrice: debtPrice,
@@ -256,17 +258,13 @@ export class RedbankExecutor extends BaseExecutor {
 
 				// update debts + totals
 				const existingDebt = debtsToRepay.get(liquidateTx.debt_denom) || 0
-				debtsToRepay.set(
-					liquidateTx.debt_denom,
-					new BigNumber(amountToRepay).plus(existingDebt),
-				)
+				debtsToRepay.set(liquidateTx.debt_denom, new BigNumber(amountToRepay).plus(existingDebt))
 				totalDebtValue = newTotalDebt
 			}
 		}
 
 		return { txs, debtsToRepay }
 	}
-
 
 	appendWithdrawMessages(
 		collateralsWon: Collateral[],
@@ -297,37 +295,37 @@ export class RedbankExecutor extends BaseExecutor {
 
 		for (const coin of coins) {
 			let coinAmount =
-			coin.denom === this.config.gasDenom
-						? new BigNumber(coin.amount).minus(100000000) // keep min 100 tokens for gas
-						: new BigNumber(coin.amount)
+				coin.denom === this.config.gasDenom
+					? new BigNumber(coin.amount).minus(100000000) // keep min 100 tokens for gas
+					: new BigNumber(coin.amount)
 
-				if (coinAmount.multipliedBy(this.prices.get(coin.denom)!).isGreaterThan(10000)) {
-					const routeResponse = await this.routeRequester.requestRoute(
-						coin.denom,
-						this.config.neutralAssetDenom,
-						coin.amount,
-					)
+			if (coinAmount.multipliedBy(this.prices.get(coin.denom)!).isGreaterThan(10000)) {
+				const routeResponse = await this.routeRequester.requestRoute(
+					coin.denom,
+					this.config.neutralAssetDenom,
+					coin.amount,
+				)
 
-					let minOutput = coinAmount
-						.multipliedBy(this.prices.get(coin.denom)!)
-						.multipliedBy(0.985)
-						.toFixed(0)
+				let minOutput = coinAmount
+					.multipliedBy(this.prices.get(coin.denom)!)
+					.multipliedBy(0.985)
+					.toFixed(0)
 
-					if (minOutput === "0") {
-						continue
-					}
-
-					expectedNeutralCoins = expectedNeutralCoins.plus(minOutput)
-
-					msgs.push(
-						this.exchangeInterface.produceSwapMessage(
-							routeResponse.route,
-							{ denom: coin.denom, amount: coinAmount.toFixed(0) },
-							minOutput,
-							liquidatorAddress,
-						)
-					)
+				if (minOutput === '0') {
+					continue
 				}
+
+				expectedNeutralCoins = expectedNeutralCoins.plus(minOutput)
+
+				msgs.push(
+					this.exchangeInterface.produceSwapMessage(
+						routeResponse.route,
+						{ denom: coin.denom, amount: coinAmount.toFixed(0) },
+						minOutput,
+						liquidatorAddress,
+					),
+				)
+			}
 		}
 
 		return expectedNeutralCoins
@@ -344,7 +342,7 @@ export class RedbankExecutor extends BaseExecutor {
 		const expectedDebtAssetsPostSwap: Map<string, BigNumber> = new Map()
 
 		for (const debt of debtsToRepay) {
-		const debtAmountRequiredFromSwap = new BigNumber(debt.amount)
+			const debtAmountRequiredFromSwap = new BigNumber(debt.amount)
 			if (debt.denom === this.config.neutralAssetDenom) {
 				const cappedAmount = remainingNeutral.isLessThan(debt.amount)
 					? remainingNeutral
@@ -354,7 +352,9 @@ export class RedbankExecutor extends BaseExecutor {
 				const totalDebt = cappedAmount.plus(expectedDebtAssetsPostSwap.get(debt.denom) || 0)
 				expectedDebtAssetsPostSwap.set(debt.denom, totalDebt)
 			} else {
-				let debtValue = debtAmountRequiredFromSwap.multipliedBy(this.prices.get(debt.denom) || 0).multipliedBy(1.02)
+				let debtValue = debtAmountRequiredFromSwap
+					.multipliedBy(this.prices.get(debt.denom) || 0)
+					.multipliedBy(1.02)
 
 				if (debtValue.gt(neutralAvailable)) {
 					debtValue = neutralAvailable
@@ -372,11 +372,11 @@ export class RedbankExecutor extends BaseExecutor {
 						{ denom: this.config.neutralAssetDenom, amount: debtValue.toFixed(0) },
 						debtAmountRequiredFromSwap.toFixed(0),
 						liquidatorAddress,
-					)
+					),
 				)
-				}
+			}
 
-				expectedDebtAssetsPostSwap.set(debt.denom, debtAmountRequiredFromSwap)
+			expectedDebtAssetsPostSwap.set(debt.denom, debtAmountRequiredFromSwap)
 		}
 
 		return expectedDebtAssetsPostSwap
@@ -400,21 +400,6 @@ export class RedbankExecutor extends BaseExecutor {
 		)
 	}
 
-	executeViaFilterer = (
-		txs: LiquidationTx[],
-		debtCoins: Coin[],
-	): MsgExecuteContractEncodeObject => {
-
-		const msg = toUtf8(JSON.stringify({ liquidate_many: { liquidations: txs } }))
-
-		return produceExecuteContractMessage(
-			this.config.liquidatorMasterAddress,
-			this.config.liquidationFiltererAddress,
-			msg,
-			debtCoins,
-		)
-	}
-
 	async run(): Promise<void> {
 		const liquidatorAddress = this.config.liquidatorMasterAddress
 
@@ -422,32 +407,32 @@ export class RedbankExecutor extends BaseExecutor {
 			throw new Error("Instantiate your clients before calling 'run()'")
 
 		await this.refreshData()
-		
+
 		const collateralsBefore: Collateral[] = await this.queryClient?.queryContractSmart(
 			this.config.redbankAddress,
 			{ user_collaterals: { user: liquidatorAddress } },
 		)
 
-		await this.liquidateCollaterals(
-			liquidatorAddress,
-			collateralsBefore
-		)
+		await this.liquidateCollaterals(liquidatorAddress, collateralsBefore)
 
-		const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/redbank`
-		const response = await fetch(url);
+		const url = `${this.config
+			.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/redbank`
+		const response = await fetch(url)
 		let positionObjects: {
-			account_id: string,
-			health_factor: string,
+			account_id: string
+			health_factor: string
 			total_debt: string
 		}[] = (await response.json())['data']
 
 		let positions: Position[] = positionObjects
-			.filter(position =>
+			.filter(
+				(position) =>
 					Number(position.health_factor) < 0.97 &&
 					Number(position.health_factor) > 0.3 &&
 					// position.account_id === "neutron1u44598z3a8fdy9e6cu7rpl2eqvl2shjvfg4sqd" &&
-					position.total_debt.length > 5)
-					
+					position.total_debt.length > 5,
+			)
+
 			.sort((a, b) => Number(a.total_debt) - Number(b.total_debt))
 			.map((positionObject) => {
 				return {
@@ -488,19 +473,21 @@ export class RedbankExecutor extends BaseExecutor {
 			// When using the liquidation filterer contract, transactions with no successfull liquidations
 			// will still succeed, meaning that we will still swap to the debt and have to swap back again.
 			// If liquidating via redbank, unsucessfull liquidations will error, preventing the swap
-			const execute: MsgExecuteContractEncodeObject =
-				// index [0] is safe as we know the length is 1 from the conditional
-				txs.length == 1 ? this.executeViaRedbankMsg(txs[0]) : this.executeViaFilterer(txs, debtCoins)
+			const execute: MsgExecuteContractEncodeObject = this.executeViaRedbankMsg(txs[0])
 			firstMsgBatch.push(execute)
 
 			if (!firstMsgBatch || firstMsgBatch.length === 0 || txs.length === 0) continue
 
-			const firstFee = await this.getFee(firstMsgBatch, this.config.liquidatorMasterAddress, this.config.chainName.toLowerCase())
+			const firstFee = await this.getFee(
+				firstMsgBatch,
+				this.config.liquidatorMasterAddress,
+				this.config.chainName.toLowerCase(),
+			)
 
 			const result = await this.client.signAndBroadcast(
 				this.config.liquidatorMasterAddress,
 				firstMsgBatch,
-				firstFee
+				firstFee,
 			)
 
 			console.log(`Liquidation hash: ${result.transactionHash}`)
@@ -512,10 +499,7 @@ export class RedbankExecutor extends BaseExecutor {
 				{ user_collaterals: { user: liquidatorAddress } },
 			)
 
-			await this.liquidateCollaterals(
-				liquidatorAddress,
-				collaterals
-			)
+			await this.liquidateCollaterals(liquidatorAddress, collaterals)
 
 			await this.setBalances(liquidatorAddress)
 
@@ -546,8 +530,9 @@ export class RedbankExecutor extends BaseExecutor {
 		const balances = await this.client?.getAllBalances(liquidatorAddress)
 
 		const combinedCoins = this.combineBalances(collaterals, balances!).filter(
-			(coin) => this.prices.get(coin.denom) && 
-						new BigNumber(coin.amount).multipliedBy(this.prices.get(coin.denom)!).gt(1000000)
+			(coin) =>
+				this.prices.get(coin.denom) &&
+				new BigNumber(coin.amount).multipliedBy(this.prices.get(coin.denom)!).gt(1000000),
 		)
 
 		if (combinedCoins.length === 0) return
@@ -556,12 +541,12 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.appendSwapToNeutralMessages(combinedCoins, liquidatorAddress, msgs)
 		if (msgs.length === 0) return
 
-		const secondFee = await this.getFee(msgs, this.config.liquidatorMasterAddress, this.config.chainName.toLowerCase())
-		await this.client.signAndBroadcast(
-			this.config.liquidatorMasterAddress,
+		const secondFee = await this.getFee(
 			msgs,
-			secondFee,
+			this.config.liquidatorMasterAddress,
+			this.config.chainName.toLowerCase(),
 		)
+		await this.client.signAndBroadcast(this.config.liquidatorMasterAddress, msgs, secondFee)
 	}
 
 	combineBalances(collaterals: Collateral[], balances: readonly Coin[]): Coin[] {

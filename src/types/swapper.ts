@@ -11,22 +11,22 @@ export interface SwapperRouteHop {
 
 // AstroSwap interface
 export interface AstroSwap {
-    from: string;
-    to: string;
-  }
-  
-  // OsmoSwap interface
+	from: string
+	to: string
+}
+
+// OsmoSwap interface
 export interface OsmoSwap {
-    pool_id: number;
-    to: string;
+	pool_id: number
+	to: string
 }
-  
-  // AstroRoute interface
+
+// AstroRoute interface
 export interface AstroRoute {
-    swaps: AstroSwap[];
+	swaps: AstroSwap[]
 }
-  
-  // OsmoRoute interface
+
+// OsmoRoute interface
 export interface OsmoRoute {
-    swaps: OsmoSwap[];
+	swaps: OsmoSwap[]
 }

@@ -1,9 +1,9 @@
 import BigNumber from 'bignumber.js'
-import { Coin } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types'
+import { Coin } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 
-import { PriceResponse } from 'marsjs-types/creditmanager/generated/mars-mock-oracle/MarsMockOracle.types'
 import { MarketInfo } from '../rover/types/MarketInfo'
 import { SwapperRoute } from '../types/swapper'
+import { PriceResponse } from 'marsjs-types/mars-oracle-osmosis/MarsOracleOsmosis.types'
 
 export interface AssetResponse extends Coin {
 	denom: string
@@ -58,7 +58,7 @@ export interface CoreDataResponse {
 }
 
 export interface Balances {
-		balance: Coin[]
+	balance: Coin[]
 }
 
 export interface VaultInfoWasm {

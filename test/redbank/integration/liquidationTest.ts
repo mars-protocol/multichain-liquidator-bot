@@ -29,8 +29,8 @@
 // import { ExchangeInterface } from '../../../../src/query/routing/RouteRequesterInterface.js
 // import { Osmosis } from '../../../src/../../../src/query/routing/AstroportRouteRequester.js
 // import { OsmosisPoolProvider } from '../../../src/query/amm/OsmosisPoolProvider'
-// import { AssetParamsUpdate } from 'marsjs-types/redbank/generated/mars-params/MarsParams.types.js'
-// import { Coin } from 'marsjs-types/creditmanager/generated/mars-credit-manager/MarsCreditManager.types.js'
+// import { AssetParamsUpdate } from 'marsjs-types/mars-params/MarsParams.types.js'
+// import { Coin } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types.js'
 // import { LiquidationBonus } from '../../../src/types/marsParams.js'
 // import * as fs from 'fs';
 // import BigNumber from 'bignumber.js'
@@ -41,9 +41,9 @@
 
 // // run test
 // const runTest = async (
-// 	testConfig: TestConfig, 
-// 	numberOfPositions: number, 
-// 	positionCollaterals: Coin[], 
+// 	testConfig: TestConfig,
+// 	numberOfPositions: number,
+// 	positionCollaterals: Coin[],
 // 	positionDebts: Coin[],
 // 	initialPrices: Coin[],
 // 	unhealthyPrices : Coin[],
@@ -109,7 +109,7 @@
 // 			[]
 // 		)
 // 	)
-			
+
 // 	setupMessages.push(
 // 		produceExecuteContractMessage(
 // 			deployerAddress,
@@ -120,7 +120,7 @@
 // 			[],
 // 		)
 // 	)
-	
+
 // 	updateParamMsgs.forEach((msg) => {
 // 		setupMessages.push(produceExecuteContractMessage(
 // 			deployerAddress,
@@ -131,7 +131,7 @@
 // 			[],
 // 		))
 // 	})
-	
+
 // 	await sgClient.signAndBroadcast(
 // 		deployerAddress,
 // 		setupMessages,
@@ -146,7 +146,7 @@
 // 	}
 
 // 	// Top up balance
-// 	for (const key of Object.keys(initialBalance)) { 
+// 	for (const key of Object.keys(initialBalance)) {
 // 		const amount = Number(initialBalance[key].amount)
 // 		const difference = amount - baseTokenAmount
 // 		if (difference < 0) {
@@ -166,8 +166,6 @@
 
 // 		}
 // 	}
-
-	
 
 // 	const config = {
 // 		gasDenom: 'uosmo',
@@ -218,7 +216,7 @@
 // 			for (const collateral of positionCollaterals) {
 // 				await deposit(cwClient, address, collateral.denom, collateral.amount, testConfig.redbankAddress)
 // 			}
-			
+
 // 			for (const debt of positionDebts) {
 // 				await borrow(cwClient, address, debt.denom, debt.amount, testConfig.redbankAddress)
 // 			}
@@ -278,7 +276,7 @@
 // 		updatedBalance,
 // 		initialBalance,
 // 	})
-	
+
 // 	const gains = Number(updatedBalance[config.neutralAssetDenom].amount) - Number(initialBalance[config.neutralAssetDenom].amount)
 
 // 	// record results
@@ -371,7 +369,7 @@
 // 		}
 // 	]
 // 	const initialPrices = [
-// 	{	
+// 	{
 // 		denom: collateralOneDenom,
 // 		amount: '13',
 // 	},
@@ -389,7 +387,7 @@
 // 	}]
 
 // 	const postPrices = [
-// 		{	
+// 		{
 // 			denom: collateralOneDenom,
 // 			amount: '10',
 // 		},
@@ -405,7 +403,7 @@
 // 			denom: debtTwoDenom,
 // 			amount: '0.41',
 // 		}]
-	
+
 // 	const liquidationBonus : LiquidationBonus = {
 // 		max_lb: '0.2',
 // 		min_lb: '0',
@@ -495,9 +493,9 @@
 // 	}
 
 // 	const targetHealthFactor = '1.05'
-	
+
 // 	await runTest(
-// 		config, 
+// 		config,
 // 		1,
 // 		collaterals,
 // 		debts,
@@ -541,7 +539,7 @@
 // 		}
 // 	]
 // 	const initialPrices = [
-// 	{	
+// 	{
 // 		denom: collateralOneDenom,
 // 		amount: '13',
 // 	},
@@ -559,7 +557,7 @@
 // 	}]
 
 // 	const postPrices = [
-// 		{	
+// 		{
 // 			denom: collateralOneDenom,
 // 			amount: '10',
 // 		},
@@ -575,7 +573,7 @@
 // 			denom: debtTwoDenom,
 // 			amount: '0.45',
 // 		}]
-	
+
 // 	const liquidationBonus : LiquidationBonus = {
 // 		max_lb: '0.2',
 // 		min_lb: '0.05',
@@ -665,9 +663,9 @@
 // 	}
 
 // 	const targetHealthFactor = '1.05'
-	
+
 // 	await runTest(
-// 		config, 
+// 		config,
 // 		1,
 // 		collaterals,
 // 		debts,
@@ -711,7 +709,7 @@
 // 		}
 // 	]
 // 	const initialPrices = [
-// 	{	
+// 	{
 // 		denom: collateralOneDenom,
 // 		amount: '13',
 // 	},
@@ -729,7 +727,7 @@
 // 	}]
 
 // 	const postPrices = [
-// 		{	
+// 		{
 // 			denom: collateralOneDenom,
 // 			amount: '10',
 // 		},
@@ -745,7 +743,7 @@
 // 			denom: debtTwoDenom,
 // 			amount: '0.45',
 // 		}]
-	
+
 // 	const liquidationBonus : LiquidationBonus = {
 // 		max_lb: '0.2',
 // 		min_lb: '0.05',
@@ -835,9 +833,9 @@
 // 	}
 
 // 	const targetHealthFactor = '1.05'
-	
+
 // 	await runTest(
-// 		config, 
+// 		config,
 // 		1,
 // 		collaterals,
 // 		debts,
@@ -881,7 +879,7 @@
 // 		}
 // 	]
 // 	const initialPrices = [
-// 	{	
+// 	{
 // 		denom: collateralOneDenom,
 // 		amount: '13',
 // 	},
@@ -899,7 +897,7 @@
 // 	}]
 
 // 	const postPrices = [
-// 		{	
+// 		{
 // 			denom: collateralOneDenom,
 // 			amount: '10',
 // 		},
@@ -915,7 +913,7 @@
 // 			denom: debtTwoDenom,
 // 			amount: '0.5',
 // 		}]
-	
+
 // 	const liquidationBonus : LiquidationBonus = {
 // 		max_lb: '0.2',
 // 		min_lb: '0.02',
@@ -1005,9 +1003,9 @@
 // 	}
 
 // 	const targetHealthFactor = '1.05'
-	
+
 // 	await runTest(
-// 		config, 
+// 		config,
 // 		1,
 // 		collaterals,
 // 		debts,
@@ -1051,7 +1049,7 @@
 // 		}
 // 	]
 // 	const initialPrices = [
-// 	{	
+// 	{
 // 		denom: collateralOneDenom,
 // 		amount: '13',
 // 	},
@@ -1069,7 +1067,7 @@
 // 	}]
 
 // 	const postPrices = [
-// 		{	
+// 		{
 // 			denom: collateralOneDenom,
 // 			amount: '10',
 // 		},
@@ -1085,7 +1083,7 @@
 // 			denom: debtTwoDenom,
 // 			amount: '0.5',
 // 		}]
-	
+
 // 	const liquidationBonus : LiquidationBonus = {
 // 		max_lb: '0.2',
 // 		min_lb: '0.02',
@@ -1175,9 +1173,9 @@
 // 	}
 
 // 	const targetHealthFactor = '1.05'
-	
+
 // 	await runTest(
-// 		config, 
+// 		config,
 // 		1,
 // 		collaterals,
 // 		debts,
@@ -1221,7 +1219,7 @@
 // 		}
 // 	]
 // 	const initialPrices = [
-// 	{	
+// 	{
 // 		denom: collateralOneDenom,
 // 		amount: '13',
 // 	},
@@ -1239,7 +1237,7 @@
 // 	}]
 
 // 	const postPrices = [
-// 		{	
+// 		{
 // 			denom: collateralOneDenom,
 // 			amount: '10',
 // 		},
@@ -1255,7 +1253,7 @@
 // 			denom: debtTwoDenom,
 // 			amount: '0.5',
 // 		}]
-	
+
 // 	const liquidationBonus : LiquidationBonus = {
 // 		max_lb: '0.2',
 // 		min_lb: '0.02',
@@ -1345,9 +1343,9 @@
 // 	}
 
 // 	const targetHealthFactor = '1.05'
-	
+
 // 	await runTest(
-// 		config, 
+// 		config,
 // 		1,
 // 		collaterals,
 // 		debts,

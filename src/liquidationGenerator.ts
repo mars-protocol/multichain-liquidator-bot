@@ -1,4 +1,3 @@
-
 import BigNumber from 'bignumber.js'
 import { AssetResponse, Collateral, Debt } from './query/types'
 
@@ -15,7 +14,8 @@ const sortAssetArrayByAmount = (
 				.multipliedBy(prices.get(a.denom) || 0)
 				.minus(new BigNumber(b.amount).multipliedBy(prices.get(b.denom) || 0))
 				.toNumber(),
-		).reverse()
+		)
+		.reverse()
 }
 
 export const getLargestCollateral = (
