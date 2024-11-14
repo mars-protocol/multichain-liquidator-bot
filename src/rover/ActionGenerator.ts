@@ -13,7 +13,7 @@ import {
 	POOL_NOT_FOUND,
 	UNSUPPORTED_VAULT,
 } from './constants/errors'
-import { queryAstroportLpUnderlyingTokens } from '../helpers'
+import { calculateTotalPerpPnl, queryAstroportLpUnderlyingTokens } from '../helpers'
 import { VaultInfo } from '../query/types'
 import { PoolType, XYKPool } from '../types/Pool'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
@@ -30,16 +30,33 @@ export class ActionGenerator {
 		account: Positions,
 		oraclePrices: Map<string, BigNumber>,
 		redbankMarkets: Map<string, MarketInfo>,
+		neutralDenom: string,
 	): Promise<Action[]> => {
 		// Find highest value collateral. Note that is merely the largest collateral by oracle price.
 		// TODO: We should be taking into account the close factor and underlying market liquidity
-		const collateral: Collateral = this.findHighestValueCollateral(account, oraclePrices)
+		const hasNoCollaterals = account.deposits.length === 0 && 
+									account.lends.length === 0 && 
+									account.staked_astro_lps.length === 0
+		const collateral: Collateral = hasNoCollaterals ? {
+											type: PositionType.DEPOSIT,
+											value: new BigNumber(0),
+											amount: new BigNumber(0),
+											denom: neutralDenom,
+										} 
+									: this.findHighestValueCollateral(account, oraclePrices)
+		const totalPerpPnl = calculateTotalPerpPnl(account.perps)
 
-		// Find best debt to liquidate
-		const debt = this.findBestDebt(account.debts, oraclePrices)
+		// In some cases, a position may be unhealthy but have no debt, as all the negative pnl is 
+		// covered by the collateral. In this case, we can use the total amount of perp debt
+		const debt = account.debts.length === 0 ? {
+			amount: new BigNumber(totalPerpPnl.abs()),
+			// TODO think this should be explicity base denom, otherwise we might get bugs
+			denom: neutralDenom,
+			value: new BigNumber(0),
+		}
+		: this.findBestDebt(account.debts, oraclePrices)
 
-		// borrow messages will include the swap if we cannot borrow debt asset directly
-		const borrowActions = this.produceBorrowActions(
+		let borrowActions: Action[] = this.produceBorrowActions(
 			debt,
 			collateral,
 			redbankMarkets,
@@ -52,7 +69,7 @@ export class ActionGenerator {
 
 		const liquidateAction = this.produceLiquidationAction(
 			collateral.type,
-			{ denom: debt.denom, amount: "0" },
+			{ denom: debt.denom, amount: debt.amount.toFixed(0) },
 			account.account_id,
 			collateral.denom,
 		)
@@ -68,26 +85,28 @@ export class ActionGenerator {
 
 		const repayMsg = this.generateRepayActions(borrow.denom)
 		// todo estimate amount based on repay to prevent slippage.
-		// const swapToStableMsg = []
-			// borrow.denom !== this.config.neutralAssetDenom && swapWinnings
-			// 	? [
-			// 		await this.liquidationActionGenerator.generateSwapActions(
-			// 			borrow.denom,
-			// 			this.config.neutralAssetDenom,
-			// 			// todo estimate winnings
-			// 			'100',
-			// 			slippage
-			// 	)]
-			// 	: []
-		// const refundAll = this.liquidationActionGenerator.produceRefundAllAction()
+		const swapToStableMsg =
+			borrow.denom !== neutralDenom
+				? [
+					await this.generateSwapActions(
+						borrow.denom,
+						neutralDenom,
+						oraclePrices.get(borrow.denom)!,
+						oraclePrices.get(neutralDenom)!,
+						// todo estimate correctly
+						'100',
+						slippage
+				)]
+				: []
+		const refundAll = this.produceRefundAllAction()
 
 		const actions = [
 			...borrowActions,
 			liquidateAction,
 			...collateralToDebtActions,
 			...repayMsg,
-			// ...swapToStableMsg,
-			// refundAll,
+			...swapToStableMsg,
+			refundAll,
 		]
 		if (process.env.DEBUG) {
 			actions.forEach((action) => console.log(JSON.stringify(action)))
@@ -320,7 +339,6 @@ export class ActionGenerator {
 				.multipliedBy(borrowed.amount)
 				.multipliedBy(0.8)
 
-			console.log(slippage)
 			actions = actions.concat(
 				await this.generateSwapActions(
 					collateralDenom,

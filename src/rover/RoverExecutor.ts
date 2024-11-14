@@ -137,7 +137,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			const updatedAccount: Positions = calculatePositionStateAfterPerpClosure(account, this.config.neutralAssetDenom)
 
-			const actions = this.liquidationActionGenerator.generateLiquidationActions(updatedAccount, this.prices, this.markets)
+			const actions = this.liquidationActionGenerator.generateLiquidationActions(updatedAccount, this.prices, this.markets, this.config.neutralAssetDenom)
 
 			const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
 

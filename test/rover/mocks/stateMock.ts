@@ -1,10 +1,11 @@
-import { Coin, Positions } from "marsjs-types/mars-credit-manager/MarsCreditManager.types";
+import { Coin, PerpPosition, Positions } from "marsjs-types/mars-credit-manager/MarsCreditManager.types";
 import { MarketInfo } from "../../../src/rover/types/MarketInfo";
 import BigNumber from "bignumber.js";
 import { InterestRateModel } from "marsjs-types/mars-red-bank/MarsRedBank.types";
 
 export class StateMock {
     constructor(
+        public neutralDenom: string,
         public account: Positions,
         public markets: Map<string, MarketInfo>,
         public prices: Map<string, BigNumber>
@@ -18,9 +19,14 @@ export class StateMock {
         this.account.debts = debts.map(debt => {return { ...debt, shares: '0' }});
     }
 
+    public setUserPerpsPositions = (perps: PerpPosition[]): void => {
+        this.account.perps = perps
+    }
+
     public static default(): StateMock {
 
         return new StateMock(
+            'uusd',
             {
                 account_id: '1',
                 account_kind: 'default',
@@ -41,7 +47,6 @@ export class StateMock {
                         'atom',
                         { ...defaultMarket, denom: 'uatom'}
                     ]
-
             ]
             ),
             new Map<string, BigNumber>(
@@ -54,6 +59,29 @@ export class StateMock {
     }
 } 
 
+export const defaultPerpPosition: PerpPosition =  {
+    denom: 'uatom',
+    base_denom: 'uusd',
+    unrealized_pnl: {
+        accrued_funding: '0',
+        closing_fee: '0',
+        opening_fee: '0',
+        pnl: '0',
+        price_pnl: '0',
+    },
+    realized_pnl: {
+        accrued_funding: '0',
+        closing_fee: '0',
+        opening_fee: '0',
+        pnl: '0',
+        price_pnl: '0',
+    },
+    current_exec_price: '0',
+    current_price: '0',
+    entry_exec_price: '0',
+    entry_price: '0',
+    size: '10',
+}
 
 
 const defaultMarket: MarketInfo = {

@@ -3,6 +3,7 @@ import {
 } from 'marsjs-types/mars-red-bank/MarsRedBank.types'
 import { MarketInfo } from '../../../src/rover/types/MarketInfo'
 import { PerpPosition } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
+import BigNumber from 'bignumber.js'
 
 export const generateRandomMarket = (denom?: string): MarketInfo => {
 	return {
@@ -22,7 +23,7 @@ export const generateRandomMarket = (denom?: string): MarketInfo => {
 		liquidity_index: Math.random().toString(),
 		liquidity_rate: Math.random().toString(),
 		max_loan_to_value: Math.random().toString(),
-		available_liquidity: Math.random() * 100000,
+		available_liquidity: new BigNumber(Math.random() * 100000),
 	}
 }
 

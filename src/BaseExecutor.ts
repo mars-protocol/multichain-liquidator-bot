@@ -50,7 +50,7 @@ export class BaseExecutor {
 	// Data
 	public prices: Map<string, BigNumber> = new Map()
 	public balances: Map<string, number> = new Map()
-	public markets: MarketInfo[] = []
+	public markets: Map<string, MarketInfo> = new Map()
 
 	// logging
 	private csvLogger = new CSVWriter('./results.csv', [
@@ -86,7 +86,7 @@ export class BaseExecutor {
 
 		const availableLiquidity = descaledDeposits.minus(descaledBorrows)
 
-		market.available_liquidity = availableLiquidity.toNumber()
+		market.available_liquidity = availableLiquidity
 		return market
 	}
 
@@ -240,6 +240,7 @@ export class BaseExecutor {
 			fetching = response.length === 5
 		}
 
+		// @ts-ignore TODO
 		this.markets = markets.map((market: MarketInfo) =>
 			this.applyAvailableLiquidity(market),
 		)
