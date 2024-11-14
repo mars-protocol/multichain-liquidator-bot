@@ -96,7 +96,7 @@ export class ActionGenerator {
 						),
 				  ]
 				: []
-		const refundAll = this.produceRefundAllAction()
+		// const refundAll = this.produceRefundAllAction()
 
 		const actions = [
 			...borrowActions,
@@ -104,7 +104,7 @@ export class ActionGenerator {
 			...collateralToDebtActions,
 			...repayMsg,
 			...swapToStableMsg,
-			refundAll,
+			// refundAll,
 		]
 		if (process.env.DEBUG) {
 			actions.forEach((action) => console.log(JSON.stringify(action)))

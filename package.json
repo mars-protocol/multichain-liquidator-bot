@@ -14,7 +14,7 @@
 		"test:coverage": "yarn clean && yarn build && jest --coverage",
 		"lint": "yarn format-check && eslint . && yarn build",
 		"format": "prettier --write .",
-		"format-check": "prettier --ignore-path .gitignore --check ."
+		"format:check": "prettier --ignore-path .gitignore --check ."
 	},
 	"dependencies": {
 		"@aws-sdk/client-secrets-manager": "^3.188.0",

@@ -154,14 +154,14 @@ export class RoverExecutor extends BaseExecutor {
 				this.config.neutralAssetDenom,
 			)
 
-			const actions = this.liquidationActionGenerator.generateLiquidationActions(
+			const actions = await this.liquidationActionGenerator.generateLiquidationActions(
 				updatedAccount,
 				this.prices,
 				this.markets,
 				this.config.neutralAssetDenom,
 			)
 
-			const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
+			const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)!
 
 			// Produce message
 			const msg = {
