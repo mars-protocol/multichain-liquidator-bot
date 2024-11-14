@@ -1,5 +1,4 @@
-# .github/workflows/pr-checks.yml
-name: Coverage
+name: Scripts
 
 on:
    push:
