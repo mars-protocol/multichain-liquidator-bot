@@ -1,7 +1,12 @@
-import { EncodeObject } from "@cosmjs/proto-signing";
-import { RouteHop } from "../types/RouteHop";
-import { Coin } from "marsjs-types/mars-credit-manager/MarsCreditManager.types";
+import { EncodeObject } from '@cosmjs/proto-signing'
+import { RouteHop } from '../types/RouteHop'
+import { Coin } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 
 export interface Exchange {
-    produceSwapMessage(route : RouteHop[], tokenIn: Coin, minimumRecieve : string, sender: string): EncodeObject
+	produceSwapMessage(
+		route: RouteHop[],
+		tokenIn: Coin,
+		minimumRecieve: string,
+		sender: string,
+	): EncodeObject
 }

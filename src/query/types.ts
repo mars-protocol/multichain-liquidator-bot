@@ -58,7 +58,7 @@ export interface CoreDataResponse {
 }
 
 export interface Balances {
-		balance: Coin[]
+	balance: Coin[]
 }
 
 export interface VaultInfoWasm {

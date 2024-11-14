@@ -4,5 +4,5 @@ export interface RouteHop {
 	poolId: Long
 	tokenInDenom: string
 	tokenOutDenom: string
-	pool : Pool
+	pool: Pool
 }

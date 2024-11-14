@@ -28,7 +28,13 @@ import {
 
 import { MsgSwapExactAmountIn } from 'osmojs/dist/codegen/osmosis/poolmanager/v1beta1/tx'
 
-import { AminoTypes, GasPrice, MsgSendEncodeObject, SigningStargateClient, StdFee } from '@cosmjs/stargate'
+import {
+	AminoTypes,
+	GasPrice,
+	MsgSendEncodeObject,
+	SigningStargateClient,
+	StdFee,
+} from '@cosmjs/stargate'
 import { camelCase } from 'lodash'
 import { HdPath } from '@cosmjs/crypto'
 import { SwapAmountInRoute } from 'osmojs/dist/codegen/osmosis/poolmanager/v1beta1/swap_route'
@@ -79,12 +85,14 @@ export const getAddress = async (wallet: DirectSecp256k1HdWallet): Promise<strin
 	return accounts[0].address
 }
 
-export const camelToSnake= (camelCaseStr: string): string => {
-    return camelCaseStr
-        // Insert an underscore before each uppercase letter
-        .replace(/([a-z])([A-Z])/g, '$1_$2')
-        // Convert the entire string to lowercase
-        .toLowerCase();
+export const camelToSnake = (camelCaseStr: string): string => {
+	return (
+		camelCaseStr
+			// Insert an underscore before each uppercase letter
+			.replace(/([a-z])([A-Z])/g, '$1_$2')
+			// Convert the entire string to lowercase
+			.toLowerCase()
+	)
 }
 
 export const produceSigningStargateClient = async (
@@ -143,18 +151,20 @@ interface AstroportPairInfo {
 	}
 }
 
-export const queryAstroportLpUnderlyingTokens = async(lpToken: string): Promise<string[] | undefined> => {
+export const queryAstroportLpUnderlyingTokens = async (
+	lpToken: string,
+): Promise<string[] | undefined> => {
 	const pairAddress = lpToken.split('/')[1]
 
 	// Build the url
 	const encodedMsg = Buffer.from(JSON.stringify({ pair: {} })).toString('base64')
 	const url = `${process.env.LCD_ENDPOINT}/cosmwasm/wasm/v1/contract/${pairAddress}/smart/${encodedMsg}`
-	
+
 	// Fetch pair info
 	const response = await fetch(url)
 	const pairInfo: AstroportPairInfo = await response.json()
-	
-	return pairInfo.data.asset_infos.map(assetInfo => assetInfo.native_token.denom)
+
+	return pairInfo.data.asset_infos.map((assetInfo) => assetInfo.native_token.denom)
 }
 
 export const setPrice = async (
@@ -182,7 +192,7 @@ export const seedAddresses = async (
 	sender: string,
 	accounts: readonly AccountData[],
 	coins: Coin[],
-	fee?: StdFee
+	fee?: StdFee,
 ): Promise<string[]> => {
 	const seededAddresses: string[] = []
 	const sendTokenMsgs: EncodeObject[] = []
@@ -217,7 +227,7 @@ export const seedAddresses = async (
 		seededAddresses.push(addressToSeed)
 	})
 
-	await client.signAndBroadcast(sender, sendTokenMsgs, fee? fee : 'auto')
+	await client.signAndBroadcast(sender, sendTokenMsgs, fee ? fee : 'auto')
 
 	return seededAddresses
 }
@@ -341,14 +351,11 @@ export const produceWithdrawMessage = (
 	return produceExecuteContractMessage(sender, redBankContractAddress, msg, [])
 }
 
-export const calculateTotalPerpPnl = (
-	perpPositions: PerpPosition[],
-) : BigNumber => {
+export const calculateTotalPerpPnl = (perpPositions: PerpPosition[]): BigNumber => {
 	return perpPositions.reduce((acc, position) => {
 		return acc.plus(position.unrealized_pnl.pnl.toString())
 	}, BigNumber(0))
 }
-
 
 // Calculate the state of the position post perp closure.
 // This simulates what would happen in the contracts when liquidation, as all positions are
@@ -357,8 +364,7 @@ export const calculateTotalPerpPnl = (
 export const calculatePositionStateAfterPerpClosure = (
 	positions: Positions,
 	baseDenom: string,
-) : Positions => {
-
+): Positions => {
 	const totalPerpPnl: BigNumber = calculateTotalPerpPnl(positions.perps)
 	const baseDenomDeposits = positions.deposits.find((deposit) => deposit.denom === baseDenom)
 	const baseDenomLends = positions.lends.find((lend) => lend.denom === baseDenom)
@@ -370,7 +376,7 @@ export const calculatePositionStateAfterPerpClosure = (
 
 	if (totalPerpPnl.isNegative()) {
 		let remainingDebt = totalPerpPnl.abs()
-		
+
 		// First we deduct from deposits
 		if (baseDenomDeposits) {
 			if (depositAmount.gt(remainingDebt)) {
@@ -419,7 +425,6 @@ export const calculatePositionStateAfterPerpClosure = (
 
 	return positions
 }
-
 
 interface MsgSwapEncodeObject {
 	typeUrl: string
@@ -503,13 +508,13 @@ export const repay = async (
 }
 
 export const createOsmoRoute = (route: RouteHop[]): OsmoRoute => {
-	const osmoRoute : OsmoRoute = {
-		swaps: route.map(hop => {
-		  return {
-			pool_id: hop.poolId.toNumber(),
-			to: hop.tokenOutDenom,
-		  }
-		})
+	const osmoRoute: OsmoRoute = {
+		swaps: route.map((hop) => {
+			return {
+				pool_id: hop.poolId.toNumber(),
+				to: hop.tokenOutDenom,
+			}
+		}),
 	}
 
 	return osmoRoute

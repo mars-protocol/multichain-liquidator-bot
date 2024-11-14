@@ -46,7 +46,7 @@ export const fetchRoverData = async (
 		address,
 		redbankAddress,
 		swapperAddress,
-		params_address
+		params_address,
 	)
 
 	const queries = vaultAddresses.map((vault) => {
@@ -114,7 +114,6 @@ export const fetchRoverPosition = async (
 	creditManagerAddress: string,
 	hiveEndpoint: string,
 ): Promise<Positions> => {
-
 	const query = { query: produceRoverAccountPositionQuery(accountId, creditManagerAddress) }
 
 	// post to hive endpoint
@@ -131,8 +130,6 @@ export const fetchRoverPosition = async (
 			}
 		}
 	}
-
-	
 
 	return result.data.wasm.position
 }
@@ -160,15 +157,14 @@ export const fetchRedbankBatch = async (
 export const fetchBalances = async (
 	client: CosmWasmClient,
 	addresses: string[],
-	gasDenom: string
-) : Promise<Map<string, Coin[]>> => {
-
+	gasDenom: string,
+): Promise<Map<string, Coin[]>> => {
 	const promises = addresses.map(async (address) => {
-		return {address, coin: await client.getBalance(address, gasDenom)}
+		return { address, coin: await client.getBalance(address, gasDenom) }
 	})
 
 	const balances = await Promise.all(promises)
-	const balancesMap : Map<string, Coin[]> = new Map()
+	const balancesMap: Map<string, Coin[]> = new Map()
 
 	balances.forEach((balance) => {
 		// @ts-ignore

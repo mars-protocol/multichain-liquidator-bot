@@ -9,7 +9,7 @@ export enum PositionType {
 	LEND,
 	DEPOSIT,
 	VAULT,
-	STAKED_ASTRO_LP
+	STAKED_ASTRO_LP,
 }
 
 export interface Collateral {

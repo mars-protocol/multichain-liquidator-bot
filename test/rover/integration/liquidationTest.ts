@@ -272,7 +272,7 @@
 // 		)
 
 // 		await executor.start()
-		
+
 // 		let liquidated = false
 // 		let startTime = Date.now()
 // 		const second = 1000
@@ -284,7 +284,7 @@
 // 			if (liquidated) {
 // 				console.log(newHealthFactorResults)
 // 			}
-		
+
 // 			await sleep(1 * second)
 // 		}
 
@@ -1268,11 +1268,10 @@
 
 // main().then(() => process.exit())
 
-
 // const updateCoinsWhitelist = async(
 //     deployerAddress: string,
 //     marsParamsAddress : string,
-//     cosmWasmClient: SigningCosmWasmClient, 
+//     cosmWasmClient: SigningCosmWasmClient,
 //     denoms: Array<string>,
 //     whitelisted: boolean) => {
 
@@ -1292,14 +1291,14 @@
 // const createUpdateCMCoinStateMsg = async(
 //     deployerAddress: string,
 //     marsParamsAddress : string,
-//     cosmWasmClient: SigningCosmWasmClient, 
+//     cosmWasmClient: SigningCosmWasmClient,
 //     denom: string,
 //     enabled: boolean
 // ) => {
 
 //     // query the asset params with the config.
 //     let state : AssetParamsBaseForAddr = await cosmWasmClient.queryContractSmart(
-//         marsParamsAddress, 
+//         marsParamsAddress,
 //         {
 //             asset_params : {
 //                 denom

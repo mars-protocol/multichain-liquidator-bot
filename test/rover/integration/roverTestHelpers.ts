@@ -3,10 +3,7 @@ import { getAddress, getWallet, produceSigningStargateClient, Seed } from '../..
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
 import { MarsCreditManagerClient } from 'marsjs-types/mars-credit-manager/MarsCreditManager.client'
 import { MarsAccountNftQueryClient } from 'marsjs-types/mars-account-nft/MarsAccountNft.client'
-import {
-	Action,
-	Coin,
-} from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
+import { Action, Coin } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import { difference } from 'lodash'
 
 export enum PositionCollectionType {
@@ -34,9 +31,7 @@ export const createCreditAccount = async (
 	exec: MarsCreditManagerClient,
 ): Promise<string> => {
 	const before = await nft.tokens({ owner: userAddress })
-	await exec.createCreditAccount(
-		'default'
-	)
+	await exec.createCreditAccount('default')
 	const after = await nft.tokens({ owner: userAddress })
 	const diff = difference(after.tokens, before.tokens)
 

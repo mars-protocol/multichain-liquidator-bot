@@ -1,4 +1,3 @@
-
 export interface TestConfig {
 	seed: string
 	atomDenom: string
@@ -36,7 +35,7 @@ export const testnetConfig: TestConfig = {
 	liquidationFiltererAddress: 'abc',
 	redbankAddress: 'osmo1t0dl6r27phqetfu0geaxrng0u9zn8qgrdwztapt5xr32adtwptaq6vwg36',
 	oracleAddress: 'osmo1dqz2u3c8rs5e7w5fnchsr2mpzzsxew69wtdy0aq4jsd76w7upmsstqe0s8',
-	marsParamsAddress : 'osmo10qt8wg0n7z740ssvf3urmvgtjhxpyp74hxqvqt7z226gykuus7eqxj2v4d',
+	marsParamsAddress: 'osmo10qt8wg0n7z740ssvf3urmvgtjhxpyp74hxqvqt7z226gykuus7eqxj2v4d',
 	rpcEndpoint: 'https://osmosis-delphi-testnet-1.simply-vc.com.mt/XF32UOOU55CX/osmosis-rpc/',
 	prefix: 'osmo',
 	hiveEndpoint:
@@ -48,7 +47,7 @@ export const testnetConfig: TestConfig = {
 		liquidateSingle: true,
 		liquidateMany: true,
 		liquidateBeatenFilterer: true,
-	}
+	},
 }
 
 export const localnetConfig: TestConfig = {

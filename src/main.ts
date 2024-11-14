@@ -20,7 +20,6 @@ const REDBANK = 'Redbank'
 const ROVER = 'Rover'
 
 export const main = async () => {
-
 	// Define if we are launching a rover executor or a redbank executor
 	const executorType = process.env.EXECUTOR_TYPE!
 
@@ -38,13 +37,18 @@ export const main = async () => {
 	}
 
 	const liquidator = await DirectSecp256k1HdWallet.fromMnemonic(await sm.getSeedPhrase(), {
-		prefix ,
+		prefix,
 		hdPaths,
 	})
 	const liquidatorMasterAddress = (await liquidator.getAccounts())[0].address
 
 	// Produce config
-	const network  = process.env.NETWORK === "MAINNET" ? Network.MAINNET : process.env.NETWORK === "TESTNET" ? Network.TESTNET : Network.LOCALNET
+	const network =
+		process.env.NETWORK === 'MAINNET'
+			? Network.MAINNET
+			: process.env.NETWORK === 'TESTNET'
+			? Network.TESTNET
+			: Network.LOCALNET
 	const redbankConfig = getRedbankConfig(liquidatorMasterAddress, network, chainName)
 	const roverConfig = getRoverConfig(liquidatorMasterAddress, network, chainName)
 
@@ -52,8 +56,14 @@ export const main = async () => {
 	const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!)
 	const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
 
-	const exchangeInterface = chainName === "osmosis" ? new Osmosis() : new AstroportCW(prefix, redbankConfig.astroportRouter!)
-	const routeRequester = chainName === "neutron" ? new AstroportRouteRequester(process.env.ASTROPORT_API_URL!) : new OsmosisRouteRequester(process.env.API_URL!)
+	const exchangeInterface =
+		chainName === 'osmosis'
+			? new Osmosis()
+			: new AstroportCW(prefix, redbankConfig.astroportRouter!)
+	const routeRequester =
+		chainName === 'neutron'
+			? new AstroportRouteRequester(process.env.ASTROPORT_API_URL!)
+			: new OsmosisRouteRequester(process.env.API_URL!)
 
 	switch (executorType) {
 		case REDBANK:
@@ -69,7 +79,6 @@ export const main = async () => {
 	}
 }
 
-
 const launchRover = async (
 	client: SigningStargateClient,
 	wasmClient: CosmWasmClient,
@@ -77,20 +86,14 @@ const launchRover = async (
 	liquidatorWallet: DirectSecp256k1HdWallet,
 	routeRequester: RouteRequester,
 ) => {
-	await new RoverExecutor(
-		roverConfig,
-		client,
-		wasmClient,
-		liquidatorWallet,
-		routeRequester,
-	).start()
+	await new RoverExecutor(roverConfig, client, wasmClient, liquidatorWallet, routeRequester).start()
 }
 
 const launchRedbank = async (
 	client: SigningStargateClient,
 	wasmClient: CosmWasmClient,
-	redbankConfig : RedbankExecutorConfig,
-	exchangeInterface : Exchange,
+	redbankConfig: RedbankExecutorConfig,
+	exchangeInterface: Exchange,
 	routeRequester: RouteRequester,
 ) => {
 	await new RedbankExecutor(

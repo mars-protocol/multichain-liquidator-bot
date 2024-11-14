@@ -2,7 +2,7 @@ export const produceCoreRoverDataQuery = (
 	address: string,
 	redbankAddress: string,
 	swapperAddress: string,
-  params_address: string,
+	params_address: string,
 ) => {
 	return `{
     bank {

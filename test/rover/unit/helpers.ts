@@ -1,6 +1,4 @@
-import {
-	UserDebtResponse,
-} from 'marsjs-types/mars-red-bank/MarsRedBank.types'
+import { UserDebtResponse } from 'marsjs-types/mars-red-bank/MarsRedBank.types'
 import { MarketInfo } from '../../../src/rover/types/MarketInfo'
 import { PerpPosition } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
@@ -42,9 +40,8 @@ export const generateRandomCreditLine = (
 export const generateBlankPerpPositionWithPnl = (
 	baseDenom: string,
 	perpDenom: string,
-	pnl: string
+	pnl: string,
 ): PerpPosition => {
-
 	const unrealizedPnl = {
 		accrued_funding: '0',
 		closing_fee: '0',
