@@ -90,49 +90,55 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	run = async () => {
-		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-		const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=${
-			this.config.chainName
-		}&product=${this.config.productName}`
+		try {
+			// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
+			const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=${
+				this.config.chainName
+			}&product=${this.config.productName}`
 
-		const response = await fetch(url)
-		let targetAccountObjects: {
-			account_id: string
-			health_factor: string
-			total_debt: string
-		}[] = (await response.json())['data']
+			const response = await fetch(url)
+			let targetAccountObjects: {
+				account_id: string
+				health_factor: string
+				total_debt: string
+			}[] = (await response.json())['data']
 
-		const targetAccounts = targetAccountObjects
-			.filter(
-				(account) =>
-					Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
-					Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
-				// To target specific accounts, filter here
-			)
-			.sort((accountA, accountB) => Number(accountB.total_debt) - Number(accountA.total_debt))
-		// Sleep to avoid spamming.
+			const targetAccounts = targetAccountObjects
+				.filter(
+					(account) =>
+						Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
+						Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
+					// To target specific accounts, filter here
+				)
+				.sort((accountA, accountB) => Number(accountB.total_debt) - Number(accountA.total_debt))
+			// Sleep to avoid spamming.
 
-		if (targetAccounts.length == 0) {
-			await sleep(2000)
-			return
-		}
-
-		// create chunks of accounts to liquidate
-		const unhealthyAccountChunks = []
-		for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {
-			unhealthyAccountChunks.push(targetAccounts.slice(i, i + this.liquidatorAccounts.size))
-		}
-		// iterate over chunks and liquidate
-		for (const chunk of unhealthyAccountChunks) {
-			const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
-			const liquidationPromises: Promise<void>[] = []
-			for (const account of chunk) {
-				const nextLiquidator = liquidatorAddressesIterator.next()
-				console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
-				liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value!))
+			if (targetAccounts.length == 0) {
+				await sleep(2000)
+				return
 			}
-			await Promise.all(liquidationPromises)
-			await sleep(4000)
+
+			// create chunks of accounts to liquidate
+			const unhealthyAccountChunks = []
+			for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {
+				unhealthyAccountChunks.push(targetAccounts.slice(i, i + this.liquidatorAccounts.size))
+			}
+			// iterate over chunks and liquidate
+			for (const chunk of unhealthyAccountChunks) {
+				const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
+				const liquidationPromises: Promise<void>[] = []
+				for (const account of chunk) {
+					const nextLiquidator = liquidatorAddressesIterator.next()
+					console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
+					liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value!))
+				}
+				await Promise.all(liquidationPromises)
+				await sleep(4000)
+			}
+		} catch (ex) {
+			if (process.env.DEBUG) {
+				console.error(ex)
+			}
 		}
 	}
 

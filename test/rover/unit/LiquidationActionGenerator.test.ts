@@ -79,7 +79,6 @@ describe('Liquidation Action Generator Tests', () => {
 			expect(denom).toBe('uatom')
 		})
 		it('Action 1; Should select deposit usd collateral', () => {
-			console.log(actions[1])
 			// @ts-ignore
 			let denom: String = actions[1].liquidate.request.deposit
 
@@ -372,7 +371,6 @@ describe('Liquidation Action Generator Tests', () => {
 		})
 
 		it('Should pick the usd collateral', () => {
-			console.log(actions[1])
 			// @ts-ignore
 			let denom: String = actions[1].liquidate.request.deposit
 
@@ -452,7 +450,6 @@ describe('Liquidation Action Generator Tests', () => {
 		})
 
 		it('Should pick the usd collateral', () => {
-			console.log(actions[1])
 			// @ts-ignore
 			let denom: String = actions[1].liquidate.request.deposit
 
