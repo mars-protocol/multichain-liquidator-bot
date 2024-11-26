@@ -9,11 +9,14 @@ import {
 	DebtAmount,
 } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
-import { POOL_NOT_FOUND, UNSUPPORTED_VAULT } from './constants/errors'
 import { calculateTotalPerpPnl, queryAstroportLpUnderlyingTokens } from '../helpers'
-import { VaultInfo } from '../query/types'
-import { PoolType, XYKPool } from '../types/Pool'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
+import {
+	LiquidationAmountInputs,
+	calculate_liquidation_amounts_js,
+	HealthData,
+} from 'liquidation-wasm'
+import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types.js'
 
 export class ActionGenerator {
 	private routeRequester: RouteRequester
@@ -26,6 +29,8 @@ export class ActionGenerator {
 		account: Positions,
 		oraclePrices: Map<string, BigNumber>,
 		redbankMarkets: Map<string, MarketInfo>,
+		assetParams: Map<string, AssetParamsBaseForAddr>,
+		healthData: HealthData,
 		neutralDenom: string,
 	): Promise<Action[]> => {
 		// Find highest value collateral. Note that is merely the largest collateral by oracle price.
@@ -54,9 +59,35 @@ export class ActionGenerator {
 						denom: neutralDenom,
 						value: new BigNumber(0),
 				  }
-				: this.findBestDebt(account.debts, oraclePrices)
+				: this.findLargestDebt(account.debts, oraclePrices)
 
-		let borrowActions: Action[] = this.produceBorrowActions(debt, collateral, redbankMarkets)
+		const liquidationAmountInputs: LiquidationAmountInputs = {
+			collateral_amount: collateral.amount.toFixed(0),
+			collateral_price: oraclePrices.get(collateral.denom)!.toFixed(18),
+			collateral_params: assetParams.get(collateral.denom)!,
+			debt_amount: debt.amount.toFixed(0),
+			debt_params: assetParams.get(debt.denom)!,
+			debt_requested_to_repay: debt.amount.toFixed(0),
+			debt_price: oraclePrices.get(debt.denom)!.toFixed(18),
+			health: healthData,
+			// TODO: do we need to query this?
+			perps_lb_ratio: new BigNumber(0.1).toString(),
+		}
+
+		const liqHf: number = liquidationAmountInputs.health.liquidation_health_factor
+		if (liqHf == null || liqHf >= 1) {
+			throw new Error('Error: Position is not liquidatable. HF is either null or > 1. HF : ', )
+		}
+
+		console.log(liquidationAmountInputs)
+		const liquidationAmounts = calculate_liquidation_amounts_js(liquidationAmountInputs)
+		console.log(liquidationAmounts)
+		let borrowActions: Action[] = this.produceBorrowActions(
+			debt.denom,
+			liquidationAmounts.debt_amount,
+			collateral,
+			redbankMarkets,
+		)
 
 		// variables
 		const { borrow } = borrowActions[0] as { borrow: Coin }
@@ -65,7 +96,7 @@ export class ActionGenerator {
 
 		const liquidateAction = this.produceLiquidationAction(
 			collateral.type,
-			{ denom: debt.denom, amount: debt.amount.toFixed(0) },
+			{ denom: debt.denom, amount: liquidationAmounts.debt_amount.toString() },
 			account.account_id,
 			collateral.denom,
 		)
@@ -73,7 +104,10 @@ export class ActionGenerator {
 		const collateralToDebtActions =
 			collateral.denom !== borrow.denom
 				? await this.swapCollateralCoinToDebtActions(
-						collateral.denom,
+						{
+							amount: liquidationAmounts.collateral_amount_received_by_liquidator.toString(),
+							denom: collateral.denom,
+						},
 						borrow,
 						slippage,
 						oraclePrices,
@@ -96,7 +130,8 @@ export class ActionGenerator {
 						),
 				  ]
 				: []
-		const refundAll = this.produceRefundAllAction()
+		// TODO 
+		// const refundAll = this.produceRefundAllAction()
 
 		const actions = [
 			...borrowActions,
@@ -104,7 +139,7 @@ export class ActionGenerator {
 			...collateralToDebtActions,
 			...repayMsg,
 			...swapToStableMsg,
-			refundAll,
+			// refundAll,
 		]
 		if (process.env.DEBUG) {
 			actions.forEach((action) => console.log(JSON.stringify(action)))
@@ -128,7 +163,8 @@ export class ActionGenerator {
 	 * @param collateral The largest collateral in the position
 	 */
 	produceBorrowActions = (
-		debt: Debt,
+		debtDenom: string,
+		maxRepayableAmount: BigNumber,
 		collateral: Collateral,
 		//@ts-ignore - to be used for todos in method
 		markets: map<string, MarketInfo[]>,
@@ -148,9 +184,10 @@ export class ActionGenerator {
 
 		// // debt amount is a number, not a value (e.g in dollar / base asset denominated terms)
 		// let debtAmount = debtToRepayRatio.multipliedBy(debt.amount)
+		console.log(maxRepayableAmount)
 		const debtCoin: Coin = {
-			amount: debt.amount.toFixed(0),
-			denom: debt.denom,
+			amount: maxRepayableAmount.toString(),
+			denom: debtDenom,
 		}
 
 		// TODO - check if asset is whitelisted
@@ -212,62 +249,6 @@ export class ActionGenerator {
 		}
 	}
 
-	produceVaultToDebtActions = async (
-		vault: VaultInfo,
-		borrow: Coin,
-		slippage: string,
-		prices: Map<string, BigNumber>,
-	): Promise<Action[]> => {
-		let vaultActions: Action[] = []
-		if (!vault) throw new Error(UNSUPPORTED_VAULT)
-
-		const lpTokenDenom = vault.baseToken
-		const poolId = lpTokenDenom.split('/').pop()
-
-		// withdraw lp
-		const withdraw = this.produceWithdrawLiquidityAction(lpTokenDenom)
-
-		vaultActions.push(withdraw)
-
-		//@ts-ignore
-		// Convert pool assets to borrowed asset
-		const pool = this.router.getPool(poolId!)
-
-		// todo log id - this shouldn't happen though
-		if (!pool) throw new Error(`${POOL_NOT_FOUND} : ${poolId}`)
-
-		// todo = support CL/Stableswap on rover
-		if (
-			pool.poolType === PoolType.CONCENTRATED_LIQUIDITY ||
-			pool.poolType === PoolType.STABLESWAP
-		) {
-			return []
-		}
-
-		let filteredPools = (pool as XYKPool).poolAssets.filter(
-			(poolAsset) => poolAsset.token.denom !== borrow.denom,
-		)
-
-		for (const poolAsset of filteredPools) {
-			const assetOutPrice = prices.get(borrow.denom)!
-			const assetInPrice = prices.get(poolAsset.token.denom)!
-			const amountIn = new BigNumber(assetOutPrice.dividedBy(assetInPrice)).multipliedBy(
-				borrow.amount,
-			)
-			vaultActions.push(
-				await this.generateSwapActions(
-					poolAsset.token.denom,
-					borrow.denom,
-					assetInPrice,
-					assetOutPrice,
-					amountIn.toFixed(0),
-					slippage,
-				),
-			)
-		}
-		return vaultActions
-	}
-
 	produceWithdrawLiquidityAction = (lpTokenDenom: string): Action => {
 		return {
 			withdraw_liquidity: {
@@ -304,16 +285,14 @@ export class ActionGenerator {
 	 * @returns An array of swap actions that convert the collateral to the debt.
 	 */
 	swapCollateralCoinToDebtActions = async (
-		collateralDenom: string,
+		collateralWon: Coin,
 		borrowed: Coin,
 		slippage: string,
 		prices: Map<string, BigNumber>,
 	): Promise<Action[]> => {
 		let actions: Action[] = []
-
-		console.log(JSON.stringify(prices.keys()))
-		console.log(collateralDenom)
-		console.log(borrowed.denom)
+		const collateralDenom = collateralWon.denom
+		const collateralAmount = new BigNumber(collateralWon.amount)
 		const assetInPrice = prices.get(collateralDenom)!
 		const assetOutPrice = prices.get(borrowed.denom)!
 
@@ -325,14 +304,9 @@ export class ActionGenerator {
 			const underlyingDenoms = (await queryAstroportLpUnderlyingTokens(collateralDenom))!
 			for (const denom of underlyingDenoms) {
 				if (denom !== borrowed.denom) {
-					// TODO This is a very rough approximation. We could optimise and make more accurate
-					const amountIn = assetOutPrice
-						.dividedBy(assetInPrice)
-						.multipliedBy(borrowed.amount)
-						.dividedBy(underlyingDenoms.length)
-						// This could be a source of bugs, if the amount of underlying tokens in the pools
-						// are not even. So we err on the side of caution.
-						.multipliedBy(0.5)
+					// TODO: This could be a source of bugs, if the amount of underlying tokens in the pools
+					// are not even.
+					const amountIn = collateralAmount.multipliedBy(0.5)
 					actions = actions.concat(
 						await this.generateSwapActions(
 							denom,
@@ -346,19 +320,13 @@ export class ActionGenerator {
 				}
 			}
 		} else {
-			// TODO this is a rough approximation
-			let amountIn = assetOutPrice
-				.dividedBy(assetInPrice)
-				.multipliedBy(borrowed.amount)
-				.multipliedBy(0.8)
-
 			actions = actions.concat(
 				await this.generateSwapActions(
 					collateralDenom,
 					borrowed.denom,
 					assetInPrice,
 					assetOutPrice,
-					amountIn.toFixed(0),
+					collateralAmount.toFixed(0),
 					slippage,
 				),
 			)
@@ -496,7 +464,7 @@ export class ActionGenerator {
 		return amountBn.multipliedBy(oraclePrice).toNumber()
 	}
 
-	findBestDebt = (debts: DebtAmount[], oraclePrices: Map<string, BigNumber>): Debt => {
+	findLargestDebt = (debts: DebtAmount[], oraclePrices: Map<string, BigNumber>): Debt => {
 		if (debts.length === 0) throw new Error('Error: No debts found')
 		return debts
 			.map((debtAmount) => {

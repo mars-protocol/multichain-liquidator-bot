@@ -42,7 +42,9 @@
 		"requests": "^0.3.0",
 		"ts-jest": "^29.2.5",
 		"ts-node": "^10.9.1",
-		"uuid": "^9.0.0"
+		"uuid": "^9.0.0",
+		"liquidation-wasm": "file:./packages/liquidation/pkg-node",
+		"hc-wasm": "file:./packages/health/pkg-web"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.21.0",

@@ -1,7 +1,6 @@
 import BigNumber from 'bignumber.js'
 import { Collateral, Debt } from '../query/types'
 import { AssetParamsBaseForAddr, Coin } from 'marsjs-types/mars-params/MarsParams.types'
-
 export const calculatePositionLtv = (
 	debts: Debt[],
 	collaterals: Collateral[],

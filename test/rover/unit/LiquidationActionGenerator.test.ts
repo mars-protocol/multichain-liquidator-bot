@@ -1,7 +1,7 @@
 import { Action, ActionCoin, Coin } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import { RouteRequester } from '../../../src/query/routing/RouteRequesterInterface'
 import { ActionGenerator } from '../../../src/rover/ActionGenerator'
-import { defaultPerpPosition, StateMock } from '../mocks/stateMock'
+import { StateMock } from '../mocks/stateMock'
 import Long from 'long'
 import { Pool } from '../../../src/types/Pool'
 
@@ -18,6 +18,10 @@ describe('Liquidation Action Generator Tests', () => {
 	describe('uusd collateral; atom debt', () => {
 		let actions: Action[] = []
 		beforeAll(async () => {
+			global.console.log = (...args) => {
+				process.stdout.write(args.join(' ') + '\n')
+			}
+
 			mock.setUserDeposits([
 				{
 					denom: 'uusd',
@@ -27,10 +31,17 @@ describe('Liquidation Action Generator Tests', () => {
 
 			mock.setUserDebts([
 				{
-					denom: 'uatom',
-					amount: '80',
+					denom: 'uusd',
+					amount: '1000',
 				},
 			])
+
+			mock.assetParams.forEach((value, key) => {
+				console.log(key)
+				console.log(JSON.stringify(value))
+			})
+
+			console.log(JSON.stringify(mock.getHealth()))
 
 			// We need to mock the route requester to return the correct routes
 			// First swap call is to swap collateral to debt
@@ -65,6 +76,8 @@ describe('Liquidation Action Generator Tests', () => {
 				mock.account,
 				mock.prices,
 				mock.markets,
+				mock.assetParams,
+				mock.getHealth(),
 				mock.neutralDenom,
 			)
 		})
@@ -181,10 +194,14 @@ describe('Liquidation Action Generator Tests', () => {
 				expectedOutput: '100',
 			})
 
+			console.log(mock.assetParams.keys())
+
 			actions = await liquidationActionGenerator.generateLiquidationActions(
 				mock.account,
 				mock.prices,
 				mock.markets,
+				mock.assetParams,
+				mock.getHealth(),
 				mock.neutralDenom,
 			)
 		})
@@ -278,6 +295,8 @@ describe('Liquidation Action Generator Tests', () => {
 				mock.account,
 				mock.prices,
 				mock.markets,
+				mock.assetParams,
+				mock.getHealth(),
 				mock.neutralDenom,
 			)
 		})
@@ -356,6 +375,8 @@ describe('Liquidation Action Generator Tests', () => {
 				mock.account,
 				mock.prices,
 				mock.markets,
+				mock.assetParams,
+				mock.getHealth(),
 				mock.neutralDenom,
 			)
 		})
@@ -435,6 +456,8 @@ describe('Liquidation Action Generator Tests', () => {
 				mock.account,
 				mock.prices,
 				mock.markets,
+				mock.assetParams,
+				mock.getHealth(),
 				mock.neutralDenom,
 			)
 		})
@@ -483,3 +506,5 @@ describe('Liquidation Action Generator Tests', () => {
 		})
 	})
 })
+
+// TODO perp case When borrow amount is 0

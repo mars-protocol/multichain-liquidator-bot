@@ -402,7 +402,8 @@ export const calculatePositionStateAfterPerpClosure = (
 		// if we still have debt, we need to increment it
 		if (baseDenomDebts) {
 			baseDenomDebts.amount = debtAmount.plus(remainingDebt).toString()
-		} else {
+		} else if (remainingDebt.gt(0)) {
+			console.log(remainingDebt.toString())
 			positions.debts.push({
 				amount: remainingDebt.toString(),
 				denom: baseDenom,
