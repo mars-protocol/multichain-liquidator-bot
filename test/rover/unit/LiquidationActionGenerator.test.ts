@@ -1,7 +1,7 @@
 import { Action, ActionCoin, Coin } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import { RouteRequester } from '../../../src/query/routing/RouteRequesterInterface'
 import { ActionGenerator } from '../../../src/rover/ActionGenerator'
-import { StateMock } from '../mocks/stateMock'
+import { defaultPerpPosition, StateMock } from '../mocks/stateMock'
 import Long from 'long'
 import { Pool } from '../../../src/types/Pool'
 
@@ -193,8 +193,6 @@ describe('Liquidation Action Generator Tests', () => {
 				//todo
 				expectedOutput: '100',
 			})
-
-			console.log(mock.assetParams.keys())
 
 			actions = await liquidationActionGenerator.generateLiquidationActions(
 				mock.account,

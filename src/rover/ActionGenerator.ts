@@ -79,9 +79,7 @@ export class ActionGenerator {
 			throw new Error('Error: Position is not liquidatable. HF is either null or > 1. HF : ')
 		}
 
-		console.log(liquidationAmountInputs)
 		const liquidationAmounts = calculate_liquidation_amounts_js(liquidationAmountInputs)
-		console.log(liquidationAmounts)
 		let borrowActions: Action[] = this.produceBorrowActions(
 			debt.denom,
 			liquidationAmounts.debt_amount,

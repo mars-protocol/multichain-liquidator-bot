@@ -47,8 +47,8 @@ export class StateMock {
 		let hc: HealthComputer = {
 			kind: this.account.account_kind,
 			positions: this.account,
-			asset_params: this.assetParams,
-			oracle_prices: this.prices,
+			asset_params: Object.fromEntries(this.assetParams),
+			oracle_prices: Object.fromEntries(this.prices),
 			perps_data: defaultPerpsData,
 			vaults_data: defaultVaultsData,
 		}
@@ -119,7 +119,7 @@ export const defaultPerpParams: PerpParams = {
 }
 
 export const defaultPerpsData = {
-	params: new Map<string, PerpParams>([['ubtc', defaultPerpParams]]),
+	params: Object.fromEntries(new Map<string, PerpParams>([['ubtc', defaultPerpParams]])),
 }
 
 export const defaultCmSettingsForAddr: CmSettingsForAddr = {
