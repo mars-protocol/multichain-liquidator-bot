@@ -86,7 +86,10 @@ export class RoverExecutor extends BaseExecutor {
 		// Ensure our liquidator wallets have more than enough funds to operate
 		setInterval(this.updateLiquidatorBalances, 20 * 1000)
 		// check for and dispatch liquidations
-		setInterval(this.run, 1000)
+		while (true) {
+			await this.run()
+			await sleep(2000)
+		}
 	}
 
 	run = async () => {
@@ -198,7 +201,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			const fee = await this.getFee(
 				msgs,
-				this.config.liquidatorMasterAddress,
+				liquidatorAddress,
 				this.config.chainName.toLowerCase(),
 			)
 

@@ -422,7 +422,8 @@ export const calculatePositionStateAfterPerpClosure = (
 			})
 		}
 	}
-
+	positions.deposits = positions.deposits.filter((deposit) => deposit.amount !== '0')
+	positions.debts = positions.debts.filter((debt) => debt.amount !== '0')
 	return positions
 }
 

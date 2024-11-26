@@ -55,22 +55,22 @@ export const getConfig = (
 		neutralAssetDenom: 'factory/neutron1ke0vqqzyymlp5esr8gjwuzh94ysnpvj8er5hm7/UUSDC', // no usdc pools on testnet so we use osmo
 		swapperAddress:
 			process.env.SWAPPER_ADDRESS ||
-			'neutron12xuseg6l3q6g6e928chmvzqus92m9tw6ajns88yg9ww5crx58djshwlqya',
+			'neutron1dyltrt8aekyprrs3l838r02cpceed48hjtz3x8vqrzm0tukm3ktqtp5j49',
 		oracleAddress:
 			process.env.ORACLE_ADDRESS ||
-			'neutron1pev35y62g6vte0s9t67gsf6m8d60x36t7wr0p0ghjl9r3h5mwl0q4h2zwc',
+			'neutron12vejgch3jd74j99kdrpjf57f6zjlu425yyfscdjnmnn4vvyrazvqgvcp24',
 		redbankAddress:
 			process.env.REDBANK_ADDRESS ||
-			'neutron1f8ag222s4rnytkweym7lfncrxhtee3za5uk54r5n2rjxvsl9slzq36f66d',
+			'neutron19ucpt6vyha2k6tgnex880sladcqsguwynst4f8krh9vuxhktwkvq3yc3nl',
 		accountNftAddress:
 			process.env.ACCOUNT_NFT_ADDRESS ||
-			'neutron1hx27cs7jjuvwq4hqgxn4av8agnspy2nwvrrq8e9f80jkeyrwrh8s8x645z',
+			'neutron1pgk4ttz3ned9xvqlg79f4jumjet0443uqh2rga9ahalzgxqngtrqrszdna',
 		marsParamsAddress:
 			process.env.MARS_PARAMS_ADDRESS ||
-			'neutron1q66e3jv2j9r0duzwzt37fwl7h5njhr2kqs0fxmaa58sfqke80a2ss5hrz7',
+			'neutron14a0qr0ahrg3f3yml06m9f0xmvw30ldf3scgashcjw5mrtyrc4aaq0v4tm9',
 		creditManagerAddress:
 			process.env.CREDIT_MANAGER_ADDRESS ||
-			'neutron13vyqc4efsnc357ze97ppv9h954zjasuj9d0w8es3mk9ea8sg6mvsr3xkjg',
+			'neutron1zkxezh5e6jvg0h3kj50hz5d0yrgagkp0c3gcdr6stulw7fye9xlqygj2gz',
 		liquidatorMasterAddress: liquidatorMasterAddress,
 		minGasTokens: 1000000,
 		logResults: false,
