@@ -31,7 +31,7 @@ export const getConfig = (
 				neutralAssetDenom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4',
 				poolsRefreshWindow: 60000,
 				liquidationProfitMarginPercent: 0.01,
-				marsEndpoint: 'https://api.marsprotocol.io',
+				marsEndpoint: process.env.MARS_API_ENDPOINT ? process.env.MARS_API_ENDPOINT : 'https://api.marsprotocol.io',
 				sqsUrl: process.env.SQS_URL!,
 		  }
 		: {
@@ -57,6 +57,7 @@ export const getConfig = (
 				logResults: false, // enable for debugging
 				neutralAssetDenom: 'uosmo', // no usdc pools on testnet
 				poolsRefreshWindow: 60000,
+				marsEndpoint: process.env.MARS_API_ENDPOINT ? process.env.MARS_API_ENDPOINT : 'https://api.marsprotocol.io',
 				liquidationProfitMarginPercent: 0.01,
 				sqsUrl: process.env.SQS_URL!,
 		  }

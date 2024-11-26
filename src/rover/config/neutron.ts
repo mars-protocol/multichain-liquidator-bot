@@ -35,7 +35,7 @@ export const getConfig = (
 			maxLiquidators: process.env.MAX_LIQUIDATORS ? parseInt(process.env.MAX_LIQUIDATORS) : 10,
 			stableBalanceThreshold: 5000000,
 			// marsEndpoint: "http://127.0.0.1:3000",
-			marsEndpoint: 'https://api.marsprotocol.io',
+			marsEndpoint: process.env.MARS_API_ENDPOINT ? process.env.MARS_API_ENDPOINT : 'https://api.marsprotocol.io',
 			sqsUrl: 'https://sqs.osmosis.zone/',
 		}
 	}
