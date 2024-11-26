@@ -76,7 +76,7 @@ export class ActionGenerator {
 
 		const liqHf: number = liquidationAmountInputs.health.liquidation_health_factor
 		if (liqHf == null || liqHf >= 1) {
-			throw new Error('Error: Position is not liquidatable. HF is either null or > 1. HF : ', )
+			throw new Error('Error: Position is not liquidatable. HF is either null or > 1. HF : ')
 		}
 
 		console.log(liquidationAmountInputs)
@@ -130,7 +130,7 @@ export class ActionGenerator {
 						),
 				  ]
 				: []
-		// TODO 
+		// TODO
 		// const refundAll = this.produceRefundAllAction()
 
 		const actions = [

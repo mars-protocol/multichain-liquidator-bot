@@ -156,14 +156,14 @@ export class RoverExecutor extends BaseExecutor {
 				this.config.neutralAssetDenom,
 			)
 
-			// Make prices safe for our wasm. If we just to string we 
+			// Make prices safe for our wasm. If we just to string we
 			// get things like 3.42558449e-9 which cannot be parsed
 			// by the health computer
-			let checkedPrices : Map<string, string> = new Map()
+			let checkedPrices: Map<string, string> = new Map()
 			this.prices.forEach((price, denom) => {
 				checkedPrices.set(denom, price.toFixed(18))
 			})
-			
+
 			// TODO calculate health
 			let hc: HealthComputer = {
 				kind: updatedAccount.account_kind,
@@ -185,9 +185,12 @@ export class RoverExecutor extends BaseExecutor {
 				account_net_value: new BigNumber(healthResponse.total_collateral_value)
 					.minus(healthResponse.total_debt_value)
 					.toFixed(0),
-				collateralization_ratio: healthResponse.total_debt_value === '0' ? new BigNumber(100000000) : new BigNumber(healthResponse.total_collateral_value)
-					.dividedBy(new BigNumber(healthResponse.total_debt_value))
-					.toFixed(0),
+				collateralization_ratio:
+					healthResponse.total_debt_value === '0'
+						? new BigNumber(100000000)
+						: new BigNumber(healthResponse.total_collateral_value)
+								.dividedBy(new BigNumber(healthResponse.total_debt_value))
+								.toFixed(0),
 				perps_pnl_loss: healthResponse.perps_pnl_loss,
 			}
 
@@ -235,11 +238,7 @@ export class RoverExecutor extends BaseExecutor {
 				msgs.push(sendMsg)
 			}
 
-			const fee = await this.getFee(
-				msgs,
-				liquidatorAddress,
-				this.config.chainName.toLowerCase(),
-			)
+			const fee = await this.getFee(msgs, liquidatorAddress, this.config.chainName.toLowerCase())
 
 			const result = await this.signingClient.signAndBroadcast(liquidatorAddress, msgs, fee)
 
