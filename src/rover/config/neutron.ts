@@ -67,7 +67,7 @@ export const getConfig = (
 		poolsRefreshWindow: 60000,
 		maxLiquidators: process.env.MAX_LIQUIDATORS ? parseInt(process.env.MAX_LIQUIDATORS) : 1,
 		stableBalanceThreshold: 5000000,
-		marsEndpoint: 'https://testnet-api.marsprotocol.io',
+		marsEndpoint: process.env.MARS_API_ENDPOINT ? process.env.MARS_API_ENDPOINT : 'https://testnet-api.marsprotocol.io',
 		sqsUrl: 'https://sqs.osmosis.zone/',
 	}
 }

@@ -57,7 +57,7 @@ export const getConfig = (
 				gasDenom: 'untrn',
 				liquidatorMasterAddress: liquidatorMasterAddress,
 				logResults: false, // enable for debugging
-				marsEndpoint: process.env.MARS_API_ENDPOINT ? process.env.MARS_API_ENDPOINT : 'https://api.marsprotocol.io',
+				marsEndpoint: process.env.MARS_API_ENDPOINT ? process.env.MARS_API_ENDPOINT : 'https://testnet-api.marsprotocol.io',
 				neutralAssetDenom: 'ibc/EFB00E728F98F0C4BBE8CA362123ACAB466EDA2826DC6837E49F4C1902F21BBA',
 				astroportRouter: 'neutron12jm24l9lr9cupufqjuxpdjnnweana4h66tsx5cl800mke26td26sq7m05p',
 				astroportFactory: 'neutron1jj0scx400pswhpjes589aujlqagxgcztw04srynmhf0f6zplzn2qqmhwj7',
