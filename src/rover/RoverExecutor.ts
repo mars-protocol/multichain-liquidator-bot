@@ -19,10 +19,10 @@ import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
-import { compute_health_js, HealthComputer } from 'hc-wasm'
+import { compute_health_js, HealthComputer } from 'mars-rover-health-computer'
 import { TokensResponse } from 'marsjs-types/mars-account-nft/MarsAccountNft.types'
 import { ChainQuery } from '../query/chainQuery'
-import { HealthData } from 'liquidation-wasm'
+import { HealthData } from 'mars-liquidation'
 
 interface CreateCreditAccountResponse {
 	tokenId: number
@@ -92,7 +92,10 @@ export class RoverExecutor extends BaseExecutor {
 		// Ensure our liquidator wallets have more than enough funds to operate
 		setInterval(this.updateLiquidatorBalances, 20 * 1000)
 		// check for and dispatch liquidations
-		while (true) await this.run()
+		while (true) {
+			await this.run()
+			await sleep(5000)
+		}
 	}
 
 	run = async () => {
@@ -343,10 +346,11 @@ export class RoverExecutor extends BaseExecutor {
 		let tokensResponse: TokensResponse = await this.queryClient.queryAccountsForAddress(
 			liquidatorAddress,
 		)
+
 		let msgs = [
 			produceExecuteContractMessage(
 				liquidatorAddress,
-				this.config.contracts.creditManagerAddress,
+				this.config.contracts.creditManager,
 				toUtf8(`{ "create_credit_account": "default" }`),
 			),
 		]

@@ -43,8 +43,8 @@
 		"ts-jest": "^29.2.5",
 		"ts-node": "^10.9.1",
 		"uuid": "^9.0.0",
-		"liquidation-wasm": "file:./packages/liquidation/pkg-node",
-		"hc-wasm": "file:./packages/health/pkg-web"
+		"mars-rover-health-computer": "2.2.0",
+		"mars-liquidation": "1.0.0"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.21.0",

@@ -15,7 +15,7 @@ import {
 	LiquidationAmountInputs,
 	calculate_liquidation_amounts_js,
 	HealthData,
-} from 'liquidation-wasm'
+} from 'mars-liquidation'
 import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types.js'
 
 export class ActionGenerator {

@@ -4297,9 +4297,6 @@ hash.js@^1.0.0, hash.js@^1.0.3, hash.js@~1.1.7:
     inherits "^2.0.3"
     minimalistic-assert "^1.0.1"
 
-"hc-wasm@file:./packages/health/pkg-web":
-  version "2.1.0"
-
 hmac-drbg@^1.0.1:
   version "1.0.1"
   resolved "https://registry.npmjs.org/hmac-drbg/-/hmac-drbg-1.0.1.tgz"
@@ -5106,9 +5103,6 @@ lines-and-columns@^1.1.6:
   resolved "https://registry.npmjs.org/lines-and-columns/-/lines-and-columns-1.2.4.tgz"
   integrity sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==
 
-"liquidation-wasm@file:./packages/liquidation/pkg-node":
-  version "1.0.0"
-
 loads@0.0.x:
   version "0.0.4"
   resolved "https://registry.npmjs.org/loads/-/loads-0.0.4.tgz"
@@ -5215,6 +5209,16 @@ map-obj@^4.3.0:
   version "4.3.0"
   resolved "https://registry.npmjs.org/map-obj/-/map-obj-4.3.0.tgz"
   integrity sha512-hdN1wVrZbb29eBGiGjJbeP8JbKjq1urkHJ/LIP/NY48MZ1QVXUsQBV1G1zvYFHn1XE06cwjBsOI2K3Ulnj1YXQ==
+
+mars-liquidation@1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/mars-liquidation/-/mars-liquidation-1.0.0.tgz#9e51ad689d05ae53141374b33eb3650609195d51"
+  integrity sha512-X86KDcF74XvMgG3bzFcCbk5zpFtPB76zkvQLJdQjpmOSi/ZDl+3DGEaiXI8UCa6igIEHXMZ5iNX2yK15Hg6DWA==
+
+mars-rover-health-computer@2.2.0:
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/mars-rover-health-computer/-/mars-rover-health-computer-2.2.0.tgz#d49f47956f4a81bff0dbf9df6a212d8a9f6c9c58"
+  integrity sha512-u2hhJt/IrUHW9bb75wkBXdUc9CZlK5UVTbuXdz+kG9B5WzGnSRCQc9WmxVzTixljB0Me2uxlkVSE7GTkAOUaTA==
 
 marsjs-types@2.0.2:
   version "2.0.2"
