@@ -19,10 +19,10 @@ import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
 import { VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
-import { compute_health_js, HealthComputer } from 'mars-rover-health-computer'
+import { compute_health_js, HealthComputer } from 'mars-rover-health-computer-node'
 import { TokensResponse } from 'marsjs-types/mars-account-nft/MarsAccountNft.types'
 import { ChainQuery } from '../query/chainQuery'
-import { HealthData } from 'mars-liquidation'
+import { HealthData } from 'mars-liquidation-node'
 
 interface CreateCreditAccountResponse {
 	tokenId: number
@@ -205,6 +205,10 @@ export class RoverExecutor extends BaseExecutor {
 				healthData,
 				this.config.neutralAssetDenom,
 			)
+
+			if (actions.length === 0) {
+				return
+			}
 
 			const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)!
 

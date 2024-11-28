@@ -43,8 +43,8 @@
 		"ts-jest": "^29.2.5",
 		"ts-node": "^10.9.1",
 		"uuid": "^9.0.0",
-		"mars-rover-health-computer": "2.2.0",
-		"mars-liquidation": "1.0.0"
+		"mars-rover-health-computer-node": "2.2.0",
+		"mars-liquidation-node": "1.0.0"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.21.0",

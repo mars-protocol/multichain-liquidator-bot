@@ -15,7 +15,7 @@ import {
 	LiquidationAmountInputs,
 	calculate_liquidation_amounts_js,
 	HealthData,
-} from 'mars-liquidation'
+} from 'mars-liquidation-node'
 import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types.js'
 
 export class ActionGenerator {
@@ -76,7 +76,8 @@ export class ActionGenerator {
 
 		const liqHf: number = liquidationAmountInputs.health.liquidation_health_factor
 		if (liqHf == null || liqHf >= 1) {
-			throw new Error('Error: Position is not liquidatable. HF is either null or > 1. HF : ')
+			console.log(`Position with id ${account.account_id} is not liquidatable. HF : ${liqHf}`)
+			return []
 		}
 
 		const liquidationAmounts = calculate_liquidation_amounts_js(liquidationAmountInputs)

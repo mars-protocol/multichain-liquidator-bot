@@ -15,8 +15,8 @@ import {
 	PerpParams,
 	RedBankSettings,
 } from 'marsjs-types/mars-params/MarsParams.types'
-import { HealthData, HealthValuesResponse } from 'mars-liquidation'
-import { compute_health_js, HealthComputer } from 'mars-rover-health-computer'
+import { HealthData, HealthValuesResponse } from 'mars-liquidation-node'
+import { compute_health_js, HealthComputer } from 'mars-rover-health-computer-node'
 
 export class StateMock {
 	constructor(
