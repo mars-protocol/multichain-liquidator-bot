@@ -18,10 +18,6 @@ describe('Liquidation Action Generator Tests', () => {
 	describe('uusd collateral; atom debt', () => {
 		let actions: Action[] = []
 		beforeAll(async () => {
-			global.console.log = (...args) => {
-				process.stdout.write(args.join(' ') + '\n')
-			}
-
 			mock.setUserDeposits([
 				{
 					denom: 'uusd',
@@ -31,17 +27,10 @@ describe('Liquidation Action Generator Tests', () => {
 
 			mock.setUserDebts([
 				{
-					denom: 'uusd',
-					amount: '1000',
+					denom: 'uatom',
+					amount: '86',
 				},
 			])
-
-			mock.assetParams.forEach((value, key) => {
-				console.log(key)
-				console.log(JSON.stringify(value))
-			})
-
-			console.log(JSON.stringify(mock.getHealth()))
 
 			// We need to mock the route requester to return the correct routes
 			// First swap call is to swap collateral to debt
@@ -88,7 +77,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('80')
+			expect(amount).toBe('43')
 			expect(denom).toBe('uatom')
 		})
 		it('Action 1; Should select deposit usd collateral', () => {
@@ -103,7 +92,7 @@ describe('Liquidation Action Generator Tests', () => {
 
 			expect(debtCoin.denom).toBe('uatom')
 			// TODO check correct debt here
-			expect(debtCoin.amount).toBe('80')
+			expect(debtCoin.amount).toBe('43')
 		})
 
 		it('Action 2; Should swap all won usd collateral to atom', () => {
@@ -150,7 +139,7 @@ describe('Liquidation Action Generator Tests', () => {
 			mock.setUserDeposits([
 				{
 					denom: 'uusd',
-					amount: '1000',
+					amount: '750',
 				},
 			])
 
@@ -210,7 +199,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('60')
+			expect(amount).toBe('30')
 			expect(denom).toBe('uatom')
 		})
 		it('Action 1; Should select deposit usd collateral', () => {
@@ -224,7 +213,7 @@ describe('Liquidation Action Generator Tests', () => {
 			let debtCoin: Coin = actions[1].liquidate.debt_coin
 
 			expect(debtCoin.denom).toBe('uatom')
-			expect(debtCoin.amount).toBe('60')
+			expect(debtCoin.amount).toBe('30')
 		})
 
 		it('Action 2; Should swap all won usd collateral to atom', () => {
@@ -283,7 +272,7 @@ describe('Liquidation Action Generator Tests', () => {
 				},
 				{
 					denom: 'uusd',
-					amount: '450', // 450 * 1 = 450
+					amount: '500', // 500 * 1 = 500
 				},
 			])
 
@@ -305,7 +294,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('450')
+			expect(amount).toBe('250')
 			expect(denom).toBe('uusd')
 		})
 		it('Should pick the usd collateral', () => {
@@ -320,7 +309,7 @@ describe('Liquidation Action Generator Tests', () => {
 
 			expect(debtCoin.denom).toBe('uusd')
 			// TODO check correct debt here
-			expect(debtCoin.amount).toBe('450')
+			expect(debtCoin.amount).toBe('250')
 		})
 
 		it('Should not do any swap of the collateral', () => {
@@ -359,11 +348,16 @@ describe('Liquidation Action Generator Tests', () => {
 				{
 					...defaultPerpPosition,
 					denom: 'ubtc',
+					size: '100',
 					base_denom: 'uusd',
 					unrealized_pnl: {
 						...defaultPerpPosition.unrealized_pnl,
-						pnl: '-100',
+						pnl: '-600',
+						price_pnl: '-600',
 					},
+					entry_price: '100',
+					current_price: '94',
+					current_exec_price: '94',
 				},
 			])
 
@@ -385,7 +379,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('100')
+			expect(amount).toBe('300')
 			expect(denom).toBe('uusd')
 		})
 
@@ -396,12 +390,12 @@ describe('Liquidation Action Generator Tests', () => {
 			expect(denom).toBe('uusd')
 		})
 
-		it('Should repay all negative pnl', () => {
+		it('Should repay negative pnl', () => {
 			// @ts-ignore
 			let debtCoin: Coin = actions[1].liquidate.debt_coin
 
 			expect(debtCoin.denom).toBe('uusd')
-			expect(debtCoin.amount).toBe('100')
+			expect(debtCoin.amount).toBe('300')
 		})
 
 		it('Should not do any swap of the collateral', () => {
@@ -433,18 +427,22 @@ describe('Liquidation Action Generator Tests', () => {
 				},
 			])
 
-			// Make usd larger debt
 			mock.setUserDebts([])
 
 			mock.setUserPerpsPositions([
 				{
 					...defaultPerpPosition,
 					denom: 'ubtc',
+					size: '100',
 					base_denom: 'uusd',
 					unrealized_pnl: {
 						...defaultPerpPosition.unrealized_pnl,
 						pnl: '-1100',
+						price_pnl: '-1100',
 					},
+					entry_price: '100',
+					current_price: '89',
+					current_exec_price: '89',
 				},
 			])
 
@@ -466,7 +464,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('1100')
+			expect(amount).toBe('550')
 			expect(denom).toBe('uusd')
 		})
 
@@ -482,7 +480,7 @@ describe('Liquidation Action Generator Tests', () => {
 			let debtCoin: Coin = actions[1].liquidate.debt_coin
 
 			expect(debtCoin.denom).toBe('uusd')
-			expect(debtCoin.amount).toBe('1100')
+			expect(debtCoin.amount).toBe('550')
 		})
 
 		it('Should not do any swap of the collateral', () => {

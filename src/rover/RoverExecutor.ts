@@ -167,7 +167,6 @@ export class RoverExecutor extends BaseExecutor {
 				checkedPrices.set(denom, price.toFixed(18))
 			})
 
-			// TODO calculate health
 			let hc: HealthComputer = {
 				kind: updatedAccount.account_kind,
 				positions: updatedAccount,
@@ -182,18 +181,22 @@ export class RoverExecutor extends BaseExecutor {
 				oracle_prices: Object.fromEntries(checkedPrices),
 			}
 
-			let healthResponse = compute_health_js(hc)
-			let healthData: HealthData = {
+			const healthResponse = compute_health_js(hc)
+
+			const accountNetValue = new BigNumber(healthResponse.total_collateral_value)
+				.minus(healthResponse.total_debt_value)
+				.toFixed(0)
+			const collateralizationRatio =
+				healthResponse.total_debt_value === '0'
+					? new BigNumber(100000000) // Instead of `infinity` we use a very high number
+					: new BigNumber(healthResponse.total_collateral_value)
+							.dividedBy(new BigNumber(healthResponse.total_debt_value))
+							.toFixed(0)
+
+			const healthData: HealthData = {
 				liquidation_health_factor: healthResponse.liquidation_health_factor,
-				account_net_value: new BigNumber(healthResponse.total_collateral_value)
-					.minus(healthResponse.total_debt_value)
-					.toFixed(0),
-				collateralization_ratio:
-					healthResponse.total_debt_value === '0'
-						? new BigNumber(100000000)
-						: new BigNumber(healthResponse.total_collateral_value)
-								.dividedBy(new BigNumber(healthResponse.total_debt_value))
-								.toFixed(0),
+				account_net_value: accountNetValue,
+				collateralization_ratio: collateralizationRatio,
 				perps_pnl_loss: healthResponse.perps_pnl_loss,
 			}
 

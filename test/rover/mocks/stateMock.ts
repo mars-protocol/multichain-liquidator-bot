@@ -55,14 +55,20 @@ export class StateMock {
 
 		let healthResponse: HealthValuesResponse = compute_health_js(hc)
 
+		const accountNetValue = new BigNumber(healthResponse.total_collateral_value)
+			.minus(healthResponse.total_debt_value)
+			.toFixed(0)
+		const collateralizationRatio =
+			healthResponse.total_debt_value === '0'
+				? new BigNumber(100000000) // Instead of `infinity` we use a very high number
+				: new BigNumber(healthResponse.total_collateral_value)
+						.dividedBy(new BigNumber(healthResponse.total_debt_value))
+						.toFixed(0)
+
 		return {
 			liquidation_health_factor: healthResponse.liquidation_health_factor,
-			account_net_value: new BigNumber(healthResponse.total_collateral_value)
-				.minus(healthResponse.total_debt_value)
-				.toString(),
-			collateralization_ratio: new BigNumber(healthResponse.total_collateral_value)
-				.dividedBy(healthResponse.total_debt_value)
-				.toString(),
+			account_net_value: accountNetValue,
+			collateralization_ratio: collateralizationRatio,
 			perps_pnl_loss: healthResponse.perps_pnl_loss,
 		}
 	}
@@ -154,13 +160,13 @@ export const defaultAssetParams: AssetParamsBaseForAddr = {
 }
 
 export const defaultPerpPosition: PerpPosition = {
-	denom: 'ubtc',
+	denom: 'uatom',
 	base_denom: 'uusd',
 	unrealized_pnl: {
-		accrued_funding: '10',
-		closing_fee: '10',
-		opening_fee: '10',
-		pnl: '100',
+		accrued_funding: '0',
+		closing_fee: '0',
+		opening_fee: '0',
+		pnl: '0',
 		price_pnl: '0',
 	},
 	realized_pnl: {
