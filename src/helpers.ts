@@ -402,7 +402,7 @@ export const calculatePositionStateAfterPerpClosure = (
 		// if we still have debt, we need to increment it
 		if (baseDenomDebts) {
 			baseDenomDebts.amount = debtAmount.plus(remainingDebt).toString()
-		} else {
+		} else if (remainingDebt.gt(0)) {
 			positions.debts.push({
 				amount: remainingDebt.toString(),
 				denom: baseDenom,
@@ -418,10 +418,14 @@ export const calculatePositionStateAfterPerpClosure = (
 			positions.deposits.push({
 				amount: totalPerpPnl.abs().toString(),
 				denom: baseDenom,
-				shares: totalPerpPnl.abs().toString(), // do we care about shares?
+				shares: totalPerpPnl.abs().toString(),
 			})
 		}
 	}
+
+	positions.debts = positions.debts.filter((debt) => BigNumber(debt.amount).gt(0))
+	positions.deposits = positions.deposits.filter((deposit) => BigNumber(deposit.amount).gt(0))
+	positions.lends = positions.lends.filter((lend) => BigNumber(lend.amount).gt(0))
 
 	return positions
 }
