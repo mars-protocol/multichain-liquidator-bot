@@ -118,11 +118,11 @@ export class RoverExecutor extends BaseExecutor {
 				Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
 				Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV) &&
 				// To target specific accounts, filter here
-				// account.account_id === "22372" &&
+				// account.account_id === "3821" &&
 				account.total_debt.length > 3
 			)
 			.sort((accountA, accountB)=> Number(accountB.total_debt) - Number(accountA.total_debt))
-		
+
 		// Sleep to avoid spamming.
 		if (targetAccounts.length == 0) {
 			await sleep(2000)
@@ -189,7 +189,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			const liquidateMessage = this.liquidationActionGenerator.produceLiquidationAction(
 				bestCollateral.type,
-				{ denom: bestDebt.denom, amount: borrow.amount },
+				{ denom: bestDebt.denom, amount: (Number(borrow.amount) * 0.995).toFixed(0) },
 				roverPosition.account_id,
 				bestCollateral.denom,
 				bestCollateral.vaultType,
@@ -209,13 +209,17 @@ export class RoverExecutor extends BaseExecutor {
 
 			const repayMsg = this.liquidationActionGenerator.generateRepayActions(borrow.denom)
 			// todo estimate amount based on repay to prevent slippage.
+
 			const swapToStableMsg =
 				borrow.denom !== this.config.neutralAssetDenom && swapWinnings
 					? [
 						await this.liquidationActionGenerator.generateSwapActions(
 							borrow.denom,
 							this.config.neutralAssetDenom,
-							bestDebt.amount.toFixed(0),
+							bestDebt.amount.toLocaleString('fullwide', {
+								useGrouping: false,
+								maximumFractionDigits: 0
+							}),
 							slippage
 					)]
 					: []
