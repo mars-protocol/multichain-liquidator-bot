@@ -565,7 +565,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 		let positions: Position[] = positionObjects
 			.filter(position =>
-					Number(position.health_factor) < 0.94 &&
+					Number(position.health_factor) < 0.97 &&
 					Number(position.health_factor) > 0.3 &&
 					position.total_debt.length > 5)
 					

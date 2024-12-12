@@ -62,7 +62,7 @@ export class ActionGenerator {
 		// estimate our debt to repay - this depends on collateral amount and close factor
 		let maxRepayValue = (collateral.value * collateral.closeFactor)
 		const maxDebtValue = debt.amount * debt.price
-		const debtCeiling = 10000000000
+		const debtCeiling = 5000000000
 		if (maxDebtValue > debtCeiling) {
 			maxRepayValue = debtCeiling
 		}
@@ -75,6 +75,41 @@ export class ActionGenerator {
 		const debtCoin: Coin = {
 			amount: debtAmount.toFixed(0),
 			denom: debt.denom,
+		}
+
+		if (debt.denom === "ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858") {
+			let actions : Action[] = [
+				// borrow usdc
+				{
+					borrow: {
+						amount: debtCoin.amount,
+						denom: "ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4"
+					}
+				},
+				// swap to axlsdc
+				{
+					swap_exact_in: {
+						coin_in: {
+							amount: "account_balance",
+							denom: "ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4"
+						},
+						denom_out: "ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858",
+						route: {
+							osmo: {
+								swaps: [
+									{
+										pool_id: 1223,
+										to: "ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858"
+									}
+								]
+							}
+						},
+						slippage: "0.008"
+					}
+				}
+			]
+
+			return actions
 		}
 
 		// if asset is not enabled, or we have less than 50% the required liquidity, do alternative borrow
@@ -208,37 +243,7 @@ export class ActionGenerator {
 
 		return actions
 	}
-	
-	// private getAvailablePools = (): number[] => {
-	// 	const pools : number[] = []
 
-	// 	this.swapperRoutes.forEach((route) => {
-	// 		route.route.forEach((hop) => {
-	// 			// Check if we have already pushed that pool
-	// 			if (pools.find((pool)=> pool === hop.pool_id) === undefined) {
-	// 				pools.push(hop.pool_id as number)
-	// 			}
-	// 		})
-	// 	})
-
-	// 	return pools
-	// }
-
-	// private isViableRoute = (route: RouteHop[]): boolean => {
-	// 	return true
-	// 	return (
-	// 		route.filter(
-	// 			(hop) =>
-	// 				this.swapperRoutes.find(
-	// 					(swapperRoute) =>
-	// 						(swapperRoute.denom_in === hop.tokenInDenom &&
-	// 						swapperRoute.denom_out === hop.tokenOutDenom) ||
-	// 						(swapperRoute.denom_in === hop.tokenOutDenom &&
-	// 							swapperRoute.denom_out === hop.tokenInDenom),
-	// 				) !== undefined,
-	// 		).length > 0
-	// 	)
-	// }
 	/**
 	 * Swap the coillateral we won to repay the debt we borrowed. This method calculates the
 	 * best route and returns an array of swap actions (on action per route hop) to execute
