@@ -47,7 +47,10 @@ export class ActionGenerator {
 					denom: neutralDenom,
 			  }
 			: this.findHighestValueCollateral(account, oraclePrices)
-		const totalPerpPnl = calculateTotalPerpPnl(account.perps)
+
+		// Perp pnl
+		let hasPerps = account.perps && account.perps.length > 0
+		const totalPerpPnl = hasPerps ? calculateTotalPerpPnl(account.perps) : new BigNumber(0)
 
 		// In some cases, a position may be unhealthy but have no debt, as all the negative pnl is
 		// covered by the collateral. In this case, we can use the total amount of perp debt
