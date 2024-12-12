@@ -28,8 +28,7 @@ describe('Rover Executor Tests', () => {
 			// calculate the debts, deposits
 			const details = calculatePositionStateAfterPerpClosure(positions, baseDenom)
 
-			expect(details.debts[0].amount).toBe('0')
-			expect(details.debts[0].denom).toBe('uusd')
+			expect(details.debts.length).toBe(0)
 			expect(details.deposits[0].amount).toBe('100')
 			expect(details.deposits[0].denom).toBe('uusd')
 		}),
@@ -205,10 +204,8 @@ describe('Rover Executor Tests', () => {
 				// We first deduct from deposits, then unlend, then borrow
 				// Because we have 1k lend and 1 deposit with 200 negative pnl, we should have
 				// 900 lend and 0 deposit
-				expect(details.debts[0].amount).toBe('0')
-				expect(details.debts[0].denom).toBe('uusd')
-				expect(details.deposits[0].amount).toBe('0')
-				expect(details.deposits[0].denom).toBe('uusd')
+				expect(details.debts.length).toBe(0)
+				expect(details.deposits.length).toBe(0)
 				expect(details.lends[0].amount).toBe('900')
 				expect(details.lends[0].denom).toBe('uusd')
 			}),
@@ -244,10 +241,8 @@ describe('Rover Executor Tests', () => {
 				// 0 lend and 0 deposit and 100 debt
 				expect(details.debts[0].amount).toBe('100')
 				expect(details.debts[0].denom).toBe('uusd')
-				expect(details.deposits[0].amount).toBe('0')
-				expect(details.deposits[0].denom).toBe('uusd')
-				expect(details.lends[0].amount).toBe('0')
-				expect(details.lends[0].denom).toBe('uusd')
+				expect(details.deposits.length).toBe(0)
+				expect(details.lends.length).toBe(0)
 			})
 	})
 })

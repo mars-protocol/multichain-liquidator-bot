@@ -7,12 +7,14 @@
 	"scripts": {
 		"test:integration": "yarn build && node build/test/redbank/integration/liquidationTest",
 		"test:rover-integration": "yarn build && node build/test/rover/integration/liquidationTest",
+		"clean": "rimraf build",
 		"build": "tsc",
 		"start": "yarn build && node build/src/main",
-		"test": "jest",
+		"test": "yarn clean && yarn build && jest",
+		"test:coverage": "yarn clean && yarn build && jest --coverage",
 		"lint": "yarn format-check && eslint . && yarn build",
 		"format": "prettier --write .",
-		"format-check": "prettier --ignore-path .gitignore --check ."
+		"format:check": "prettier --ignore-path .gitignore --check ."
 	},
 	"dependencies": {
 		"@aws-sdk/client-secrets-manager": "^3.188.0",
@@ -40,7 +42,9 @@
 		"requests": "^0.3.0",
 		"ts-jest": "^29.2.5",
 		"ts-node": "^10.9.1",
-		"uuid": "^9.0.0"
+		"uuid": "^9.0.0",
+		"mars-rover-health-computer-node": "2.2.0",
+		"mars-liquidation-node": "1.0.0"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.21.0",

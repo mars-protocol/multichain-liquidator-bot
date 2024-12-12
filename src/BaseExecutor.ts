@@ -1,6 +1,5 @@
 import { SigningStargateClient, StdFee } from '@cosmjs/stargate'
 import { Coin, EncodeObject, coins } from '@cosmjs/proto-signing'
-import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { AMMRouter } from './AmmRouter'
 import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from './types/Pool'
 import 'dotenv/config.js'
@@ -8,22 +7,20 @@ import { MarketInfo } from './rover/types/MarketInfo'
 import { CSVWriter, Row } from './CsvWriter'
 
 import BigNumber from 'bignumber.js'
-import { fetchRedbankData } from './query/hive'
 import { RouteRequester } from './query/routing/RouteRequesterInterface'
 import { sleep } from './helpers'
-import { OraclePriceFetcher as MarsOraclePriceFetcher } from './query/oracle/OraclePriceFetcher'
-import { PythPriceFetcher } from './query/oracle/PythPriceFetcher'
-import { OraclePrice } from './query/oracle/PriceFetcherInterface'
 import { PriceSourceResponse } from './types/oracle'
+import { AssetParamsBaseForAddr, PerpParams } from 'marsjs-types/mars-params/MarsParams.types'
+import { ChainQuery } from './query/chainQuery'
+import { PriceResponse } from 'marsjs-types/mars-oracle-osmosis/MarsOracleOsmosis.types'
+import { Market } from 'marsjs-types/mars-red-bank/MarsRedBank.types'
+import { Dictionary } from 'lodash'
 
 export interface BaseConfig {
 	lcdEndpoint: string
 	chainName: string
 	productName: string
-	hiveEndpoint: string
-	oracleAddress: string
-	redbankAddress: string
-	marsParamsAddress: string
+	contracts: Dictionary<string>
 	liquidatorMasterAddress: string
 	gasDenom: string
 	neutralAssetDenom: string
@@ -44,15 +41,12 @@ export interface BaseConfig {
 export class BaseExecutor {
 	private priceSources: PriceSourceResponse[] = []
 
-	private marsOraclePriceFetcher: MarsOraclePriceFetcher = new MarsOraclePriceFetcher(
-		this.queryClient,
-	)
-	private pythOraclePriceFetcher: PythPriceFetcher = new PythPriceFetcher()
-
 	// Data
 	public prices: Map<string, BigNumber> = new Map()
 	public balances: Map<string, number> = new Map()
 	public markets: Map<string, MarketInfo> = new Map()
+	public assetParams: Map<string, AssetParamsBaseForAddr> = new Map()
+	public perpParams: Map<string, PerpParams> = new Map()
 
 	// logging
 	private csvLogger = new CSVWriter('./results.csv', [
@@ -66,15 +60,15 @@ export class BaseExecutor {
 
 	constructor(
 		public config: BaseConfig,
-		public client: SigningStargateClient,
-		public queryClient: CosmWasmClient,
+		public signingClient: SigningStargateClient,
+		public queryClient: ChainQuery,
 		public routeRequester: RouteRequester,
 		public ammRouter: AMMRouter = new AMMRouter(),
 	) {
 		console.log({ config })
 	}
 
-	applyAvailableLiquidity = (market: MarketInfo): MarketInfo => {
+	applyAvailableLiquidity = (market: Market): MarketInfo => {
 		// Available liquidity = deposits - borrows. However, we need to
 		// compute the underlying uasset amounts from the scaled amounts.
 		const scalingFactor = 1e6
@@ -88,12 +82,16 @@ export class BaseExecutor {
 
 		const availableLiquidity = descaledDeposits.minus(descaledBorrows)
 
-		market.available_liquidity = availableLiquidity
-		return market
+		const marketInfo = {
+			available_liquidity: availableLiquidity,
+			...market,
+		}
+
+		return marketInfo
 	}
 
 	setBalances = async (liquidatorAddress: string) => {
-		const coinBalances: readonly Coin[] = await this.client.getAllBalances(liquidatorAddress)
+		const coinBalances: readonly Coin[] = await this.signingClient.getAllBalances(liquidatorAddress)
 		for (const index in coinBalances) {
 			const coin = coinBalances[index]
 			this.balances.set(coin.denom, Number(coin.amount))
@@ -108,20 +106,19 @@ export class BaseExecutor {
 		await this.csvLogger.writeToFile()
 	}
 
-	refreshData = async () => {
+	init = async () => {
 		// dispatch hive request and parse it
-
-		const { bank } = await fetchRedbankData(
-			this.config.hiveEndpoint,
-			this.config.liquidatorMasterAddress,
-			this.config.redbankAddress,
-		)
-
-		bank.balance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
 
 		await this.updatePriceSources()
 		await this.updateOraclePrices()
-		await this.refreshMarketData()
+		await this.updatePrices()
+		await this.updateMarketsData()
+		await this.updateAssetParams()
+	}
+
+	updatePrices = async () => {
+		await this.updatePriceSources()
+		await this.updateOraclePrices()
 	}
 
 	updatePriceSources = async () => {
@@ -135,12 +132,7 @@ export class BaseExecutor {
 
 		while (fetching) {
 			try {
-				const response = await this.queryClient.queryContractSmart(this.config.oracleAddress, {
-					price_sources: {
-						limit,
-						start_after,
-					},
-				})
+				const response = await this.queryClient.queryOraclePriceSources(start_after, limit)
 				start_after = response[response.length - 1] ? response[response.length - 1].denom : ''
 				priceSources = priceSources.concat(response)
 				fetching = response.length === limit
@@ -164,12 +156,80 @@ export class BaseExecutor {
 		}
 	}
 
+	updatePerpParams = async () => {
+		let perpParams: PerpParams[] = []
+		let fetching = true
+		let start_after = ''
+		let retries = 0
+
+		const maxRetries = 5
+		const limit = 5
+
+		while (fetching) {
+			try {
+				const response = await this.queryClient.queryPerpParams(start_after, limit)
+				start_after = response[response.length - 1] ? response[response.length - 1].denom : ''
+				perpParams = perpParams.concat(response)
+				fetching = response.length === limit
+				retries = 0
+			} catch (e) {
+				console.warn(e)
+				retries++
+				if (retries >= maxRetries) {
+					console.warn('Max retries exceeded, exiting', maxRetries)
+					fetching = false
+				} else {
+					await sleep(5000)
+					console.info('Retrying...')
+				}
+			}
+		}
+
+		// don't override if we did not fetch all data.
+		if (retries < maxRetries) {
+			perpParams.forEach((perpParam) => {
+				this.perpParams.set(perpParam.denom, perpParam)
+			})
+		}
+	}
+
+	updateAssetParams = async () => {
+		const maxRetries = 5
+		const limit = 5
+
+		// while not returning empty, get all asset params
+		let fetching = true
+		let startAfter = ''
+		let retries = 0
+		while (fetching) {
+			try {
+				const response = await this.queryClient.queryAllAssetParams(startAfter, limit)
+				startAfter = response[response.length - 1] ? response[response.length - 1].denom : ''
+				response.forEach((assetParam: AssetParamsBaseForAddr) => {
+					this.assetParams.set(assetParam.denom, assetParam)
+				})
+				fetching = response.length === 5
+				retries = 0
+			} catch (ex) {
+				console.warn(ex)
+				retries++
+				if (retries > maxRetries) {
+					console.warn('Max retries exceeded, exiting', maxRetries)
+					fetching = false
+				} else {
+					await sleep(5000)
+					console.info('Retrying...')
+				}
+			}
+		}
+	}
+
 	updateOraclePrices = async () => {
 		try {
 			// Fetch all price sources
-			const priceResults: PromiseSettledResult<OraclePrice>[] = await Promise.allSettled(
+			const priceResults: PromiseSettledResult<PriceResponse>[] = await Promise.allSettled(
 				this.priceSources.map(
-					async (priceSource) => await this.fetchOraclePrice(priceSource.denom),
+					async (priceSource) => await this.queryClient.queryOraclePrice(priceSource.denom),
 				),
 			)
 
@@ -179,7 +239,7 @@ export class BaseExecutor {
 
 				// push successfull price results
 				if (successfull && oraclePrice) {
-					this.prices.set(oraclePrice.denom, oraclePrice.price)
+					this.prices.set(oraclePrice.denom, new BigNumber(oraclePrice.price))
 				}
 			})
 		} catch (e) {
@@ -187,68 +247,21 @@ export class BaseExecutor {
 		}
 	}
 
-	private fetchOraclePrice = async (denom: string): Promise<OraclePrice> => {
-		const priceSource: PriceSourceResponse | undefined = this.priceSources.find(
-			(ps) => ps.denom === denom,
-		)
-		if (!priceSource) {
-			console.error(`No price source found for ${denom}`)
-		}
-
-		switch (priceSource?.price_source!.toString()) {
-			case 'fixed':
-			case 'spot':
-			// todo - support via pool query. These will default to oracle price
-			case 'arithmetic_twap':
-			case 'geometric_twap':
-			case 'xyk_liquidity_token':
-			case 'lsd':
-			case 'staked_geometric_twap':
-				return await this.marsOraclePriceFetcher.fetchPrice({
-					oracleAddress: this.config.oracleAddress,
-					priceDenom: denom,
-				})
-			case 'pyth':
-				const pyth: {
-					price_feed_id: string
-					denom_decimals: number
-					//@ts-expect-error - our generated types don't handle this case
-				} = priceSource.price_source.pyth
-
-				return await this.pythOraclePriceFetcher.fetchPrice({
-					priceFeedId: pyth.price_feed_id,
-					denomDecimals: pyth.denom_decimals,
-					denom: denom,
-				})
-			// Handle other cases for different price source types
-			default:
-				// Handle unknown or unsupported price source types
-				return await this.marsOraclePriceFetcher.fetchPrice({
-					oracleAddress: this.config.oracleAddress,
-					priceDenom: denom,
-				})
-		}
-	}
-
-	refreshMarketData = async () => {
-		let markets: MarketInfo[] = []
+	updateMarketsData = async () => {
+		let markets: Market[] = []
 		let fetching = true
+		let limit = 5
 		let start_after = ''
 		while (fetching) {
-			const response = await this.queryClient.queryContractSmart(this.config.redbankAddress, {
-				markets: {
-					start_after,
-					limit: 5,
-				},
-			})
-
+			const response = await this.queryClient.queryMarkets(start_after, limit)
 			start_after = response[response.length - 1] ? response[response.length - 1].denom : ''
 			markets = markets.concat(response)
 			fetching = response.length === 5
 		}
 
-		// @ts-ignore TODO
-		this.markets = markets.map((market: MarketInfo) => this.applyAvailableLiquidity(market))
+		this.markets = new Map(
+			markets.map((market) => [market.denom, this.applyAvailableLiquidity(market)]),
+		)
 	}
 
 	// Filter out pools that are invalid
@@ -294,7 +307,7 @@ export class BaseExecutor {
 
 	// Calculate the fee for a transaction on osmosis. Incorporates EIP1559 dynamic base fee
 	getOsmosisFee = async (msgs: EncodeObject[], address: string) => {
-		if (!this.client)
+		if (!this.signingClient)
 			throw new Error(
 				'Stargate Client is undefined, ensure you call initiate at before calling this method',
 			)
@@ -302,7 +315,7 @@ export class BaseExecutor {
 			`${process.env.LCD_ENDPOINT}/osmosis/txfees/v1beta1/cur_eip_base_fee?x-apikey=${process.env.API_KEY}`,
 		)
 		const { base_fee: baseFee } = await gasPriceRequest.json()
-		const gasEstimated = await this.client.simulate(address, msgs, '')
+		const gasEstimated = await this.signingClient.simulate(address, msgs, '')
 		const gas = Number(gasEstimated * 1.3)
 		const gasPrice = Number(baseFee)
 		const safeGasPrice = gasPrice < 0.025 ? 0.025 : gasPrice
@@ -316,7 +329,7 @@ export class BaseExecutor {
 	}
 
 	getNeutronFee = async (msgs: EncodeObject[], address: string): Promise<StdFee> => {
-		if (!this.client)
+		if (!this.signingClient)
 			throw new Error(
 				'Stargate Client is undefined, ensure you call initiate at before calling this method',
 			)
@@ -325,7 +338,7 @@ export class BaseExecutor {
 			await gasPriceRequest.json()
 		const baseFee = fees.params.minimum_gas_prices.filter((price) => price.denom === 'untrn')[0] //todo default here
 		const gasPrice = Number(baseFee.amount)
-		const gasEstimated = await this.client.simulate(address, msgs, '')
+		const gasEstimated = await this.signingClient.simulate(address, msgs, '')
 		const gas = Number(gasEstimated * 1.8)
 		const safeGasPrice = gasPrice < 0.025 ? 0.025 : gasPrice
 		const amount = coins((gas * safeGasPrice + 1).toFixed(0), this.config.gasDenom)

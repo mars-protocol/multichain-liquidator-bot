@@ -6,24 +6,30 @@ import {
 	sleep,
 } from '../helpers'
 import { toUtf8 } from '@cosmjs/encoding'
-import { fetchBalances } from '../query/hive'
+
 import { ActionGenerator } from './ActionGenerator'
-import { Coin, Positions } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
+import {
+	Addr,
+	Coin,
+	Positions,
+	VaultPositionValue,
+} from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
 import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
-import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
-import { QueryMsg, VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
+import { VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
+import { compute_health_js, HealthComputer } from 'mars-rover-health-computer-node'
+import { TokensResponse } from 'marsjs-types/mars-account-nft/MarsAccountNft.types'
+import { ChainQuery } from '../query/chainQuery'
+import { HealthData } from 'mars-liquidation-node'
+
 interface CreateCreditAccountResponse {
 	tokenId: number
 	liquidatorAddress: string
 }
 
 export interface RoverExecutorConfig extends BaseConfig {
-	creditManagerAddress: string
-	swapperAddress: string
-	accountNftAddress: string
 	minGasTokens: number
 	maxLiquidators: number
 	stableBalanceThreshold: number
@@ -44,7 +50,7 @@ export class RoverExecutor extends BaseExecutor {
 	constructor(
 		config: RoverExecutorConfig,
 		client: SigningStargateClient,
-		queryClient: CosmWasmClient,
+		queryClient: ChainQuery,
 		wallet: DirectSecp256k1HdWallet,
 		routeRequester: RouteRequester,
 	) {
@@ -56,7 +62,7 @@ export class RoverExecutor extends BaseExecutor {
 
 	// Entry to rover executor
 	start = async () => {
-		await this.refreshData()
+		await this.init()
 
 		// set up accounts
 		const accounts = await this.wallet.getAccounts()
@@ -71,7 +77,7 @@ export class RoverExecutor extends BaseExecutor {
 
 		const createCreditAccountpromises: Promise<CreateCreditAccountResponse>[] = []
 		liquidatorAddresses.map((address) =>
-			createCreditAccountpromises.push(this.createCreditAccount(address)),
+			createCreditAccountpromises.push(this.getDefaultCreditAccount(address)),
 		)
 
 		const results: CreateCreditAccountResponse[] = await Promise.all(createCreditAccountpromises)
@@ -82,85 +88,137 @@ export class RoverExecutor extends BaseExecutor {
 		// We set up 3 separate tasks to run in parallel
 		//
 		// Periodically  fetch the different pieces of data we need,
-		setInterval(this.refreshData, 30 * 1000)
+		setInterval(this.init, 30 * 1000)
 		// Ensure our liquidator wallets have more than enough funds to operate
 		setInterval(this.updateLiquidatorBalances, 20 * 1000)
 		// check for and dispatch liquidations
-		setInterval(this.run, 1000)
+		while (true) {
+			await this.run()
+			await sleep(5000)
+		}
 	}
 
 	run = async () => {
-		// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-		const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=${
-			this.config.chainName
-		}&product=${this.config.productName}`
+		try {
+			// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
+			const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=${
+				this.config.chainName
+			}&product=${this.config.productName}`
 
-		const response = await fetch(url)
-		let targetAccountObjects: {
-			account_id: string
-			health_factor: string
-			total_debt: string
-		}[] = (await response.json())['data']
+			const response = await fetch(url)
+			let targetAccountObjects: {
+				account_id: string
+				health_factor: string
+				total_debt: string
+			}[] = (await response.json())['data']
 
-		const targetAccounts = targetAccountObjects
-			.filter(
-				(account) =>
-					Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
-					Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
-				// To target specific accounts, filter here
-			)
-			.sort((accountA, accountB) => Number(accountB.total_debt) - Number(accountA.total_debt))
-		// Sleep to avoid spamming.
+			const targetAccounts = targetAccountObjects
+				.filter(
+					(account) =>
+						Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
+						Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
+					// To target specific accounts, filter here
+				)
+				.sort((accountA, accountB) => Number(accountB.total_debt) - Number(accountA.total_debt))
+			// Sleep to avoid spamming.
 
-		if (targetAccounts.length == 0) {
-			await sleep(2000)
-			return
-		}
-
-		// create chunks of accounts to liquidate
-		const unhealthyAccountChunks = []
-		for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {
-			unhealthyAccountChunks.push(targetAccounts.slice(i, i + this.liquidatorAccounts.size))
-		}
-		// iterate over chunks and liquidate
-		for (const chunk of unhealthyAccountChunks) {
-			const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
-			const liquidationPromises: Promise<void>[] = []
-			for (const account of chunk) {
-				const nextLiquidator = liquidatorAddressesIterator.next()
-				console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
-				liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value!))
+			if (targetAccounts.length == 0) {
+				await sleep(2000)
+				return
 			}
-			await Promise.all(liquidationPromises)
-			await sleep(4000)
+
+			// create chunks of accounts to liquidate
+			const unhealthyAccountChunks = []
+			for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {
+				unhealthyAccountChunks.push(targetAccounts.slice(i, i + this.liquidatorAccounts.size))
+			}
+			// iterate over chunks and liquidate
+			for (const chunk of unhealthyAccountChunks) {
+				const liquidatorAddressesIterator = this.liquidatorAccounts.keys()
+				const liquidationPromises: Promise<void>[] = []
+				for (const account of chunk) {
+					const nextLiquidator = liquidatorAddressesIterator.next()
+					console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
+					liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value!))
+				}
+				await Promise.all(liquidationPromises)
+				await sleep(4000)
+			}
+		} catch (ex) {
+			if (process.env.DEBUG) {
+				console.error(ex)
+			}
 		}
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress: string) => {
 		try {
-			const account: Positions = await this.queryClient.queryContractSmart(
-				this.config.creditManagerAddress,
-				{ positions: { account_id: accountId } },
-			)
-
+			const account: Positions = await this.queryClient.queryPositionsForAccount(accountId)
 			const updatedAccount: Positions = calculatePositionStateAfterPerpClosure(
 				account,
 				this.config.neutralAssetDenom,
 			)
 
-			const actions = this.liquidationActionGenerator.generateLiquidationActions(
+			// Make prices safe for our wasm. If we just to string we
+			// get things like 3.42558449e-9 which cannot be parsed
+			// by the health computer
+			let checkedPrices: Map<string, string> = new Map()
+			this.prices.forEach((price, denom) => {
+				checkedPrices.set(denom, price.toFixed(18))
+			})
+
+			let hc: HealthComputer = {
+				kind: updatedAccount.account_kind,
+				positions: updatedAccount,
+				asset_params: Object.fromEntries(this.assetParams),
+				vaults_data: {
+					vault_values: new Map<Addr, VaultPositionValue>(),
+					vault_configs: new Map<Addr, VaultConfigBaseForString>(),
+				},
+				perps_data: {
+					params: Object.fromEntries(this.perpParams),
+				},
+				oracle_prices: Object.fromEntries(checkedPrices),
+			}
+
+			const healthResponse = compute_health_js(hc)
+
+			const accountNetValue = new BigNumber(healthResponse.total_collateral_value)
+				.minus(healthResponse.total_debt_value)
+				.toFixed(0)
+			const collateralizationRatio =
+				healthResponse.total_debt_value === '0'
+					? new BigNumber(100000000) // Instead of `infinity` we use a very high number
+					: new BigNumber(healthResponse.total_collateral_value)
+							.dividedBy(new BigNumber(healthResponse.total_debt_value))
+							.toFixed(0)
+
+			const healthData: HealthData = {
+				liquidation_health_factor: healthResponse.liquidation_health_factor,
+				account_net_value: accountNetValue,
+				collateralization_ratio: collateralizationRatio,
+				perps_pnl_loss: healthResponse.perps_pnl_loss,
+			}
+
+			const actions = await this.liquidationActionGenerator.generateLiquidationActions(
 				updatedAccount,
 				this.prices,
 				this.markets,
+				this.assetParams,
+				healthData,
 				this.config.neutralAssetDenom,
 			)
 
-			const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)
+			if (actions.length === 0) {
+				return
+			}
+
+			const liquidatorAccountId = this.liquidatorAccounts.get(liquidatorAddress)!
 
 			// Produce message
 			const msg = {
 				update_credit_account: {
-					account_id: liquidatorAccountId,
+					account_id: liquidatorAccountId.toString(),
 					actions,
 				},
 			}
@@ -168,7 +226,7 @@ export class RoverExecutor extends BaseExecutor {
 			const msgs: EncodeObject[] = [
 				produceExecuteContractMessage(
 					liquidatorAddress,
-					this.config.creditManagerAddress,
+					this.config.contracts.creditManager,
 					toUtf8(JSON.stringify(msg)),
 				),
 			]
@@ -190,13 +248,9 @@ export class RoverExecutor extends BaseExecutor {
 				msgs.push(sendMsg)
 			}
 
-			const fee = await this.getFee(
-				msgs,
-				this.config.liquidatorMasterAddress,
-				this.config.chainName.toLowerCase(),
-			)
+			const fee = await this.getFee(msgs, liquidatorAddress, this.config.chainName.toLowerCase())
 
-			const result = await this.client.signAndBroadcast(liquidatorAddress, msgs, fee)
+			const result = await this.signingClient.signAndBroadcast(liquidatorAddress, msgs, fee)
 
 			if (result.code !== 0) {
 				console.log(`Liquidation failed. TxHash: ${result.transactionHash}`)
@@ -221,17 +275,22 @@ export class RoverExecutor extends BaseExecutor {
 
 	ensureWorkerMinBalance = async (addresses: string[]) => {
 		try {
-			const balances = await fetchBalances(this.queryClient, addresses, this.config.gasDenom)
-			this.liquidatorBalances = balances
 			const sendMsgs: MsgSendEncodeObject[] = []
 			const amountToSend = this.config.minGasTokens * 2
-			for (const address of Array.from(balances.keys())) {
-				const osmoBalance = Number(
-					balances.get(address)?.find((coin: Coin) => coin.denom === this.config.gasDenom)
-						?.amount || 0,
+
+			for (const address of addresses) {
+				let balancesResponse = await this.queryClient.queryBalance(address)
+				// Update our balances with latest amounts
+				this.liquidatorBalances.set(address, balancesResponse.balances)
+
+				// Check gas balance, send more if required
+				let gasDenomBalance = balancesResponse.balances.find(
+					(coin) => coin.denom === this.config.gasDenom,
 				)
-				if (osmoBalance === undefined || osmoBalance < this.config.minGasTokens) {
-					// send message to send gas tokens to our liquidator
+				if (
+					gasDenomBalance === undefined ||
+					new BigNumber(gasDenomBalance.amount).isLessThan(this.config.minGasTokens)
+				) {
 					sendMsgs.push(
 						produceSendMessage(this.config.liquidatorMasterAddress, address, [
 							{ denom: this.config.gasDenom, amount: amountToSend.toFixed(0) },
@@ -246,7 +305,11 @@ export class RoverExecutor extends BaseExecutor {
 					this.config.liquidatorMasterAddress,
 					this.config.chainName.toLowerCase(),
 				)
-				await this.client.signAndBroadcast(this.config.liquidatorMasterAddress, sendMsgs, fee)
+				await this.signingClient.signAndBroadcast(
+					this.config.liquidatorMasterAddress,
+					sendMsgs,
+					fee,
+				)
 			}
 		} catch (ex) {
 			console.error(ex)
@@ -254,37 +317,7 @@ export class RoverExecutor extends BaseExecutor {
 		}
 	}
 
-	fetchVaults = async () => {
-		let foundAll = false
-		const limit = 5
-		let vaults: VaultConfigBaseForString[] = []
-		let startAfter: string | undefined = undefined
-		while (!foundAll) {
-			const vaultQuery: QueryMsg = {
-				all_vault_configs: {
-					limit,
-					start_after: startAfter,
-				},
-			}
-
-			const results: VaultConfigBaseForString[] = await this.queryClient.queryContractSmart(
-				this.config.marsParamsAddress,
-				vaultQuery,
-			)
-
-			vaults = vaults.concat(results)
-
-			if (results.length < limit) {
-				foundAll = true
-			}
-
-			startAfter = results.pop()?.addr
-		}
-
-		return vaults
-	}
-
-	refreshData = async () => {
+	init = async () => {
 		try {
 			// Periodically refresh the vaults we have
 			const currentTimeMs = Date.now()
@@ -303,30 +336,33 @@ export class RoverExecutor extends BaseExecutor {
 			// 	this.config.marsParamsAddress,
 			// )
 
-			await this.refreshMarketData()
+			await this.updateMarketsData()
 			await this.updatePriceSources()
 			await this.updateOraclePrices()
-			// roverData.masterBalance.forEach((coin) => this.balances.set(coin.denom, Number(coin.amount)))
-			// this.vaultInfo = roverData.vaultInfo
+			await this.updatePerpParams()
+			await this.updateAssetParams()
 		} catch (ex) {
 			console.error('Failed to refresh data')
 			console.error(JSON.stringify(ex))
 		}
 	}
 
-	createCreditAccount = async (liquidatorAddress: string): Promise<CreateCreditAccountResponse> => {
-		let { tokens } = await this.queryClient.queryContractSmart(this.config.accountNftAddress, {
-			tokens: { owner: liquidatorAddress },
-		})
+	getDefaultCreditAccount = async (
+		liquidatorAddress: string,
+	): Promise<CreateCreditAccountResponse> => {
+		let tokensResponse: TokensResponse = await this.queryClient.queryAccountsForAddress(
+			liquidatorAddress,
+		)
+
 		let msgs = [
 			produceExecuteContractMessage(
 				liquidatorAddress,
-				this.config.creditManagerAddress,
+				this.config.contracts.creditManager,
 				toUtf8(`{ "create_credit_account": "default" }`),
 			),
 		]
-		if (tokens.length === 0) {
-			const result = await this.client.signAndBroadcast(
+		if (tokensResponse.tokens.length === 0) {
+			const result = await this.signingClient.signAndBroadcast(
 				liquidatorAddress,
 				msgs,
 				await this.getFee(msgs, liquidatorAddress, this.config.chainName.toLowerCase()),
@@ -339,16 +375,11 @@ export class RoverExecutor extends BaseExecutor {
 			}
 
 			// todo parse result to get sub account id
-			const { tokens: updatedTokens } = await this.queryClient.queryContractSmart(
-				this.config.accountNftAddress,
-				{
-					tokens: { owner: liquidatorAddress },
-				},
-			)
+			const newTokensResponse = await this.queryClient.queryAccountsForAddress(liquidatorAddress)
 
-			tokens = updatedTokens
+			tokensResponse = newTokensResponse
 		}
 
-		return { liquidatorAddress, tokenId: tokens[0] }
+		return { liquidatorAddress, tokenId: Number(tokensResponse.tokens[0]) }
 	}
 }

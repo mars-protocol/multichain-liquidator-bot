@@ -1,10 +1,10 @@
 import { Market } from 'marsjs-types/mars-red-bank/MarsRedBank.types'
-import { ContractQuery } from '../../src/query/contractQuery'
+import { ChainQuery } from '../../src/query/chainQuery'
 
 describe('Contract Query Tests', () => {
-	let contractQuery: ContractQuery
+	let contractQuery: ChainQuery
 	beforeAll(() => {
-		contractQuery = new ContractQuery(
+		contractQuery = new ChainQuery(
 			'https://neutron-rest.cosmos-apis.com/',
 			process.env.APIKEY!,
 			// TODO put this somewhere better
@@ -56,6 +56,12 @@ describe('Contract Query Tests', () => {
 		let positions = await contractQuery.queryPositionsForAccount('391')
 		expect(positions.account_id).toBe('391')
 		expect(positions.account_kind).toBe('default')
+	})
+	it('Can query tokens for account correctly', async () => {
+		let tokens = await contractQuery.queryAccountsForAddress(
+			'neutron1ncrjuggwa6x9k9g6a7tsk4atmkhvlq58v8gh5n',
+		)
+		expect(tokens.tokens.length).toBe(2)
 	})
 })
 

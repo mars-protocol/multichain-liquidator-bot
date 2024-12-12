@@ -1,3 +1,4 @@
+import BigNumber from 'bignumber.js'
 import {
 	calculateCollateralRatio,
 	calculateLiquidationBonus,
@@ -25,12 +26,12 @@ describe('Redbank Executor Tests', () => {
 			{ denom: 'untrn', amount: '1200' },
 		]
 
-		const prices = new Map<string, number>([
-			['uosmo', 3],
-			['ujake', 1],
-			['uatom', 8.2],
-			['uusdc', 8.5],
-			['untrn', 5.5],
+		const prices = new Map<string, BigNumber>([
+			['uosmo', new BigNumber(3)],
+			['ujake', new BigNumber(1)],
+			['uatom', new BigNumber(8.2)],
+			['uusdc', new BigNumber(8.5)],
+			['untrn', new BigNumber(5.5)],
 		])
 
 		//@ts-ignore
@@ -69,7 +70,6 @@ describe('Redbank Executor Tests', () => {
 			targetHealthFactor,
 			//@ts-ignore
 			debts,
-			// @ts-ignore
 			collaterals,
 			assetLts,
 			liquidationBonus,

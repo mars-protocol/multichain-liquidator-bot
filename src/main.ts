@@ -1,8 +1,7 @@
-import { CosmWasmClient } from '@cosmjs/cosmwasm-stargate'
 import { HdPath } from '@cosmjs/crypto'
 import { DirectSecp256k1HdWallet, makeCosmoshubPath } from '@cosmjs/proto-signing'
 import { SigningStargateClient } from '@cosmjs/stargate'
-import { produceReadOnlyCosmWasmClient, produceSigningStargateClient } from './helpers.js'
+import { produceSigningStargateClient } from './helpers.js'
 import { RedbankExecutor, RedbankExecutorConfig } from './redbank/RedbankExecutor.js'
 import { RoverExecutor, RoverExecutorConfig } from './rover/RoverExecutor.js'
 import { getSecretManager } from './secretManager.js'
@@ -15,6 +14,7 @@ import { AstroportCW } from './exchange/Astroport.js'
 import { AstroportRouteRequester } from './query/routing/AstroportRouteRequester.js'
 import { OsmosisRouteRequester } from './query/routing/OsmosisRouteRequester.js'
 import { RouteRequester } from './query/routing/RouteRequesterInterface.js'
+import { ChainQuery } from './query/chainQuery.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -49,17 +49,21 @@ export const main = async () => {
 			: process.env.NETWORK === 'TESTNET'
 			? Network.TESTNET
 			: Network.LOCALNET
-	const redbankConfig = getRedbankConfig(liquidatorMasterAddress, network, chainName)
-	const roverConfig = getRoverConfig(liquidatorMasterAddress, network, chainName)
+	const config =
+		executorType === REDBANK
+			? getRedbankConfig(liquidatorMasterAddress, network, chainName)
+			: getRoverConfig(liquidatorMasterAddress, network, chainName)
 
 	// Produce clients
-	const queryClient = await produceReadOnlyCosmWasmClient(process.env.RPC_ENDPOINT!)
+	const chainQuery = new ChainQuery(
+		process.env.LCD_ENDPOINT!,
+		process.env.APIKEY!,
+		config.contracts,
+	)
 	const client = await produceSigningStargateClient(process.env.RPC_ENDPOINT!, liquidator)
 
 	const exchangeInterface =
-		chainName === 'osmosis'
-			? new Osmosis()
-			: new AstroportCW(prefix, redbankConfig.astroportRouter!)
+		chainName === 'osmosis' ? new Osmosis() : new AstroportCW(prefix, config.astroportRouter!)
 	const routeRequester =
 		chainName === 'neutron'
 			? new AstroportRouteRequester(process.env.ASTROPORT_API_URL!)
@@ -67,10 +71,22 @@ export const main = async () => {
 
 	switch (executorType) {
 		case REDBANK:
-			await launchRedbank(client, queryClient, redbankConfig, exchangeInterface, routeRequester)
+			await launchRedbank(
+				client,
+				chainQuery,
+				config as RedbankExecutorConfig,
+				exchangeInterface,
+				routeRequester,
+			)
 			return
 		case ROVER:
-			await launchRover(client, queryClient, roverConfig, liquidator, routeRequester)
+			await launchRover(
+				client,
+				chainQuery,
+				config as RoverExecutorConfig,
+				liquidator,
+				routeRequester,
+			)
 			return
 		default:
 			throw new Error(
@@ -80,29 +96,29 @@ export const main = async () => {
 }
 
 const launchRover = async (
-	client: SigningStargateClient,
-	wasmClient: CosmWasmClient,
+	signingClient: SigningStargateClient,
+	queryClient: ChainQuery,
 	roverConfig: RoverExecutorConfig,
 	liquidatorWallet: DirectSecp256k1HdWallet,
 	routeRequester: RouteRequester,
 ) => {
-	await new RoverExecutor(roverConfig, client, wasmClient, liquidatorWallet, routeRequester).start()
+	await new RoverExecutor(
+		roverConfig,
+		signingClient,
+		queryClient,
+		liquidatorWallet,
+		routeRequester,
+	).start()
 }
 
 const launchRedbank = async (
 	client: SigningStargateClient,
-	wasmClient: CosmWasmClient,
+	query: ChainQuery,
 	redbankConfig: RedbankExecutorConfig,
 	exchangeInterface: Exchange,
 	routeRequester: RouteRequester,
 ) => {
-	await new RedbankExecutor(
-		redbankConfig,
-		client,
-		wasmClient,
-		exchangeInterface,
-		routeRequester,
-	).start()
+	await new RedbankExecutor(redbankConfig, client, query, exchangeInterface, routeRequester).start()
 }
 
 main().catch((e) => {
