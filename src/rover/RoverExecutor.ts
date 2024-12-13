@@ -325,17 +325,6 @@ export class RoverExecutor extends BaseExecutor {
 				this.lastFetchedVaultTime = currentTimeMs
 			}
 
-			// TODO
-			// // dispatch hive request and parse it
-			// const roverData = await fetchRoverData(
-			// 	this.config.hiveEndpoint,
-			// 	this.config.liquidatorMasterAddress,
-			// 	this.config.redbankAddress,
-			// 	this.config.swapperAddress,
-			// 	this.vaults,
-			// 	this.config.marsParamsAddress,
-			// )
-
 			await this.updateMarketsData()
 			await this.updatePriceSources()
 			await this.updateOraclePrices()
