@@ -31,7 +31,6 @@ const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
 export interface RedbankExecutorConfig extends BaseExecutorConfig {
 	liquidationFiltererAddress: string
-	liquidatableAssets: string[]
 	safetyMargin: number
 	liquidationProfitMarginPercent: number
 }

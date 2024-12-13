@@ -7,7 +7,6 @@ export const getConfig = (
 ): RedbankExecutorConfig => {
 	return network === Network.MAINNET
 		? {
-				liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
 				chainName: "neutron",
 				liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!, // todo hardcode here
 				safetyMargin: 0.05,
@@ -26,7 +25,6 @@ export const getConfig = (
 				astroportFactory : 'neutron1hptk0k5kng7hjy35vmh009qd5m6l33609nypgf2yc6nqnewduqasxplt4e'
 		  }
 		: {
-			liquidatableAssets: JSON.parse(process.env.LIQUIDATABLE_ASSETS!) as string[],
 			liquidationFiltererAddress: process.env.LIQUIDATION_FILTERER_CONTRACT!, // todo hardcode here
 			safetyMargin: 0.05,
 			chainName: "neutron",
