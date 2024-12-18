@@ -36,14 +36,11 @@ export interface RoverExecutorConfig extends BaseConfig {
 }
 
 export class RoverExecutor extends BaseExecutor {
-	private VAULT_RELOAD_WINDOW = 1800000
 	public config: RoverExecutorConfig
 	private liquidationActionGenerator: ActionGenerator
 
 	private liquidatorAccounts: Map<string, number> = new Map()
 	private liquidatorBalances: Map<string, Coin[]> = new Map()
-
-	private lastFetchedVaultTime = 0
 
 	private wallet: DirectSecp256k1HdWallet
 
@@ -152,6 +149,8 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress: string) => {
+		this.prometheus.incrementLiquidationAttemptCounter()
+		const timer = this.prometheus.startLiquidationTimer()
 		try {
 			const account: Positions = await this.queryClient.queryPositionsForAccount(accountId)
 			const updatedAccount: Positions = calculatePositionStateAfterPerpClosure(
@@ -210,6 +209,7 @@ export class RoverExecutor extends BaseExecutor {
 			)
 
 			if (actions.length === 0) {
+				timer()
 				return
 			}
 
@@ -255,11 +255,14 @@ export class RoverExecutor extends BaseExecutor {
 			if (result.code !== 0) {
 				console.log(`Liquidation failed. TxHash: ${result.transactionHash}`)
 			} else {
+				this.prometheus.incrementLiquidationSuccessCounter()
 				console.log(
 					`Liquidation successfull. TxHash: ${result.transactionHash}, account : ${accountId}`,
 				)
 			}
+
 		} catch (ex) {
+			timer()
 			if (process.env.DEBUG) {
 				console.error(ex)
 			}
@@ -319,12 +322,6 @@ export class RoverExecutor extends BaseExecutor {
 
 	init = async () => {
 		try {
-			// Periodically refresh the vaults we have
-			const currentTimeMs = Date.now()
-			if (this.lastFetchedVaultTime + this.VAULT_RELOAD_WINDOW < currentTimeMs) {
-				this.lastFetchedVaultTime = currentTimeMs
-			}
-
 			await this.updateMarketsData()
 			await this.updatePriceSources()
 			await this.updateOraclePrices()
@@ -332,7 +329,7 @@ export class RoverExecutor extends BaseExecutor {
 			await this.updateAssetParams()
 		} catch (ex) {
 			console.error('Failed to refresh data')
-			console.error(JSON.stringify(ex))
+			console.error(ex)
 		}
 	}
 

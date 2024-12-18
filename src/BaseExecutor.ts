@@ -4,7 +4,6 @@ import { AMMRouter } from './AmmRouter'
 import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from './types/Pool'
 import 'dotenv/config.js'
 import { MarketInfo } from './rover/types/MarketInfo'
-import { CSVWriter, Row } from './CsvWriter'
 
 import BigNumber from 'bignumber.js'
 import { RouteRequester } from './query/routing/RouteRequesterInterface'
@@ -15,6 +14,7 @@ import { ChainQuery } from './query/chainQuery'
 import { PriceResponse } from 'marsjs-types/mars-oracle-osmosis/MarsOracleOsmosis.types'
 import { Market } from 'marsjs-types/mars-red-bank/MarsRedBank.types'
 import { Dictionary } from 'lodash'
+import { Prometheus } from './prometheus'
 
 export interface BaseConfig {
 	lcdEndpoint: string
@@ -47,16 +47,7 @@ export class BaseExecutor {
 	public markets: Map<string, MarketInfo> = new Map()
 	public assetParams: Map<string, AssetParamsBaseForAddr> = new Map()
 	public perpParams: Map<string, PerpParams> = new Map()
-
-	// logging
-	private csvLogger = new CSVWriter('./results.csv', [
-		{ id: 'blockHeight', title: 'BlockHeight' },
-		{ id: 'userAddress', title: 'User' },
-		{ id: 'estimatedLtv', title: 'LiquidationLtv' },
-		{ id: 'debtRepaid', title: 'debtRepaid' },
-		{ id: 'collateral', title: 'collateral' },
-		{ id: 'liquidatorBalance', title: 'liquidatorBalance' },
-	])
+	public prometheus: Prometheus = new Prometheus(this.config.chainName, this.config.productName)
 
 	constructor(
 		public config: BaseConfig,
@@ -98,20 +89,9 @@ export class BaseExecutor {
 		}
 	}
 
-	addCsvRow = (row: Row) => {
-		this.csvLogger.addRow(row)
-	}
-
-	writeCsv = async () => {
-		await this.csvLogger.writeToFile()
-	}
-
 	init = async () => {
-		// dispatch hive request and parse it
-
 		await this.updatePriceSources()
 		await this.updateOraclePrices()
-		await this.updatePrices()
 		await this.updateMarketsData()
 		await this.updateAssetParams()
 	}

@@ -38,7 +38,7 @@ export const getConfig = (
 			// marsEndpoint: "http://127.0.0.1:3000",
 			marsEndpoint: process.env.MARS_API_ENDPOINT
 				? process.env.MARS_API_ENDPOINT
-				: 'https://api.marsprotocol.io',
+				: 'https://backend.prod.mars-dev.net',
 			sqsUrl: 'https://sqs.osmosis.zone/',
 		}
 	}

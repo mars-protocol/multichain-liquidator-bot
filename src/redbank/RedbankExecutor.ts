@@ -457,10 +457,6 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.setBalances(liquidatorAddress)
 
 		console.log(`- Liquidation Process Complete.`)
-
-		if (this.config.logResults) {
-			this.writeCsv()
-		}
 	}
 
 	async liquidateCollaterals(liquidatorAddress: string, collaterals: Collateral[]) {
