@@ -365,6 +365,7 @@ export class RedbankExecutor extends BaseExecutor {
 			throw new Error("Instantiate your clients before calling 'run()'")
 
 		await this.init()
+		await this.setBalances(liquidatorAddress)
 
 		const collateralsBefore: Collateral[] = await this.queryClient.queryRedbankCollaterals(
 			liquidatorAddress,
@@ -372,7 +373,7 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.liquidateCollaterals(liquidatorAddress, collateralsBefore)
 
 		const url = `${this.config
-			.marsEndpoint!}/v1/unhealthy_positions/${this.config.chainName.toLowerCase()}/redbank`
+			.marsEndpoint!}/v2/unhealthy_positions?chain=${this.config.chainName.toLowerCase()}&product=redbank`
 		const response = await fetch(url)
 		let positionObjects: {
 			account_id: string
@@ -453,8 +454,6 @@ export class RedbankExecutor extends BaseExecutor {
 		)
 
 		await this.liquidateCollaterals(liquidatorAddress, collaterals)
-
-		await this.setBalances(liquidatorAddress)
 
 		console.log(`- Liquidation Process Complete.`)
 
