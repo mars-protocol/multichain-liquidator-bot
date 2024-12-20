@@ -374,7 +374,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 		const url = `${this.config
 			.marsEndpoint!}/v2/unhealthy_positions?chain=${this.config.chainName.toLowerCase()}&product=redbank`
-			const response = await fetch(url)
+		const response = await fetch(url)
 		let positionObjects: {
 			account_id: string
 			health_factor: string
