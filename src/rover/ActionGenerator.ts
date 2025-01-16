@@ -26,6 +26,7 @@ export class ActionGenerator {
 	}
 
 	generateLiquidationActions = async (
+		chainName: string,
 		account: Positions,
 		oraclePrices: Map<string, BigNumber>,
 		redbankMarkets: Map<string, MarketInfo>,
@@ -106,6 +107,7 @@ export class ActionGenerator {
 		const collateralToDebtActions =
 			collateral.denom !== borrow.denom
 				? await this.swapCollateralCoinToDebtActions(
+						chainName,
 						{
 							amount: liquidationAmounts.collateral_amount_received_by_liquidator.toString(),
 							denom: collateral.denom,
@@ -122,6 +124,7 @@ export class ActionGenerator {
 			borrow.denom !== neutralDenom
 				? [
 						await this.generateSwapActions(
+							chainName,
 							borrow.denom,
 							neutralDenom,
 							oraclePrices.get(borrow.denom)!,
@@ -211,6 +214,7 @@ export class ActionGenerator {
 	 * @returns An array of swap actions that convert the asset from collateral to the debt.
 	 */
 	generateSwapActions = async (
+		chainName: string,
 		assetInDenom: string,
 		assetOutDenom: string,
 		assetInPrice: BigNumber,
@@ -231,16 +235,27 @@ export class ActionGenerator {
 		const minReceive = amountBN.multipliedBy(priceRatio).multipliedBy(1 - Number(slippage))
 		const route = await this.routeRequester.requestRoute(assetInDenom, assetOutDenom, amountIn)
 
-		const swapperRoute: SwapperRoute = {
-			astro: {
-				swaps: route.route.map((swap) => {
-					return {
-						from: swap.tokenInDenom,
-						to: swap.tokenOutDenom,
-					}
-				}),
-			},
-		}
+		const swapperRoute: SwapperRoute = chainName === 'osmosis'
+			? {
+				osmo: {
+					swaps: route.route.map((swap) => {
+						return {
+							pool_id: swap.poolId.toNumber(),
+							to: swap.tokenOutDenom,
+						} as any
+					}),
+				},
+			}
+			: {
+				astro: {
+					swaps: route.route.map((swap) => {
+						return {
+							from: swap.tokenInDenom,
+							to: swap.tokenOutDenom,
+						}
+					}),
+				},
+			}
 		return this.produceSwapAction(assetInDenom, assetOutDenom, minReceive.toFixed(0), swapperRoute)
 	}
 
@@ -286,6 +301,7 @@ export class ActionGenerator {
 	 * @returns An array of swap actions that convert the collateral to the debt.
 	 */
 	swapCollateralCoinToDebtActions = async (
+		chainName: string,
 		collateralWon: Coin,
 		borrowed: Coin,
 		slippage: string,
@@ -310,6 +326,7 @@ export class ActionGenerator {
 					const amountIn = collateralAmount.multipliedBy(0.5)
 					actions = actions.concat(
 						await this.generateSwapActions(
+							chainName,
 							denom,
 							borrowed.denom,
 							assetInPrice,
@@ -323,6 +340,7 @@ export class ActionGenerator {
 		} else {
 			actions = actions.concat(
 				await this.generateSwapActions(
+					chainName,
 					collateralDenom,
 					borrowed.denom,
 					assetInPrice,
