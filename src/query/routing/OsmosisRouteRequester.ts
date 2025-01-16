@@ -19,25 +19,25 @@ export class OsmosisRouteRequester extends RouteRequester {
 			throw new Error(`Failed to fetch route: ${response.statusText}, ${url}`)
 		}
 
-		let routeResponse : RouteResponse = await response.json()
+		let routeResponse: RouteResponse = await response.json()
 
 		let route = routeResponse.route[0].pools.map((pool) => {
-				let routeHop : RouteHop = {
-					poolId: new Long(pool.id),
-					tokenInDenom: tokenInDenom,
-					tokenOutDenom: pool.token_out_denom,
-					pool: {
-						address: "notrequired",
-						id: new Long(pool.id),
-						poolType: PoolType.XYK,
-						swapFee: pool.spread_factor,
-						token0: tokenInDenom,
-						token1: pool.token_out_denom
-					}
-				}
-				tokenInDenom = pool.token_out_denom
-				return routeHop
-			});
+			let routeHop: RouteHop = {
+				poolId: new Long(pool.id),
+				tokenInDenom: tokenInDenom,
+				tokenOutDenom: pool.token_out_denom,
+				pool: {
+					address: 'notrequired',
+					id: new Long(pool.id),
+					poolType: PoolType.XYK,
+					swapFee: pool.spread_factor,
+					token0: tokenInDenom,
+					token1: pool.token_out_denom,
+				},
+			}
+			tokenInDenom = pool.token_out_denom
+			return routeHop
+		})
 
 		// allow for 2.5% slippage from what we estimated
 		const minOutput = new BigNumber(routeResponse.amount_out).multipliedBy(0.975).toFixed(0)

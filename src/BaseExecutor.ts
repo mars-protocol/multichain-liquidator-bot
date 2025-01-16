@@ -33,7 +33,7 @@ export interface BaseConfig {
 	// The mars api endpoint
 	marsEndpoint?: string
 	// Mars API endpoint version (e.g v1 or v2)
-	apiVersion: string,
+	apiVersion: string
 }
 
 /**
