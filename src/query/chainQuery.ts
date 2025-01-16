@@ -97,11 +97,7 @@ export class ChainQuery {
 			},
 		}
 
-		let positions: Positions = await this.queryContractSmart(msg, this.contracts.creditManager)
-		positions.staked_astro_lps = []
-		positions.perps = []
-		positions.account_kind = 'default'
-		return positions
+		return this.queryContractSmart(msg, this.contracts.creditManager)
 	}
 
 	public async queryAllAssetParams(
@@ -115,15 +111,7 @@ export class ChainQuery {
 			},
 		}
 
-		let params: AssetParamsBaseForAddr[] = await this.queryContractSmart(msg, this.contracts.params)
-		params = params.map((param) => {
-			param.close_factor = '0.5'
-			param.red_bank.withdraw_enabled = true
-			param.credit_manager.withdraw_enabled = true
-			return param
-		})
-
-		return params
+		return this.queryContractSmart(msg, this.contracts.params)
 	}
 
 	public async queryAccountsForAddress(liquidatorAddress: String): Promise<TokensResponse> {
