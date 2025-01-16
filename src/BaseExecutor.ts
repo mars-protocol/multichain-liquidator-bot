@@ -208,7 +208,6 @@ export class BaseExecutor {
 				const response = await this.queryClient.queryAllAssetParams(startAfter, limit)
 				startAfter = response[response.length - 1] ? response[response.length - 1].denom : ''
 				response.forEach((assetParam: AssetParamsBaseForAddr) => {
-
 					// We need to default some variables if we are running against an older version
 					// of the contracts (e.g osmosis is 2.1.0, neutron 2.2.0)
 					if (!assetParam.close_factor) {

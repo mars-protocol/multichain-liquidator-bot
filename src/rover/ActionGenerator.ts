@@ -235,27 +235,28 @@ export class ActionGenerator {
 		const minReceive = amountBN.multipliedBy(priceRatio).multipliedBy(1 - Number(slippage))
 		const route = await this.routeRequester.requestRoute(assetInDenom, assetOutDenom, amountIn)
 
-		const swapperRoute: SwapperRoute = chainName === 'osmosis'
-			? {
-				osmo: {
-					swaps: route.route.map((swap) => {
-						return {
-							pool_id: swap.poolId.toNumber(),
-							to: swap.tokenOutDenom,
-						} as any
-					}),
-				},
-			}
-			: {
-				astro: {
-					swaps: route.route.map((swap) => {
-						return {
-							from: swap.tokenInDenom,
-							to: swap.tokenOutDenom,
-						}
-					}),
-				},
-			}
+		const swapperRoute: SwapperRoute =
+			chainName === 'osmosis'
+				? {
+						osmo: {
+							swaps: route.route.map((swap) => {
+								return {
+									pool_id: swap.poolId.toNumber(),
+									to: swap.tokenOutDenom,
+								} as any
+							}),
+						},
+				  }
+				: {
+						astro: {
+							swaps: route.route.map((swap) => {
+								return {
+									from: swap.tokenInDenom,
+									to: swap.tokenOutDenom,
+								}
+							}),
+						},
+				  }
 		return this.produceSwapAction(assetInDenom, assetOutDenom, minReceive.toFixed(0), swapperRoute)
 	}
 
