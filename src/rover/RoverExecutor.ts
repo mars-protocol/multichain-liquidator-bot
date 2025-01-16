@@ -265,7 +265,6 @@ export class RoverExecutor extends BaseExecutor {
 		assetParams: Map<string, AssetParamsBaseForAddr>,
 		perpParams: Map<string, PerpParams>,
 	): HealthData => {
-		positions.account_kind = "default"
 		let hc: HealthComputer = {
 			kind: 'default',
 			positions: positions,
