@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js'
-import { AstroportApiRoute } from '../../types/AstroportApiRoute'
+import { AstroportApiRoute } from '../../types/AstroportRouteResponse'
 import { RequestRouteResponse, RouteRequester } from './RouteRequesterInterface'
 import { RouteHop } from '../../types/RouteHop'
 import { PoolType } from '../../types/Pool'
