@@ -39,7 +39,9 @@ export const getConfig = (
 			marsEndpoint: process.env.MARS_API_ENDPOINT
 				? process.env.MARS_API_ENDPOINT
 				: 'https://api.marsprotocol.io',
+			apiVersion: 'v2',
 			sqsUrl: 'https://sqs.osmosis.zone/',
+			usePerps: true,
 		}
 	}
 
@@ -73,6 +75,8 @@ export const getConfig = (
 		marsEndpoint: process.env.MARS_API_ENDPOINT
 			? process.env.MARS_API_ENDPOINT
 			: 'https://testnet-api.marsprotocol.io',
+		apiVersion: 'v2',
 		sqsUrl: 'https://sqs.osmosis.zone/',
+		usePerps: true,
 	}
 }

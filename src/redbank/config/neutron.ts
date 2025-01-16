@@ -10,6 +10,7 @@ export const getConfig = (
 		? {
 				chainName: 'neutron',
 				productName: 'redbank',
+				apiVersion: 'v1',
 				safetyMargin: 0.05,
 				contracts: mapValues({
 					addressProvider: 'neutron17yehp4x7n79zq9dlw4g7xmnrvwdjjj2yecq26844sg8yu74knlxqfx5vqv',
@@ -62,6 +63,7 @@ export const getConfig = (
 				marsEndpoint: process.env.MARS_API_ENDPOINT
 					? process.env.MARS_API_ENDPOINT
 					: 'https://testnet-api.marsprotocol.io',
+				apiVersion: 'v1',
 				neutralAssetDenom: 'ibc/EFB00E728F98F0C4BBE8CA362123ACAB466EDA2826DC6837E49F4C1902F21BBA',
 				astroportRouter: 'neutron12jm24l9lr9cupufqjuxpdjnnweana4h66tsx5cl800mke26td26sq7m05p',
 				astroportFactory: 'neutron1jj0scx400pswhpjes589aujlqagxgcztw04srynmhf0f6zplzn2qqmhwj7',
