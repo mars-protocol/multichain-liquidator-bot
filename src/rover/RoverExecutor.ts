@@ -161,6 +161,12 @@ export class RoverExecutor extends BaseExecutor {
 	liquidate = async (accountId: string, liquidatorAddress: string) => {
 		try {
 			const account: Positions = await this.queryClient.queryPositionsForAccount(accountId)
+
+			if (!this.config.usePerps) {
+				// default to null if perps are not present
+				account.perps = []
+			}
+
 			const hasPerps = account.perps.length > 0
 			const updatedAccount: Positions = hasPerps
 				? calculatePositionStateAfterPerpClosure(
@@ -185,6 +191,7 @@ export class RoverExecutor extends BaseExecutor {
 				this.perpParams,
 			)
 			const actions = await this.liquidationActionGenerator.generateLiquidationActions(
+				this.config.chainName,
 				updatedAccount,
 				this.prices,
 				this.markets,
