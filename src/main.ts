@@ -67,7 +67,7 @@ export const main = async () => {
 	const routeRequester =
 		chainName === 'neutron'
 			? new AstroportRouteRequester(process.env.ASTROPORT_API_URL!)
-			: new OsmosisRouteRequester(process.env.SIDECAR_QUERY_SERVER!)
+			: new OsmosisRouteRequester(process.env.SQS_URL!)
 
 	switch (executorType) {
 		case REDBANK:
