@@ -104,10 +104,12 @@ export class RoverExecutor extends BaseExecutor {
 
 	run = async () => {
 		try {
+			let endpointPath =
+				this.config.apiVersion === 'v1'
+					? `v1/unhealthy_positions/${this.config.chainName}/${this.config.productName}`
+					: `v2/unhealthy_positions?chain=${this.config.chainName}&product=${this.config.productName}`
 			// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-			const url = `${this.config.marsEndpoint!}/${this.config.apiVersion}/unhealthy_positions/${
-				this.config.chainName
-			}/${this.config.productName}`
+			const url = `${this.config.marsEndpoint!}/${endpointPath}`
 
 			const response = await fetch(url)
 			let targetAccountObjects: {
