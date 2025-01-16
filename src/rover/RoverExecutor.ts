@@ -17,7 +17,7 @@ import {
 import BigNumber from 'bignumber.js'
 import { MsgSendEncodeObject, SigningStargateClient } from '@cosmjs/stargate'
 import { DirectSecp256k1HdWallet, EncodeObject } from '@cosmjs/proto-signing'
-import { VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
+import { AssetParamsBaseForAddr, PerpParams, VaultConfigBaseForString } from 'marsjs-types/mars-params/MarsParams.types'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 import { compute_health_js, HealthComputer } from 'mars-rover-health-computer-node'
 import { TokensResponse } from 'marsjs-types/mars-account-nft/MarsAccountNft.types'
@@ -33,6 +33,7 @@ export interface RoverExecutorConfig extends BaseConfig {
 	minGasTokens: number
 	maxLiquidators: number
 	stableBalanceThreshold: number
+	usePerps: boolean
 }
 
 export class RoverExecutor extends BaseExecutor {
@@ -84,11 +85,10 @@ export class RoverExecutor extends BaseExecutor {
 		results.forEach((result) =>
 			this.liquidatorAccounts.set(result.liquidatorAddress, result.tokenId),
 		)
-
 		// We set up 3 separate tasks to run in parallel
 		//
 		// Periodically  fetch the different pieces of data we need,
-		setInterval(this.init, 30 * 1000)
+		setInterval(this.init, 300 * 1000)
 		// Ensure our liquidator wallets have more than enough funds to operate
 		setInterval(this.updateLiquidatorBalances, 20 * 1000)
 		// check for and dispatch liquidations
@@ -101,9 +101,9 @@ export class RoverExecutor extends BaseExecutor {
 	run = async () => {
 		try {
 			// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-			const url = `${this.config.marsEndpoint!}/v2/unhealthy_positions?chain=${
+			const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${
 				this.config.chainName
-			}&product=${this.config.productName}`
+			}/${this.config.productName}`
 
 			const response = await fetch(url)
 			let targetAccountObjects: {
@@ -123,7 +123,8 @@ export class RoverExecutor extends BaseExecutor {
 			// Sleep to avoid spamming.
 
 			if (targetAccounts.length == 0) {
-				await sleep(2000)
+				console.log('No unhealthy accounts found. Sleeping for 5 seconds')
+				await sleep(5000)
 				return
 			}
 
@@ -144,7 +145,7 @@ export class RoverExecutor extends BaseExecutor {
 				await Promise.all(liquidationPromises)
 				await sleep(4000)
 			}
-		} catch (ex) {
+	} catch (ex) {
 			if (process.env.DEBUG) {
 				console.error(ex)
 			}
@@ -154,10 +155,12 @@ export class RoverExecutor extends BaseExecutor {
 	liquidate = async (accountId: string, liquidatorAddress: string) => {
 		try {
 			const account: Positions = await this.queryClient.queryPositionsForAccount(accountId)
-			const updatedAccount: Positions = calculatePositionStateAfterPerpClosure(
+			const hasPerps = account.perps.length > 0
+			const updatedAccount: Positions = hasPerps ? calculatePositionStateAfterPerpClosure(
 				account,
 				this.config.neutralAssetDenom,
-			)
+			// We can use the account as is if we don't have any perps
+			) : account
 
 			// Make prices safe for our wasm. If we just to string we
 			// get things like 3.42558449e-9 which cannot be parsed
@@ -167,39 +170,7 @@ export class RoverExecutor extends BaseExecutor {
 				checkedPrices.set(denom, price.toFixed(18))
 			})
 
-			let hc: HealthComputer = {
-				kind: updatedAccount.account_kind,
-				positions: updatedAccount,
-				asset_params: Object.fromEntries(this.assetParams),
-				vaults_data: {
-					vault_values: new Map<Addr, VaultPositionValue>(),
-					vault_configs: new Map<Addr, VaultConfigBaseForString>(),
-				},
-				perps_data: {
-					params: Object.fromEntries(this.perpParams),
-				},
-				oracle_prices: Object.fromEntries(checkedPrices),
-			}
-
-			const healthResponse = compute_health_js(hc)
-
-			const accountNetValue = new BigNumber(healthResponse.total_collateral_value)
-				.minus(healthResponse.total_debt_value)
-				.toFixed(0)
-			const collateralizationRatio =
-				healthResponse.total_debt_value === '0'
-					? new BigNumber(100000000) // Instead of `infinity` we use a very high number
-					: new BigNumber(healthResponse.total_collateral_value)
-							.dividedBy(new BigNumber(healthResponse.total_debt_value))
-							.toFixed(0)
-
-			const healthData: HealthData = {
-				liquidation_health_factor: healthResponse.liquidation_health_factor,
-				account_net_value: accountNetValue,
-				collateralization_ratio: collateralizationRatio,
-				perps_pnl_loss: healthResponse.perps_pnl_loss,
-			}
-
+			let healthData = this.createHealthData(updatedAccount, checkedPrices, this.assetParams, this.perpParams)
 			const actions = await this.liquidationActionGenerator.generateLiquidationActions(
 				updatedAccount,
 				this.prices,
@@ -268,6 +239,43 @@ export class RoverExecutor extends BaseExecutor {
 
 	/// Helpers
 
+	createHealthData = (positions: Positions, prices: Map<string, string>, assetParams: Map<string, AssetParamsBaseForAddr>, perpParams: Map<string, PerpParams>): HealthData => {
+		let hc: HealthComputer = {
+				kind: "default",
+				positions: positions,
+				asset_params: Object.fromEntries(assetParams),
+				vaults_data: {
+					vault_values: new Map<Addr, VaultPositionValue>(),
+					vault_configs: new Map<Addr, VaultConfigBaseForString>(),
+				},
+				perps_data: {
+					params: Object.fromEntries(perpParams),
+				},
+				oracle_prices: Object.fromEntries(prices),
+			}
+
+			const healthResponse = compute_health_js(hc)
+
+			const accountNetValue = new BigNumber(healthResponse.total_collateral_value)
+				.minus(healthResponse.total_debt_value)
+				.toFixed(0)
+			const collateralizationRatio =
+				healthResponse.total_debt_value === '0'
+					? new BigNumber(100000000) // Instead of `infinity` we use a very high number
+					: new BigNumber(healthResponse.total_collateral_value)
+							.dividedBy(new BigNumber(healthResponse.total_debt_value))
+							.toFixed(0)
+
+			const healthData: HealthData = {
+				liquidation_health_factor: healthResponse.liquidation_health_factor,
+				account_net_value: accountNetValue,
+				collateralization_ratio: collateralizationRatio,
+				perps_pnl_loss: healthResponse.perps_pnl_loss,
+			}
+
+			return healthData
+	}
+
 	updateLiquidatorBalances = async () => {
 		const liquidatorAddresses = Array.from(this.liquidatorAccounts.keys())
 		await this.ensureWorkerMinBalance(liquidatorAddresses)
@@ -328,7 +336,9 @@ export class RoverExecutor extends BaseExecutor {
 			await this.updateMarketsData()
 			await this.updatePriceSources()
 			await this.updateOraclePrices()
-			await this.updatePerpParams()
+			if (this.config.usePerps) {
+				await this.updatePerpParams()
+			}
 			await this.updateAssetParams()
 		} catch (ex) {
 			console.error('Failed to refresh data')

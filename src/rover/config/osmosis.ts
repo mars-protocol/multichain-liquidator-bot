@@ -37,6 +37,7 @@ export const getConfig = (
 				? process.env.MARS_API_ENDPOINT
 				: 'https://api.marsprotocol.io',
 			sqsUrl: 'https://sqs.osmosis.zone/',
+			usePerps: false,
 		}
 	}
 
@@ -70,5 +71,6 @@ export const getConfig = (
 			: 'https://testnet-api.marsprotocol.io',
 		stableBalanceThreshold: 5000000,
 		sqsUrl: 'https://sqs.osmosis.zone/',
+		usePerps: false,
 	}
 }
