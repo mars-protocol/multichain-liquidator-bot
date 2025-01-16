@@ -62,6 +62,7 @@ describe('Liquidation Action Generator Tests', () => {
 			})
 
 			actions = await liquidationActionGenerator.generateLiquidationActions(
+				'neutron',
 				mock.account,
 				mock.prices,
 				mock.markets,
@@ -184,6 +185,7 @@ describe('Liquidation Action Generator Tests', () => {
 			})
 
 			actions = await liquidationActionGenerator.generateLiquidationActions(
+				'neutron',
 				mock.account,
 				mock.prices,
 				mock.markets,
@@ -279,6 +281,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// We don't need to swap anything
 
 			actions = await liquidationActionGenerator.generateLiquidationActions(
+				'neutron',
 				mock.account,
 				mock.prices,
 				mock.markets,
@@ -364,6 +367,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// We don't need to swap anything
 
 			actions = await liquidationActionGenerator.generateLiquidationActions(
+				'osmosis',
 				mock.account,
 				mock.prices,
 				mock.markets,
@@ -449,6 +453,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// We don't need to swap anything
 
 			actions = await liquidationActionGenerator.generateLiquidationActions(
+				'osmosis',
 				mock.account,
 				mock.prices,
 				mock.markets,
