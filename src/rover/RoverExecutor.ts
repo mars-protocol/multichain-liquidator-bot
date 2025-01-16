@@ -101,7 +101,7 @@ export class RoverExecutor extends BaseExecutor {
 	run = async () => {
 		try {
 			// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
-			const url = `${this.config.marsEndpoint!}/v1/unhealthy_positions/${
+			const url = `${this.config.marsEndpoint!}/${this.config.apiVersion}/unhealthy_positions/${
 				this.config.chainName
 			}/${this.config.productName}`
 

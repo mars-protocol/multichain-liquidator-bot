@@ -32,6 +32,8 @@ export interface BaseConfig {
 	astroportRouter?: string
 	// The mars api endpoint
 	marsEndpoint?: string
+	// Mars API endpoint version (e.g v1 or v2)
+	apiVersion: string,
 }
 
 /**

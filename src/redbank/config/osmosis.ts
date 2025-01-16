@@ -34,6 +34,7 @@ export const getConfig = (
 				marsEndpoint: process.env.MARS_API_ENDPOINT
 					? process.env.MARS_API_ENDPOINT
 					: 'https://api.marsprotocol.io',
+				apiVersion: 'v1',
 				sqsUrl: process.env.SQS_URL!,
 		  }
 		: {
@@ -62,6 +63,7 @@ export const getConfig = (
 				marsEndpoint: process.env.MARS_API_ENDPOINT
 					? process.env.MARS_API_ENDPOINT
 					: 'https://testnet-api.marsprotocol.io',
+				apiVersion: 'v1',
 				liquidationProfitMarginPercent: 0.01,
 				sqsUrl: process.env.SQS_URL!,
 		  }
