@@ -208,6 +208,19 @@ export class BaseExecutor {
 				const response = await this.queryClient.queryAllAssetParams(startAfter, limit)
 				startAfter = response[response.length - 1] ? response[response.length - 1].denom : ''
 				response.forEach((assetParam: AssetParamsBaseForAddr) => {
+					if (!assetParam.close_factor) {
+						// Default to 0.5 if close factor
+						assetParam.close_factor = '0.5'
+					}
+					if (assetParam.credit_manager.withdraw_enabled == undefined) {
+						// Default to true if withdraw_enabled is not defined
+						assetParam.credit_manager.withdraw_enabled = true
+					}
+
+					if (assetParam.red_bank.withdraw_enabled == undefined) {
+						// Default to true if withdraw_enabled is not defined
+						assetParam.red_bank.withdraw_enabled = true
+					}
 					this.assetParams.set(assetParam.denom, assetParam)
 				})
 				fetching = response.length === 5
