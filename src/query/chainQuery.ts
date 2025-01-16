@@ -17,6 +17,7 @@ export class ChainQuery {
 	) {}
 
 	async queryContractSmart<T>(msg: Object, contractAddress: string): Promise<T> {
+
 		const base64Msg = Buffer.from(JSON.stringify(msg)).toString('base64')
 		const url = `${this.lcdUrl}/cosmwasm/wasm/v1/contract/${contractAddress}/smart/${base64Msg}?x-apikey=${this.apiKey}`
 		const response = await fetch(url)
@@ -97,7 +98,11 @@ export class ChainQuery {
 			},
 		}
 
-		return this.queryContractSmart(msg, this.contracts.creditManager)
+		let positions: Positions = await this.queryContractSmart(msg, this.contracts.creditManager)
+		positions.staked_astro_lps = []
+		positions.perps = []
+		positions.account_kind = "default"
+		return positions
 	}
 
 	public async queryAllAssetParams(
@@ -111,7 +116,15 @@ export class ChainQuery {
 			},
 		}
 
-		return this.queryContractSmart(msg, this.contracts.params)
+		let params : AssetParamsBaseForAddr[] = await this.queryContractSmart(msg, this.contracts.params)
+		params = params.map((param) => {
+			param.close_factor = "0.5"
+			param.red_bank.withdraw_enabled = true
+			param.credit_manager.withdraw_enabled = true
+			return param
+		})
+
+		return params
 	}
 
 	public async queryAccountsForAddress(liquidatorAddress: String): Promise<TokensResponse> {
