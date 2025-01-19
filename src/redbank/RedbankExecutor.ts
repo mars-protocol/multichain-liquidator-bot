@@ -387,8 +387,8 @@ export class RedbankExecutor extends BaseExecutor {
 		let positions: Position[] = positionObjects
 			.filter(
 				(position) =>
-					Number(position.health_factor) < 0.98 &&
-					Number(position.health_factor) > 0.3 &&
+					Number(position.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV!) &&
+					Number(position.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV!) &&
 					// position.account_id === "neutron1u44598z3a8fdy9e6cu7rpl2eqvl2shjvfg4sqd" &&
 					position.total_debt.length > 5,
 			)
