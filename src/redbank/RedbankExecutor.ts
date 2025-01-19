@@ -373,9 +373,9 @@ export class RedbankExecutor extends BaseExecutor {
 		await this.liquidateCollaterals(liquidatorAddress, collateralsBefore)
 
 		let endpointPath =
-				this.config.apiVersion === 'v1'
-					? `v1/unhealthy_positions/${this.config.chainName}/${this.config.productName}`
-					: `v2/unhealthy_positions?chain=${this.config.chainName}&product=${this.config.productName}`
+			this.config.apiVersion === 'v1'
+				? `v1/unhealthy_positions/${this.config.chainName}/${this.config.productName}`
+				: `v2/unhealthy_positions?chain=${this.config.chainName}&product=${this.config.productName}`
 		const url = `${this.config.marsEndpoint!}/${endpointPath}`
 		const response = await fetch(url)
 		let positionObjects: {
