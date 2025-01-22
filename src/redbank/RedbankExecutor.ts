@@ -372,9 +372,11 @@ export class RedbankExecutor extends BaseExecutor {
 		)
 		await this.liquidateCollaterals(liquidatorAddress, collateralsBefore)
 
-		const url = `${this.config.marsEndpoint!}/${
-			this.config.apiVersion
-		}/unhealthy_positions?chain=${this.config.chainName.toLowerCase()}&product=redbank`
+		let endpointPath =
+			this.config.apiVersion === 'v1'
+				? `v1/unhealthy_positions/${this.config.chainName}/${this.config.productName}`
+				: `v2/unhealthy_positions?chain=${this.config.chainName}&product=${this.config.productName}`
+		const url = `${this.config.marsEndpoint!}/${endpointPath}`
 		const response = await fetch(url)
 		let positionObjects: {
 			account_id: string
@@ -385,8 +387,8 @@ export class RedbankExecutor extends BaseExecutor {
 		let positions: Position[] = positionObjects
 			.filter(
 				(position) =>
-					Number(position.health_factor) < 0.97 &&
-					Number(position.health_factor) > 0.3 &&
+					Number(position.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV!) &&
+					Number(position.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV!) &&
 					// position.account_id === "neutron1u44598z3a8fdy9e6cu7rpl2eqvl2shjvfg4sqd" &&
 					position.total_debt.length > 5,
 			)
