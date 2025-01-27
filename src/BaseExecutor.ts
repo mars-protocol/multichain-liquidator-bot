@@ -212,7 +212,7 @@ export class BaseExecutor {
 					// of the contracts (e.g osmosis is 2.1.0, neutron 2.2.0)
 					if (!assetParam.close_factor) {
 						// Default to 0.5 if no close factor present
-						assetParam.close_factor = '0.5'
+						assetParam.close_factor = '0.1'
 					}
 					if (assetParam.credit_manager.withdraw_enabled == undefined) {
 						// Default to true if withdraw_enabled is not defined
@@ -335,7 +335,8 @@ export class BaseExecutor {
 		const gasEstimated = await this.signingClient.simulate(address, msgs, '')
 		const gas = Number(gasEstimated * 1.3)
 		const gasPrice = Number(baseFee)
-		const safeGasPrice = gasPrice < 0.025 ? 0.025 : gasPrice
+		console.log({ gas, gasPrice })
+		const safeGasPrice = gasPrice < 0.025 ? 0.1 : gasPrice
 		const amount = coins((gas * safeGasPrice + 1).toFixed(0), this.config.gasDenom)
 		const fee = {
 			amount,
