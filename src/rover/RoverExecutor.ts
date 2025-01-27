@@ -121,6 +121,7 @@ export class RoverExecutor extends BaseExecutor {
 			const targetAccounts = targetAccountObjects
 				.filter(
 					(account) =>
+						Number(account.total_debt) > 100000 &&
 						Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
 						Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
 					// To target specific accounts, filter here

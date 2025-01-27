@@ -130,7 +130,7 @@ export class ActionGenerator {
 							oraclePrices.get(borrow.denom)!,
 							oraclePrices.get(neutralDenom)!,
 							// todo estimate correctly
-							'100',
+							'1',
 							slippage,
 						),
 				  ]

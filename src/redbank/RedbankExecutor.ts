@@ -393,12 +393,13 @@ export class RedbankExecutor extends BaseExecutor {
 					position.total_debt.length > 5,
 			)
 
-			.sort((a, b) => Number(a.total_debt) - Number(b.total_debt))
+			.sort((a, b) => Number(b.total_debt) - Number(a.total_debt))
 			.map((positionObject) => {
 				return {
 					Identifier: positionObject.account_id,
 				}
 			})
+			.slice(0, 10)
 
 		if (positions.length == 0) {
 			//sleep to avoid spamming redis db when empty
@@ -407,17 +408,21 @@ export class RedbankExecutor extends BaseExecutor {
 			return
 		}
 
-		const positionToLiquidate = positions[0]
+		for (const position of positions) {
+			await this.executeLiquidation(position, liquidatorAddress)
+		}
+	}
 
-		console.log(`- Liquidating ${positionToLiquidate.Identifier}`)
+	async executeLiquidation(position: Position, liquidatorAddress: string): Promise<void> {
+		console.log(`- Liquidating ${position.Identifier}`)
 		// Fetch position data
-		const liquidateeDebts = await this.queryClient.queryRedbankDebts(positionToLiquidate.Identifier)
+		const liquidateeDebts = await this.queryClient.queryRedbankDebts(position.Identifier)
 		const liquidateeCollaterals = await this.queryClient.queryRedbankCollaterals(
-			positionToLiquidate.Identifier,
+			position.Identifier,
 		)
 
 		const { tx, debtToRepay } = await this.produceLiquidationTx({
-			address: positionToLiquidate.Identifier,
+			address: position.Identifier,
 			debts: liquidateeDebts,
 			collaterals: liquidateeCollaterals,
 		})
