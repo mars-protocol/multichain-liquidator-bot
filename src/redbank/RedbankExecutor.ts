@@ -370,6 +370,7 @@ export class RedbankExecutor extends BaseExecutor {
 		const collateralsBefore: Collateral[] = await this.queryClient.queryRedbankCollaterals(
 			liquidatorAddress,
 		)
+		console.log(`collaterals before: ${JSON.stringify(collateralsBefore)}`)
 		await this.liquidateCollaterals(liquidatorAddress, collateralsBefore)
 
 		let endpointPath =
@@ -389,7 +390,7 @@ export class RedbankExecutor extends BaseExecutor {
 				(position) =>
 					Number(position.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV!) &&
 					Number(position.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV!) &&
-					// position.account_id === "neutron1u44598z3a8fdy9e6cu7rpl2eqvl2shjvfg4sqd" &&
+					// position.account_id === "neutron18k428zr2tgj0xmqrx2uk58qy63qfazvp6hm5c2" &&
 					position.total_debt.length > 5,
 			)
 
@@ -409,7 +410,11 @@ export class RedbankExecutor extends BaseExecutor {
 		}
 
 		for (const position of positions) {
-			await this.executeLiquidation(position, liquidatorAddress)
+			try {
+				await this.executeLiquidation(position, liquidatorAddress)
+			} catch (e) {
+				console.error(e)
+			}
 		}
 	}
 
