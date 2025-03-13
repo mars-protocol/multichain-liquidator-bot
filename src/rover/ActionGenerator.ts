@@ -171,18 +171,21 @@ export class ActionGenerator {
 			return []
 		}
 
-		// @ts-ignore
 		const receivedDebtAmount =
+			// @ts-ignore
 			collateralToDebtActions[collateralToDebtActions.length - 1].swap_exact_in.min_receive
 		const remainingDebt = new BigNumber(receivedDebtAmount).minus(borrow.amount)
-
+		if (remainingDebt.isNegative()) {
+			console.log('SwapToStableMsg: No profit after repaying debt. Nothing to swap')
+			// If this occurs, we probably have an 
+			return []
+		}
 		const assetInPrice = oraclePrices.get(collateralDenom)!
 		const assetOutPrice = oraclePrices.get(borrow.denom)!
 		const priceRatio = assetInPrice.dividedBy(assetOutPrice)
 
 		// 10% buffer here to be defensive. It is more important the liquidation tx succeed
 		const minReceive = remainingDebt.multipliedBy(priceRatio).multipliedBy(0.9)
-
 		return [
 			await this.generateSwapActions(
 				chainName,
@@ -409,7 +412,6 @@ export class ActionGenerator {
 			const underlyingCoins = collateralDenom.endsWith('astroport/share')
 				? await queryAstroportLpUnderlyingCoins(lpCoin)!
 				: await queryOsmosisLpUnderlyingCoins(lpCoin)!
-
 			for (const coin of underlyingCoins) {
 				if (coin.denom !== borrowed.denom) {
 					// TODO: This could be a source of bugs, if the amount of underlying tokens in the pools
