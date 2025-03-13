@@ -9,7 +9,11 @@ import {
 	DebtAmount,
 } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
-import { calculateTotalPerpPnl, queryAstroportLpUnderlyingCoins, queryOsmosisLpUnderlyingCoins } from '../helpers'
+import {
+	calculateTotalPerpPnl,
+	queryAstroportLpUnderlyingCoins,
+	queryOsmosisLpUnderlyingCoins,
+} from '../helpers'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 import {
 	LiquidationAmountInputs,
@@ -65,8 +69,10 @@ export class ActionGenerator {
 				  }
 				: this.findLargestDebt(account.debts, oraclePrices)
 
-		let maxDebtAmount = debt.amount.gt(500000000) ? new BigNumber(500000000).dividedBy(oraclePrices.get(debt.denom)!) : new BigNumber(debt.amount)
-			
+		let maxDebtAmount = debt.amount.gt(5000000000)
+			? new BigNumber(5000000000).dividedBy(oraclePrices.get(debt.denom)!)
+			: new BigNumber(debt.amount)
+
 		maxDebtAmount = maxDebtAmount.dividedBy(5)
 		const liquidationAmountInputs: LiquidationAmountInputs = {
 			collateral_amount: collateral.amount.toFixed(0),
@@ -89,7 +95,6 @@ export class ActionGenerator {
 
 		const liquidationAmounts = calculate_liquidation_amounts_js(liquidationAmountInputs)
 
-
 		let borrowActions: Action[] = this.produceBorrowActions(
 			debt.denom,
 			maxDebtAmount,
@@ -97,7 +102,6 @@ export class ActionGenerator {
 			redbankMarkets,
 		)
 
-		console.log(JSON.stringify(borrowActions))
 		// variables
 		const { borrow } = borrowActions[0] as { borrow: Coin }
 
@@ -109,8 +113,6 @@ export class ActionGenerator {
 			account.account_id,
 			collateral.denom,
 		)
-
-		console.log(JSON.stringify(liquidateAction))
 
 		const collateralToDebtActions =
 			collateral.denom !== borrow.denom
@@ -127,22 +129,17 @@ export class ActionGenerator {
 				: []
 
 		const repayMsg = this.generateRepayActions(borrow.denom)
-		// todo estimate amount based on repay to prevent slippage.
-		const swapToStableMsg =
-			borrow.denom !== neutralDenom
-				? [
-						await this.generateSwapActions(
-							chainName,
-							borrow.denom,
-							neutralDenom,
-							oraclePrices.get(borrow.denom)!,
-							oraclePrices.get(neutralDenom)!,
-							// todo estimate correctly
-							'10',
-							slippage,
-						),
-				  ]
-				: []
+
+		const swapToStableActions = await this.produceSwapToStableActions(
+			chainName,
+			oraclePrices,
+			collateral.denom,
+			neutralDenom,
+			borrow,
+			collateralToDebtActions,
+			slippage,
+		)
+
 		const refundAll = this.produceRefundAllAction()
 
 		const actions = [
@@ -150,7 +147,7 @@ export class ActionGenerator {
 			liquidateAction,
 			...collateralToDebtActions,
 			...repayMsg,
-			...swapToStableMsg,
+			...swapToStableActions,
 			refundAll,
 		]
 		if (process.env.DEBUG) {
@@ -160,6 +157,44 @@ export class ActionGenerator {
 		return actions
 	}
 
+	produceSwapToStableActions = async (
+		chainName: string,
+		oraclePrices: Map<string, BigNumber>,
+		collateralDenom: string,
+		neutralDenom: string,
+		borrow: Coin,
+		collateralToDebtActions: Action[],
+		slippage: string,
+	): Promise<Action[]> => {
+		if (borrow.denom === neutralDenom) {
+			console.log(`Borrow denom ${borrow.denom} is not the same as neutral denom ${neutralDenom}`)
+			return []
+		}
+
+		// @ts-ignore
+		const receivedDebtAmount =
+			collateralToDebtActions[collateralToDebtActions.length - 1].swap_exact_in.min_receive
+		const remainingDebt = new BigNumber(receivedDebtAmount).minus(borrow.amount)
+
+		const assetInPrice = oraclePrices.get(collateralDenom)!
+		const assetOutPrice = oraclePrices.get(borrow.denom)!
+		const priceRatio = assetInPrice.dividedBy(assetOutPrice)
+
+		// 10% buffer here to be defensive. It is more important the liquidation tx succeed
+		const minReceive = remainingDebt.multipliedBy(priceRatio).multipliedBy(0.9)
+
+		return [
+			await this.generateSwapActions(
+				chainName,
+				borrow.denom,
+				neutralDenom,
+				oraclePrices.get(borrow.denom)!,
+				oraclePrices.get(neutralDenom)!,
+				minReceive.toFixed(0),
+				slippage,
+			),
+		]
+	}
 	/**
 	 * Produce the borrow actions.
 	 *
@@ -186,39 +221,38 @@ export class ActionGenerator {
 			console.log(collateral)
 		}
 
-
-		if (debtDenom === "ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858") {
+		if (debtDenom === 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858') {
 			console.log(maxRepayableAmount)
 
-			let actions : Action[] = [
+			let actions: Action[] = [
 				// borrow usdc
 				{
 					borrow: {
 						amount: new BigNumber(maxRepayableAmount).toFixed(0),
-						denom: "ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4"
-					}
+						denom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4',
+					},
 				},
 				// swap to axlsdc
 				{
 					swap_exact_in: {
 						coin_in: {
-							amount: "account_balance",
-							denom: "ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4"
+							amount: 'account_balance',
+							denom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4',
 						},
-						denom_out: "ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858",
+						denom_out: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858',
 						route: {
 							osmo: {
 								swaps: [
 									{
 										pool_id: 1212,
-										to: "ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858"
-									}
-								]
-							}
+										to: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858',
+									},
+								],
+							},
 						},
-						min_receive: new BigNumber(maxRepayableAmount).multipliedBy(0.98).toFixed(0)
-					}
-				}
+						min_receive: new BigNumber(maxRepayableAmount).multipliedBy(0.98).toFixed(0),
+					},
+				},
 			]
 
 			return actions
@@ -284,7 +318,7 @@ export class ActionGenerator {
 		if (minReceive.isNaN() || minReceive.lt(10)) {
 			minReceive = new BigNumber(10)
 		}
-		
+
 		const swapperRoute: SwapperRoute =
 			chainName === 'osmosis'
 				? {
@@ -370,11 +404,11 @@ export class ActionGenerator {
 			const lpCoin = {
 				amount: collateralAmount.toFixed(0),
 				denom: collateralDenom,
-			}	
+			}
 			// find underlying tokens and swap to borrowed asset
-			const underlyingCoins = collateralDenom.endsWith('astroport/share') 
-			? await queryAstroportLpUnderlyingCoins(lpCoin)! 
-			: await queryOsmosisLpUnderlyingCoins(lpCoin)!
+			const underlyingCoins = collateralDenom.endsWith('astroport/share')
+				? await queryAstroportLpUnderlyingCoins(lpCoin)!
+				: await queryOsmosisLpUnderlyingCoins(lpCoin)!
 
 			for (const coin of underlyingCoins) {
 				if (coin.denom !== borrowed.denom) {

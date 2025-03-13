@@ -145,50 +145,42 @@ export const produceSigningCosmWasmClient = async (
 	})
 }
 
-export const queryAstroportLpUnderlyingCoins = async (
-    lpCoin: Coin,
-  ): Promise<Coin[]> => {
-    const pairAddress = lpCoin.denom.split('/')[1]
-  
-    // Build the url
-    const encodedMsg = Buffer.from(JSON.stringify({ simulate_withdraw: {lp_amount: lpCoin.amount}})).toString('base64')
-    const url = `${process.env.LCD_ENDPOINT}/cosmwasm/wasm/v1/contract/${pairAddress}/smart/${encodedMsg}`
-  
-    // Fetch pair info
-    const response = await fetch(url)
-    return (await response.json())['data'] as Coin[]
-  }
+export const queryAstroportLpUnderlyingCoins = async (lpCoin: Coin): Promise<Coin[]> => {
+	const pairAddress = lpCoin.denom.split('/')[1]
 
-export const queryOsmosisLpUnderlyingCoins = async (
-    lpCoin: Coin,
-  ) : Promise<Coin[]> => {
-    // Pool denoms are: gamm/pool/[id]
-    const poolId = lpCoin.denom.split('/')[2]
-    const response = await fetch(
-      `${process.env.LCD_ENDPOINT}/osmosis/gamm/v1beta1/pools/${poolId}`
-    )
-    const poolResponse = (await response.json())
+	// Build the url
+	const encodedMsg = Buffer.from(
+		JSON.stringify({ simulate_withdraw: { lp_amount: lpCoin.amount } }),
+	).toString('base64')
+	const url = `${process.env.LCD_ENDPOINT}/cosmwasm/wasm/v1/contract/${pairAddress}/smart/${encodedMsg}`
 
-    // Calculate how much of the underlying assets we will receive
-    const totalShares = poolResponse.pool.total_shares.amount
+	// Fetch pair info
+	const response = await fetch(url)
+	return (await response.json())['data'] as Coin[]
+}
 
-    return poolResponse.pool.pool_assets.map((asset: PoolAsset) => {
-      const tokensPerShare = new BigNumber(asset.token.amount).dividedBy(
-        totalShares
-      )
+export const queryOsmosisLpUnderlyingCoins = async (lpCoin: Coin): Promise<Coin[]> => {
+	// Pool denoms are: gamm/pool/[id]
+	const poolId = lpCoin.denom.split('/')[2]
+	const response = await fetch(`${process.env.LCD_ENDPOINT}/osmosis/gamm/v1beta1/pools/${poolId}`)
+	const poolResponse = await response.json()
 
-      // Multiply by 0.99 to account for a margin of error, as pool weights are not exact.
-      // The extra ~1% will be left in the rewards distributor contract.
-      const tokensToSwap = tokensPerShare
-        .multipliedBy(lpCoin.amount)
-        .multipliedBy(0.99)
+	// Calculate how much of the underlying assets we will receive
+	const totalShares = poolResponse.pool.total_shares.amount
 
-      return {
-        denom: asset.token.denom,
-        amount: tokensToSwap.toFixed(0),
-      }
-    })
-  }
+	return poolResponse.pool.pool_assets.map((asset: PoolAsset) => {
+		const tokensPerShare = new BigNumber(asset.token.amount).dividedBy(totalShares)
+
+		// Multiply by 0.99 to account for a margin of error, as pool weights are not exact.
+		// The extra ~1% will be left in the rewards distributor contract.
+		const tokensToSwap = tokensPerShare.multipliedBy(lpCoin.amount).multipliedBy(0.99)
+
+		return {
+			denom: asset.token.denom,
+			amount: tokensToSwap.toFixed(0),
+		}
+	})
+}
 
 export const setPrice = async (
 	client: SigningCosmWasmClient,
