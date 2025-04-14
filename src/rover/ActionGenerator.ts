@@ -166,12 +166,12 @@ export class ActionGenerator {
 		collateralToDebtActions: Action[],
 		slippage: string,
 	): Promise<Action[]> => {
-		if (borrow.denom === neutralDenom) {
-			console.log(`Borrow denom ${borrow.denom} is not the same as neutral denom ${neutralDenom}`)
+		if (borrow.denom === neutralDenom || collateralToDebtActions.length === 0) {
+			console.log(`Borrow denom ${borrow.denom} is the same as neutral denom ${neutralDenom}`)
 			return []
 		}
 
-		const receivedDebtAmount =
+		const receivedDebtAmount = 
 			// @ts-ignore
 			collateralToDebtActions[collateralToDebtActions.length - 1].swap_exact_in.min_receive
 		const remainingDebt = new BigNumber(receivedDebtAmount).minus(borrow.amount)
