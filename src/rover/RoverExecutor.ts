@@ -119,7 +119,6 @@ export class RoverExecutor extends BaseExecutor {
 					(account) =>
 						Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
 						Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
-					// To target specific accounts, filter here
 				)
 				.sort((accountA, accountB) => Number(accountB.total_debt) - Number(accountA.total_debt))
 			// Sleep to avoid spamming.

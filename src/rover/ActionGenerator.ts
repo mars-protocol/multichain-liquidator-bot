@@ -44,6 +44,8 @@ export class ActionGenerator {
 			account.deposits.length === 0 &&
 			account.lends.length === 0 &&
 			account.staked_astro_lps.length === 0
+		console.log(`hasNoCollaterals: ${hasNoCollaterals}`)
+		
 		const collateral: Collateral = hasNoCollaterals
 			? {
 					type: PositionType.DEPOSIT,
@@ -183,7 +185,6 @@ export class ActionGenerator {
 		const assetInPrice = oraclePrices.get(collateralDenom)!
 		const assetOutPrice = oraclePrices.get(borrow.denom)!
 		const priceRatio = assetInPrice.dividedBy(assetOutPrice)
-
 		// 10% buffer here to be defensive. It is more important the liquidation tx succeed
 		const minReceive = remainingDebt.multipliedBy(priceRatio).multipliedBy(0.9)
 		return [
@@ -505,11 +506,12 @@ export class ActionGenerator {
 		minReceive: string,
 		route: SwapperRoute | null = null,
 	): Action => {
+		console.log(`minReceive: ${minReceive}`)
 		return {
 			swap_exact_in: {
 				coin_in: { denom: denomIn, amount: 'account_balance' },
 				denom_out: denomOut,
-				min_receive: minReceive,
+				min_receive: '100',
 				route: route,
 			},
 		}

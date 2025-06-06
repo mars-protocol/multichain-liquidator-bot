@@ -390,7 +390,6 @@ export class RedbankExecutor extends BaseExecutor {
 				(position) =>
 					Number(position.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV!) &&
 					Number(position.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV!) &&
-					// position.account_id === "neutron18k428zr2tgj0xmqrx2uk58qy63qfazvp6hm5c2" &&
 					position.total_debt.length > 5,
 			)
 
