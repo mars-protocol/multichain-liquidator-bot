@@ -15,6 +15,7 @@ import { AstroportRouteRequester } from './query/routing/AstroportRouteRequester
 import { OsmosisRouteRequester } from './query/routing/OsmosisRouteRequester.js'
 import { RouteRequester } from './query/routing/RouteRequesterInterface.js'
 import { ChainQuery } from './query/chainQuery.js'
+import { MetricsService } from './metrics.js'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -68,6 +69,12 @@ export const main = async () => {
 		chainName === 'neutron'
 			? new AstroportRouteRequester(process.env.ASTROPORT_API_URL!)
 			: new OsmosisRouteRequester(process.env.SQS_URL!)
+
+	// Start metrics server
+	const metricsPort = process.env.METRICS_PORT ? parseInt(process.env.METRICS_PORT) : 9090
+	const metrics = MetricsService.getInstance()
+	metrics.startMetricsServer(metricsPort)
+	console.log(`Metrics server started on port ${metricsPort}`)
 
 	switch (executorType) {
 		case REDBANK:
