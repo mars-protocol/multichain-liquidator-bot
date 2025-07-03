@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - perps
+      - liquidation_bot_metrics
   pull_request:
   workflow_dispatch:
     inputs:
