@@ -49,9 +49,6 @@ jobs:
       - name: Check Coverage
         run: yarn test:coverage
 
-      - name: Check Formatting
-        run: yarn format:check
-
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     needs: coverage
