@@ -1,5 +1,9 @@
 name: Scripts
 
+permissions:
+  id-token: write
+  contents: read
+
 on:
   push:
     branches:
