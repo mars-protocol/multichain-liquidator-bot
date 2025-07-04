@@ -19,7 +19,7 @@ export class MetricsService {
 	// Per-loop (live) metrics
 	public liquidationsErrors: promClient.Gauge<string>
 	public liquidationsSuccess: promClient.Gauge<string>
-	public liquidationsUnhealthyToHealthyPositionsLive: promClient.Gauge<string>
+	public liquidationsUnhealthyAccounts: promClient.Gauge<string>
 
 	private constructor() {
 		this.register = new promClient.Registry()
@@ -106,9 +106,9 @@ export class MetricsService {
 			registers: [this.register],
 		})
 
-		this.liquidationsUnhealthyToHealthyPositionsLive = new promClient.Gauge({
-			name: 'liquidations_unhealthy_to_healthy_positions',
-			help: 'Number of positions that became healthy in the current loop',
+		this.liquidationsUnhealthyAccounts = new promClient.Gauge({
+			name: 'liquidations_unhealthy_accounts',
+			help: 'Number of unhealthy accounts in the current loop',
 			labelNames: ['chain', 'sc_addr', 'product'],
 			registers: [this.register],
 		})
@@ -172,7 +172,7 @@ export class MetricsService {
 	public resetLoopMetrics(labels: { chain: string; sc_addr: string; product: string }) {
 		this.liquidationsErrors.set(labels, 0)
 		this.liquidationsSuccess.set(labels, 0)
-		this.liquidationsUnhealthyToHealthyPositionsLive.set(labels, 0)
+		this.liquidationsUnhealthyAccounts.set(labels, 0)
 	}
 
 	public incLoopErrors(labels: { chain: string; sc_addr: string; product: string }) {
@@ -183,7 +183,7 @@ export class MetricsService {
 		this.liquidationsSuccess.inc(labels)
 	}
 
-	public incLoopUnhealthyToHealthy(labels: { chain: string; sc_addr: string; product: string }, count: number = 1) {
-		this.liquidationsUnhealthyToHealthyPositionsLive.inc(labels, count)
+	public setUnhealthyAccounts(labels: { chain: string; sc_addr: string; product: string }, count: number) {
+		this.liquidationsUnhealthyAccounts.set(labels, count)
 	}
 } 

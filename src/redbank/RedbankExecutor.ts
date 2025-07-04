@@ -46,7 +46,7 @@ export class RedbankExecutor extends BaseExecutor {
 	private MINUTE = 1000 * 60
 	public config: RedbankExecutorConfig
 	private targetHealthFactor: number = 0
-	private previousUnhealthyAccounts: Set<string> = new Set()
+
 
 	constructor(
 		config: RedbankExecutorConfig,
@@ -413,18 +413,8 @@ export class RedbankExecutor extends BaseExecutor {
 		// Record unhealthy positions detected
 		this.metrics.liquidationsUnhealthyPositionsDetectedTotal.inc(labels, positions.length)
 
-		// --- Unhealthy to healthy logic ---
-		const currentUnhealthy = new Set(positions.map((p) => p.Identifier))
-		let unhealthyToHealthyCount = 0
-		for (const prev of this.previousUnhealthyAccounts) {
-			if (!currentUnhealthy.has(prev)) {
-				unhealthyToHealthyCount++
-			}
-		}
-		if (unhealthyToHealthyCount > 0) {
-			this.metrics.incLoopUnhealthyToHealthy(labels, unhealthyToHealthyCount)
-		}
-		this.previousUnhealthyAccounts = currentUnhealthy
+		// Set current unhealthy accounts count
+		this.metrics.setUnhealthyAccounts(labels, positions.length)
 
 		if (positions.length == 0) {
 			//sleep to avoid spamming redis db when empty

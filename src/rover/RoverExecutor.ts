@@ -52,7 +52,7 @@ export class RoverExecutor extends BaseExecutor {
 
 	private wallet: DirectSecp256k1HdWallet
 
-	private previousUnhealthyAccounts: Set<string> = new Set()
+
 
 	constructor(
 		config: RoverExecutorConfig,
@@ -138,18 +138,8 @@ export class RoverExecutor extends BaseExecutor {
 			// Record unhealthy positions detected
 			this.metrics.liquidationsUnhealthyPositionsDetectedTotal.inc(labels, targetAccounts.length)
 			
-			// --- Unhealthy to healthy logic ---
-			const currentUnhealthy = new Set(targetAccounts.map((a) => a.account_id))
-			let unhealthyToHealthyCount = 0
-			for (const prev of this.previousUnhealthyAccounts) {
-				if (!currentUnhealthy.has(prev)) {
-					unhealthyToHealthyCount++
-				}
-			}
-			if (unhealthyToHealthyCount > 0) {
-				this.metrics.incLoopUnhealthyToHealthy(labels, unhealthyToHealthyCount)
-			}
-			this.previousUnhealthyAccounts = currentUnhealthy
+					// Set current unhealthy accounts count
+		this.metrics.setUnhealthyAccounts(labels, targetAccounts.length)
 			
 			// Sleep to avoid spamming.
 			if (targetAccounts.length == 0) {
