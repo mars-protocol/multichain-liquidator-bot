@@ -51,7 +51,7 @@ jobs:
         run: yarn test:coverage
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/liquidation_bot_metrics' || github.event_name == 'workflow_dispatch'
     needs: coverage
     runs-on: ubuntu-latest
     steps:
