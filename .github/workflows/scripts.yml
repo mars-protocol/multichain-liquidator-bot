@@ -89,25 +89,15 @@ jobs:
           #!/bin/bash
           set -e
           set -o pipefail
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            BRANCH_NAME="${{ github.event.inputs.branch }}"
-          else
-            BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-          fi
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ECR_REGISTRY_URI
           latest_commit=$(git rev-parse --short HEAD)
-          image_tag="${AWS_ECR_REPOSITORY_NAME}:${BRANCH_NAME}-${latest_commit}"
-          latest_tag="${AWS_ECR_REPOSITORY_NAME}:${BRANCH_NAME}-latest"
+          current_branch=$(git rev-parse --abbrev-ref HEAD)
+          image_tag="${AWS_ECR_REPOSITORY_NAME}:${current_branch}-${latest_commit}"
           docker build --no-cache -t $image_tag .
-          docker tag $image_tag $latest_tag
           image_uri="${AWS_ECR_REGISTRY_URI}/${image_tag}"
-          latest_uri="${AWS_ECR_REGISTRY_URI}/${latest_tag}"
           docker tag $image_tag $image_uri
-          docker tag $latest_tag $latest_uri
           docker push $image_uri
-          docker push $latest_uri
-          echo "Deployed to: $image_uri"
-          echo "Latest tag: $latest_uri"
+          echo $image_uri
       - name: Deploy to liquidator-bot-v2
         if: github.event.inputs.deploy_to_v2 == 'true' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         env:
@@ -118,22 +108,12 @@ jobs:
           #!/bin/bash
           set -e
           set -o pipefail
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            BRANCH_NAME="${{ github.event.inputs.branch }}"
-          else
-            BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-          fi
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ECR_REGISTRY_URI
           latest_commit=$(git rev-parse --short HEAD)
-          image_tag="${AWS_ECR_REPOSITORY_NAME}:${BRANCH_NAME}-${latest_commit}"
-          latest_tag="${AWS_ECR_REPOSITORY_NAME}:${BRANCH_NAME}-latest"
+          current_branch=$(git rev-parse --abbrev-ref HEAD)
+          image_tag="${AWS_ECR_REPOSITORY_NAME}:${current_branch}-${latest_commit}"
           docker build --no-cache -t $image_tag .
-          docker tag $image_tag $latest_tag
           image_uri="${AWS_ECR_REGISTRY_URI}/${image_tag}"
-          latest_uri="${AWS_ECR_REGISTRY_URI}/${latest_tag}"
           docker tag $image_tag $image_uri
-          docker tag $latest_tag $latest_uri
           docker push $image_uri
-          docker push $latest_uri
-          echo "Deployed to v2: $image_uri"
-          echo "Latest v2 tag: $latest_uri"
+          echo $image_uri
