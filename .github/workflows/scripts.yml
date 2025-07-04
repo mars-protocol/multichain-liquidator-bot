@@ -99,7 +99,6 @@ jobs:
           docker push $image_uri
           echo $image_uri
       - name: Deploy to liquidator-bot-v2
-        if: github.event.inputs.deploy_to_v2 == 'true' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         env:
           AWS_REGION: ap-southeast-1
           AWS_ECR_REGISTRY_URI: 864899827754.dkr.ecr.ap-southeast-1.amazonaws.com
