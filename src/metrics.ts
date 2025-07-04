@@ -16,6 +16,11 @@ export class MetricsService {
 	public gasSpent: promClient.Counter<string>
 	public stablesWon: promClient.Counter<string>
 
+	// Per-loop (live) metrics
+	public liquidationsErrors: promClient.Gauge<string>
+	public liquidationsSuccess: promClient.Gauge<string>
+	public liquidationsUnhealthyToHealthyPositionsLive: promClient.Gauge<string>
+
 	private constructor() {
 		this.register = new promClient.Registry()
 
@@ -86,6 +91,27 @@ export class MetricsService {
 			labelNames: ['chain', 'sc_addr', 'product'],
 			registers: [this.register],
 		})
+
+		this.liquidationsErrors = new promClient.Gauge({
+			name: 'liquidations_errors',
+			help: 'Number of errors in the current liquidation loop',
+			labelNames: ['chain', 'sc_addr', 'product'],
+			registers: [this.register],
+		})
+
+		this.liquidationsSuccess = new promClient.Gauge({
+			name: 'liquidations_success',
+			help: 'Number of successful liquidations in the current loop',
+			labelNames: ['chain', 'sc_addr', 'product'],
+			registers: [this.register],
+		})
+
+		this.liquidationsUnhealthyToHealthyPositionsLive = new promClient.Gauge({
+			name: 'liquidations_unhealthy_to_healthy_positions',
+			help: 'Number of positions that became healthy in the current loop',
+			labelNames: ['chain', 'sc_addr', 'product'],
+			registers: [this.register],
+		})
 	}
 
 	public static getInstance(): MetricsService {
@@ -140,5 +166,24 @@ export class MetricsService {
 
 	public recordLiquidationError(chain: string, scAddr: string, product: string, errorType: string): void {
 		this.liquidationsErrorsTotal.inc({ chain, sc_addr: scAddr, product, error_type: errorType })
+	}
+
+	// --- Per-loop metric helpers ---
+	public resetLoopMetrics(labels: { chain: string; sc_addr: string; product: string }) {
+		this.liquidationsErrors.set(labels, 0)
+		this.liquidationsSuccess.set(labels, 0)
+		this.liquidationsUnhealthyToHealthyPositionsLive.set(labels, 0)
+	}
+
+	public incLoopErrors(labels: { chain: string; sc_addr: string; product: string }) {
+		this.liquidationsErrors.inc(labels)
+	}
+
+	public incLoopSuccess(labels: { chain: string; sc_addr: string; product: string }) {
+		this.liquidationsSuccess.inc(labels)
+	}
+
+	public incLoopUnhealthyToHealthy(labels: { chain: string; sc_addr: string; product: string }, count: number = 1) {
+		this.liquidationsUnhealthyToHealthyPositionsLive.inc(labels, count)
 	}
 } 

@@ -52,6 +52,8 @@ export class RoverExecutor extends BaseExecutor {
 
 	private wallet: DirectSecp256k1HdWallet
 
+	private previousUnhealthyAccounts: Set<string> = new Set()
+
 	constructor(
 		config: RoverExecutorConfig,
 		client: SigningStargateClient,
@@ -106,6 +108,9 @@ export class RoverExecutor extends BaseExecutor {
 		const labels = this.getMetricsLabels()
 		const startTime = Date.now()
 		
+		// Reset per-loop (live) metrics
+		this.metrics.resetLoopMetrics(labels)
+		
 		try {
 			let endpointPath =
 				this.config.apiVersion === 'v1'
@@ -132,6 +137,19 @@ export class RoverExecutor extends BaseExecutor {
 			
 			// Record unhealthy positions detected
 			this.metrics.liquidationsUnhealthyPositionsDetectedTotal.inc(labels, targetAccounts.length)
+			
+			// --- Unhealthy to healthy logic ---
+			const currentUnhealthy = new Set(targetAccounts.map((a) => a.account_id))
+			let unhealthyToHealthyCount = 0
+			for (const prev of this.previousUnhealthyAccounts) {
+				if (!currentUnhealthy.has(prev)) {
+					unhealthyToHealthyCount++
+				}
+			}
+			if (unhealthyToHealthyCount > 0) {
+				this.metrics.incLoopUnhealthyToHealthy(labels, unhealthyToHealthyCount)
+			}
+			this.previousUnhealthyAccounts = currentUnhealthy
 			
 			// Sleep to avoid spamming.
 			if (targetAccounts.length == 0) {
@@ -173,6 +191,7 @@ export class RoverExecutor extends BaseExecutor {
 			// Record error
 			const errorType = ex instanceof Error ? ex.constructor.name : 'UnknownError'
 			this.metrics.recordLiquidationError(labels.chain, labels.sc_addr, labels.product, errorType)
+			this.metrics.incLoopErrors(labels)
 			
 			// Record duration for failed run
 			const duration = (Date.now() - startTime) / 1000
@@ -273,6 +292,7 @@ export class RoverExecutor extends BaseExecutor {
 			if (result.code !== 0) {
 				console.log(`Liquidation failed. TxHash: ${result.transactionHash}`)
 				this.metrics.recordLiquidationError(labels.chain, labels.sc_addr, labels.product, 'TransactionFailed')
+				this.metrics.incLoopErrors(labels)
 			} else {
 				console.log(
 					`Liquidation successfull. TxHash: ${result.transactionHash}, account : ${accountId}`,
@@ -280,6 +300,7 @@ export class RoverExecutor extends BaseExecutor {
 				
 				// Record successful liquidation
 				this.metrics.recordLiquidationSuccess(labels.chain, labels.sc_addr, labels.product)
+				this.metrics.incLoopSuccess(labels)
 				
 				// Calculate and record amounts liquidated
 				if (account.debts && account.debts.length > 0) {

@@ -46,6 +46,7 @@ export class RedbankExecutor extends BaseExecutor {
 	private MINUTE = 1000 * 60
 	public config: RedbankExecutorConfig
 	private targetHealthFactor: number = 0
+	private previousUnhealthyAccounts: Set<string> = new Set()
 
 	constructor(
 		config: RedbankExecutorConfig,
@@ -367,6 +368,9 @@ export class RedbankExecutor extends BaseExecutor {
 		const labels = this.getMetricsLabels()
 		const startTime = Date.now()
 
+		// Reset per-loop (live) metrics
+		this.metrics.resetLoopMetrics(labels)
+
 		if (!this.queryClient || !this.signingClient)
 			throw new Error("Instantiate your clients before calling 'run()'")
 
@@ -408,6 +412,19 @@ export class RedbankExecutor extends BaseExecutor {
 
 		// Record unhealthy positions detected
 		this.metrics.liquidationsUnhealthyPositionsDetectedTotal.inc(labels, positions.length)
+
+		// --- Unhealthy to healthy logic ---
+		const currentUnhealthy = new Set(positions.map((p) => p.Identifier))
+		let unhealthyToHealthyCount = 0
+		for (const prev of this.previousUnhealthyAccounts) {
+			if (!currentUnhealthy.has(prev)) {
+				unhealthyToHealthyCount++
+			}
+		}
+		if (unhealthyToHealthyCount > 0) {
+			this.metrics.incLoopUnhealthyToHealthy(labels, unhealthyToHealthyCount)
+		}
+		this.previousUnhealthyAccounts = currentUnhealthy
 
 		if (positions.length == 0) {
 			//sleep to avoid spamming redis db when empty
@@ -482,6 +499,7 @@ export class RedbankExecutor extends BaseExecutor {
 			
 			// Record successful liquidation
 			this.metrics.recordLiquidationSuccess(labels.chain, labels.sc_addr, labels.product)
+			this.metrics.incLoopSuccess(labels)
 
 			console.log(`- Liquidation Process Complete.`)
 
@@ -492,6 +510,7 @@ export class RedbankExecutor extends BaseExecutor {
 			// Record liquidation error
 			const errorType = error instanceof Error ? error.constructor.name : 'UnknownError'
 			this.metrics.recordLiquidationError(labels.chain, labels.sc_addr, labels.product, errorType)
+			this.metrics.incLoopErrors(labels)
 			console.error(`Liquidation failed: ${error}`)
 			throw error
 		} finally {
