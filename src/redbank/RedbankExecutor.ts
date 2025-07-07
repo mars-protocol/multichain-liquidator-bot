@@ -47,7 +47,6 @@ export class RedbankExecutor extends BaseExecutor {
 	public config: RedbankExecutorConfig
 	private targetHealthFactor: number = 0
 
-
 	constructor(
 		config: RedbankExecutorConfig,
 		client: SigningStargateClient,
@@ -75,7 +74,7 @@ export class RedbankExecutor extends BaseExecutor {
 				await this.run()
 			} catch (e) {
 				console.error('ERROR:', e)
-				// Record general error
+				// Record error
 				const labels = this.getMetricsLabels()
 				const errorType = e instanceof Error ? e.constructor.name : 'UnknownError'
 				this.metrics.recordLiquidationError(labels.chain, labels.sc_addr, labels.product, errorType)
@@ -429,10 +428,10 @@ export class RedbankExecutor extends BaseExecutor {
 		const positionToLiquidate = positions[0]
 
 		console.log(`- Liquidating ${positionToLiquidate.Identifier}`)
-		
+
 		// Record liquidation attempt
 		this.metrics.recordLiquidationAttempt(labels.chain, labels.sc_addr, labels.product)
-		
+
 		// Fetch position data
 		const liquidateeDebts = await this.queryClient.queryRedbankDebts(positionToLiquidate.Identifier)
 		const liquidateeCollaterals = await this.queryClient.queryRedbankCollaterals(
@@ -445,12 +444,13 @@ export class RedbankExecutor extends BaseExecutor {
 				debts: liquidateeDebts,
 				collaterals: liquidateeCollaterals,
 			})
-			
+
 			// Record debt amount being liquidated
-			const debtValue = new BigNumber(debtToRepay.amount)
-				.multipliedBy(this.prices.get(debtToRepay.denom) || 0)
+			const debtValue = new BigNumber(debtToRepay.amount).multipliedBy(
+				this.prices.get(debtToRepay.denom) || 0,
+			)
 			this.recordNotionalLiquidated(debtValue.toNumber())
-			
+
 			// deposit any neutral in our account before starting liquidations
 			const firstMsgBatch: EncodeObject[] = []
 			await this.appendSwapToDebtMessages(
@@ -474,19 +474,23 @@ export class RedbankExecutor extends BaseExecutor {
 				this.config.chainName.toLowerCase(),
 			)
 
-			await this.signingClient.signAndBroadcast(this.config.liquidatorMasterAddress, firstMsgBatch, firstFee)
+			const result = await this.signingClient.signAndBroadcast(
+				this.config.liquidatorMasterAddress,
+				firstMsgBatch,
+				firstFee,
+			)
 
 			// Record gas spent
 			this.recordGasSpent(firstFee)
 
-			console.log('Liquidation transaction broadcasted.')
+			console.log('Liquidation hash:', result.transactionHash)
 
 			const collaterals: Collateral[] = await this.queryClient.queryRedbankCollaterals(
 				liquidatorAddress,
 			)
 
 			await this.liquidateCollaterals(liquidatorAddress, collaterals)
-			
+
 			// Record successful liquidation
 			this.metrics.recordLiquidationSuccess(labels.chain, labels.sc_addr, labels.product)
 			this.metrics.incLoopSuccess(labels)
@@ -532,14 +536,16 @@ export class RedbankExecutor extends BaseExecutor {
 			this.config.liquidatorMasterAddress,
 			this.config.chainName.toLowerCase(),
 		)
-		
 		await this.signingClient.signAndBroadcast(this.config.liquidatorMasterAddress, msgs, secondFee)
-		
+
 		// Record gas spent for collateral liquidation
 		this.recordGasSpent(secondFee)
-		
+
 		// Record stables won (neutral asset gained from swapping collaterals)
-		const neutralBalance = await this.signingClient.getBalance(liquidatorAddress, this.config.neutralAssetDenom)
+		const neutralBalance = await this.signingClient.getBalance(
+			liquidatorAddress,
+			this.config.neutralAssetDenom,
+		)
 		if (neutralBalance) {
 			this.recordStablesWon(Number(neutralBalance.amount))
 		}

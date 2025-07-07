@@ -15,6 +15,7 @@ export class MetricsService {
 	public notionalLiquidated: promClient.Counter<string>
 	public gasSpent: promClient.Counter<string>
 	public stablesWon: promClient.Counter<string>
+	public liquidationsSuccessTotal: promClient.Counter<string>
 
 	// Per-loop (live) metrics
 	public liquidationsErrors: promClient.Gauge<string>
@@ -92,6 +93,13 @@ export class MetricsService {
 			registers: [this.register],
 		})
 
+		this.liquidationsSuccessTotal = new promClient.Counter({
+			name: 'liquidations_success_total',
+			help: 'Total number of successful liquidations',
+			labelNames: ['chain', 'sc_addr', 'product'],
+			registers: [this.register],
+		})
+
 		this.liquidationsErrors = new promClient.Gauge({
 			name: 'liquidations_errors',
 			help: 'Number of errors in the current liquidation loop',
@@ -162,9 +170,15 @@ export class MetricsService {
 		this.liquidationCounts.set(key, current)
 		const successRate = current.total > 0 ? (current.successful / current.total) * 100 : 0
 		this.liquidationsSuccessRate.set({ chain, sc_addr: scAddr, product }, successRate)
+		this.liquidationsSuccessTotal.inc({ chain, sc_addr: scAddr, product })
 	}
 
-	public recordLiquidationError(chain: string, scAddr: string, product: string, errorType: string): void {
+	public recordLiquidationError(
+		chain: string,
+		scAddr: string,
+		product: string,
+		errorType: string,
+	): void {
 		this.liquidationsErrorsTotal.inc({ chain, sc_addr: scAddr, product, error_type: errorType })
 	}
 
@@ -183,7 +197,10 @@ export class MetricsService {
 		this.liquidationsSuccess.inc(labels)
 	}
 
-	public setUnhealthyAccounts(labels: { chain: string; sc_addr: string; product: string }, count: number) {
+	public setUnhealthyAccounts(
+		labels: { chain: string; sc_addr: string; product: string },
+		count: number,
+	) {
 		this.liquidationsUnhealthyAccounts.set(labels, count)
 	}
-} 
+}

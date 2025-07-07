@@ -9,7 +9,6 @@ on:
     branches:
       - main
       - perps
-      - liquidation_bot_metrics
   pull_request:
   workflow_dispatch:
     inputs:
@@ -54,8 +53,10 @@ jobs:
       - name: Check Coverage
         run: yarn test:coverage
 
+      - name: Check Formatting
+        run: yarn format:check
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/liquidation_bot_metrics' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     needs: coverage
     runs-on: ubuntu-latest
     steps:

@@ -390,7 +390,7 @@ export class BaseExecutor {
 		return {
 			chain: this.config.chainName,
 			sc_addr: this.config.liquidatorMasterAddress,
-			product: this.config.productName
+			product: this.config.productName,
 		}
 	}
 }
