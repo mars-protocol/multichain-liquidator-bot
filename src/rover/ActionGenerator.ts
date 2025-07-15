@@ -9,7 +9,11 @@ import {
 	DebtAmount,
 } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
-import { calculateTotalPerpPnl, queryAstroportLpUnderlyingTokens } from '../helpers'
+import {
+	calculateTotalPerpPnl,
+	queryAstroportLpUnderlyingCoins,
+	queryOsmosisLpUnderlyingCoins,
+} from '../helpers'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 import {
 	LiquidationAmountInputs,
@@ -40,6 +44,7 @@ export class ActionGenerator {
 			account.deposits.length === 0 &&
 			account.lends.length === 0 &&
 			account.staked_astro_lps.length === 0
+		
 		const collateral: Collateral = hasNoCollaterals
 			? {
 					type: PositionType.DEPOSIT,
@@ -65,13 +70,18 @@ export class ActionGenerator {
 				  }
 				: this.findLargestDebt(account.debts, oraclePrices)
 
+		let maxDebtAmount = debt.amount.gt(5000000000)
+			? new BigNumber(5000000000).dividedBy(oraclePrices.get(debt.denom)!)
+			: new BigNumber(debt.amount)
+
+		maxDebtAmount = maxDebtAmount.dividedBy(5)
 		const liquidationAmountInputs: LiquidationAmountInputs = {
 			collateral_amount: collateral.amount.toFixed(0),
 			collateral_price: oraclePrices.get(collateral.denom)!.toFixed(18),
 			collateral_params: assetParams.get(collateral.denom)!,
-			debt_amount: debt.amount.toFixed(0),
+			debt_amount: maxDebtAmount.toFixed(0),
 			debt_params: assetParams.get(debt.denom)!,
-			debt_requested_to_repay: debt.amount.toFixed(0),
+			debt_requested_to_repay: maxDebtAmount.toFixed(0),
 			debt_price: oraclePrices.get(debt.denom)!.toFixed(18),
 			health: healthData,
 			// TODO: do we need to query this?
@@ -85,9 +95,10 @@ export class ActionGenerator {
 		}
 
 		const liquidationAmounts = calculate_liquidation_amounts_js(liquidationAmountInputs)
+
 		let borrowActions: Action[] = this.produceBorrowActions(
 			debt.denom,
-			liquidationAmounts.debt_amount,
+			maxDebtAmount,
 			collateral,
 			redbankMarkets,
 		)
@@ -99,7 +110,7 @@ export class ActionGenerator {
 
 		const liquidateAction = this.produceLiquidationAction(
 			collateral.type,
-			{ denom: debt.denom, amount: liquidationAmounts.debt_amount.toString() },
+			{ denom: debt.denom, amount: maxDebtAmount.toFixed(0) },
 			account.account_id,
 			collateral.denom,
 		)
@@ -119,22 +130,17 @@ export class ActionGenerator {
 				: []
 
 		const repayMsg = this.generateRepayActions(borrow.denom)
-		// todo estimate amount based on repay to prevent slippage.
-		const swapToStableMsg =
-			borrow.denom !== neutralDenom
-				? [
-						await this.generateSwapActions(
-							chainName,
-							borrow.denom,
-							neutralDenom,
-							oraclePrices.get(borrow.denom)!,
-							oraclePrices.get(neutralDenom)!,
-							// todo estimate correctly
-							'100',
-							slippage,
-						),
-				  ]
-				: []
+
+		const swapToStableActions = await this.produceSwapToStableActions(
+			chainName,
+			oraclePrices,
+			collateral.denom,
+			neutralDenom,
+			borrow,
+			collateralToDebtActions,
+			slippage,
+		)
+
 		const refundAll = this.produceRefundAllAction()
 
 		const actions = [
@@ -142,7 +148,7 @@ export class ActionGenerator {
 			liquidateAction,
 			...collateralToDebtActions,
 			...repayMsg,
-			...swapToStableMsg,
+			...swapToStableActions,
 			refundAll,
 		]
 		if (process.env.DEBUG) {
@@ -152,6 +158,46 @@ export class ActionGenerator {
 		return actions
 	}
 
+	produceSwapToStableActions = async (
+		chainName: string,
+		oraclePrices: Map<string, BigNumber>,
+		collateralDenom: string,
+		neutralDenom: string,
+		borrow: Coin,
+		collateralToDebtActions: Action[],
+		slippage: string,
+	): Promise<Action[]> => {
+		if (borrow.denom === neutralDenom || collateralToDebtActions.length === 0) {
+			console.log(`Borrow denom ${borrow.denom} is the same as neutral denom ${neutralDenom}`)
+			return []
+		}
+
+		const receivedDebtAmount = 
+			// @ts-ignore
+			collateralToDebtActions[collateralToDebtActions.length - 1].swap_exact_in.min_receive
+		const remainingDebt = new BigNumber(receivedDebtAmount).minus(borrow.amount)
+		if (remainingDebt.isNegative()) {
+			console.log('SwapToStableMsg: No profit after repaying debt. Nothing to swap')
+			// If this occurs, we probably have an 
+			return []
+		}
+		const assetInPrice = oraclePrices.get(collateralDenom)!
+		const assetOutPrice = oraclePrices.get(borrow.denom)!
+		const priceRatio = assetInPrice.dividedBy(assetOutPrice)
+		// 10% buffer here to be defensive. It is more important the liquidation tx succeed
+		const minReceive = remainingDebt.multipliedBy(priceRatio).multipliedBy(0.9)
+		return [
+			await this.generateSwapActions(
+				chainName,
+				borrow.denom,
+				neutralDenom,
+				oraclePrices.get(borrow.denom)!,
+				oraclePrices.get(neutralDenom)!,
+				minReceive.toFixed(0),
+				slippage,
+			),
+		]
+	}
 	/**
 	 * Produce the borrow actions.
 	 *
@@ -177,6 +223,44 @@ export class ActionGenerator {
 		if (false) {
 			console.log(collateral)
 		}
+
+		if (debtDenom === 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858') {
+			console.log(maxRepayableAmount)
+
+			let actions: Action[] = [
+				// borrow usdc
+				{
+					borrow: {
+						amount: new BigNumber(maxRepayableAmount).toFixed(0),
+						denom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4',
+					},
+				},
+				// swap to axlsdc
+				{
+					swap_exact_in: {
+						coin_in: {
+							amount: 'account_balance',
+							denom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4',
+						},
+						denom_out: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858',
+						route: {
+							osmo: {
+								swaps: [
+									{
+										pool_id: 1212,
+										to: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858',
+									},
+								],
+							},
+						},
+						min_receive: new BigNumber(maxRepayableAmount).multipliedBy(0.98).toFixed(0),
+					},
+				},
+			]
+
+			return actions
+		}
+
 		// estimate our debt to repay - this depends on collateral amount and close factor
 		// let maxRepayValue = new BigNumber(collateral.value * collateral.closeFactor)
 		// const maxDebtValue = debt.price.multipliedBy(debt.amount)
@@ -188,9 +272,8 @@ export class ActionGenerator {
 
 		// // debt amount is a number, not a value (e.g in dollar / base asset denominated terms)
 		// let debtAmount = debtToRepayRatio.multipliedBy(debt.amount)
-		console.log(maxRepayableAmount)
 		const debtCoin: Coin = {
-			amount: maxRepayableAmount.toString(),
+			amount: maxRepayableAmount.toFixed(0),
 			denom: debtDenom,
 		}
 
@@ -232,8 +315,11 @@ export class ActionGenerator {
 		// priceRatio = assetInPrice / assetOutPrice = 5
 		const priceRatio = assetInPrice.dividedBy(assetOutPrice)
 
-		const minReceive = amountBN.multipliedBy(priceRatio).multipliedBy(1 - Number(slippage))
+		let minReceive = amountBN.multipliedBy(priceRatio).multipliedBy(1 - Number(slippage))
 		const route = await this.routeRequester.requestRoute(assetInDenom, assetOutDenom, amountIn)
+		if (minReceive.isNaN() || minReceive.lt(10)) {
+			minReceive = new BigNumber(10)
+		}
 
 		const swapperRoute: SwapperRoute =
 			chainName === 'osmosis'
@@ -317,22 +403,26 @@ export class ActionGenerator {
 		// Check if is LP token
 		if (collateralDenom.startsWith('gamm/') || collateralDenom.endsWith('astroport/share')) {
 			actions.push(this.produceWithdrawLiquidityAction(collateralDenom))
-
+			const lpCoin = {
+				amount: collateralAmount.toFixed(0),
+				denom: collateralDenom,
+			}
 			// find underlying tokens and swap to borrowed asset
-			const underlyingDenoms = (await queryAstroportLpUnderlyingTokens(collateralDenom))!
-			for (const denom of underlyingDenoms) {
-				if (denom !== borrowed.denom) {
+			const underlyingCoins = collateralDenom.endsWith('astroport/share')
+				? await queryAstroportLpUnderlyingCoins(lpCoin)!
+				: await queryOsmosisLpUnderlyingCoins(lpCoin)!
+			for (const coin of underlyingCoins) {
+				if (coin.denom !== borrowed.denom) {
 					// TODO: This could be a source of bugs, if the amount of underlying tokens in the pools
 					// are not even.
-					const amountIn = collateralAmount.multipliedBy(0.5)
 					actions = actions.concat(
 						await this.generateSwapActions(
 							chainName,
-							denom,
+							coin.denom,
 							borrowed.denom,
 							assetInPrice,
 							assetOutPrice,
-							amountIn.toFixed(0),
+							coin.amount,
 							slippage,
 						),
 					)
@@ -414,11 +504,15 @@ export class ActionGenerator {
 		minReceive: string,
 		route: SwapperRoute | null = null,
 	): Action => {
+		console.log(`minReceive: ${minReceive}`)
 		return {
 			swap_exact_in: {
 				coin_in: { denom: denomIn, amount: 'account_balance' },
 				denom_out: denomOut,
-				min_receive: minReceive,
+				// Min receive is inaccurate atm, requires improvement in estimation of profit. 
+				// For now, we set to a small amount. If the liquidation tx is not profitable it
+				// will revert anyway. 
+				min_receive: '100',
 				route: route,
 			},
 		}

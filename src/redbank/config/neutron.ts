@@ -10,7 +10,7 @@ export const getConfig = (
 		? {
 				chainName: 'neutron',
 				productName: 'redbank',
-				apiVersion: 'v1',
+				apiVersion: 'v2',
 				safetyMargin: 0.05,
 				contracts: mapValues({
 					addressProvider: 'neutron17yehp4x7n79zq9dlw4g7xmnrvwdjjj2yecq26844sg8yu74knlxqfx5vqv',
