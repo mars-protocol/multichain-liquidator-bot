@@ -517,6 +517,13 @@ export class RedbankExecutor extends BaseExecutor {
 	async liquidateCollaterals(liquidatorAddress: string, collaterals: Collateral[]) {
 		let msgs: EncodeObject[] = []
 
+		// Capture neutral balance before liquidation
+		const neutralBalanceBefore = await this.signingClient?.getBalance(
+			liquidatorAddress,
+			this.config.neutralAssetDenom,
+		)
+		const neutralBalanceBeforeAmount = neutralBalanceBefore ? Number(neutralBalanceBefore.amount) : 0
+
 		const balances = await this.signingClient?.getAllBalances(liquidatorAddress)
 
 		const combinedCoins = this.combineBalances(collaterals, balances!).filter(
@@ -542,12 +549,16 @@ export class RedbankExecutor extends BaseExecutor {
 		this.recordGasSpent(secondFee)
 
 		// Record stables won (neutral asset gained from swapping collaterals)
-		const neutralBalance = await this.signingClient.getBalance(
+		const neutralBalanceAfter = await this.signingClient.getBalance(
 			liquidatorAddress,
 			this.config.neutralAssetDenom,
 		)
-		if (neutralBalance) {
-			this.recordStablesWon(Number(neutralBalance.amount))
+		if (neutralBalanceAfter) {
+			const neutralBalanceAfterAmount = Number(neutralBalanceAfter.amount)
+			const stablesWon = neutralBalanceAfterAmount - neutralBalanceBeforeAmount
+			if (stablesWon > 0) {
+				this.recordStablesWon(stablesWon)
+			}
 		}
 	}
 
