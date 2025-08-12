@@ -522,7 +522,9 @@ export class RedbankExecutor extends BaseExecutor {
 			liquidatorAddress,
 			this.config.neutralAssetDenom,
 		)
-		const neutralBalanceBeforeAmount = neutralBalanceBefore ? Number(neutralBalanceBefore.amount) : 0
+		const neutralBalanceBeforeAmount = neutralBalanceBefore
+			? Number(neutralBalanceBefore.amount)
+			: 0
 
 		const balances = await this.signingClient?.getAllBalances(liquidatorAddress)
 
