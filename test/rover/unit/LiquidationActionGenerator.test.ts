@@ -78,7 +78,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('17')
+			expect(amount).toBe('86')
 			expect(denom).toBe('uatom')
 		})
 		it('Action 1; Should select deposit usd collateral', () => {
@@ -93,7 +93,7 @@ describe('Liquidation Action Generator Tests', () => {
 
 			expect(debtCoin.denom).toBe('uatom')
 			// TODO check correct debt here
-			expect(debtCoin.amount).toBe('17')
+			expect(debtCoin.amount).toBe('86')
 		})
 
 		it('Action 2; Should swap all won usd collateral to atom', () => {
@@ -201,7 +201,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('12')
+			expect(amount).toBe('60')
 			expect(denom).toBe('uatom')
 		})
 		it('Action 1; Should select deposit usd collateral', () => {
@@ -215,7 +215,7 @@ describe('Liquidation Action Generator Tests', () => {
 			let debtCoin: Coin = actions[1].liquidate.debt_coin
 
 			expect(debtCoin.denom).toBe('uatom')
-			expect(debtCoin.amount).toBe('12')
+			expect(debtCoin.amount).toBe('60')
 		})
 
 		it('Action 2; Should swap all won usd collateral to atom', () => {
@@ -297,7 +297,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('100')
+			expect(amount).toBe('500')
 			expect(denom).toBe('uusd')
 		})
 		it('Should pick the usd collateral', () => {
@@ -312,7 +312,7 @@ describe('Liquidation Action Generator Tests', () => {
 
 			expect(debtCoin.denom).toBe('uusd')
 			// TODO check correct debt here
-			expect(debtCoin.amount).toBe('100')
+			expect(debtCoin.amount).toBe('500')
 		})
 
 		it('Should not do any swap of the collateral', () => {
@@ -383,7 +383,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('120')
+			expect(amount).toBe('600')
 			expect(denom).toBe('uusd')
 		})
 
@@ -399,7 +399,7 @@ describe('Liquidation Action Generator Tests', () => {
 			let debtCoin: Coin = actions[1].liquidate.debt_coin
 
 			expect(debtCoin.denom).toBe('uusd')
-			expect(debtCoin.amount).toBe('120')
+			expect(debtCoin.amount).toBe('600')
 		})
 
 		it('Should not do any swap of the collateral', () => {
@@ -469,7 +469,7 @@ describe('Liquidation Action Generator Tests', () => {
 			// @ts-ignore
 			let denom: String = actions[0].borrow.denom
 
-			expect(amount).toBe('220')
+			expect(amount).toBe('1100')
 			expect(denom).toBe('uusd')
 		})
 
@@ -485,7 +485,7 @@ describe('Liquidation Action Generator Tests', () => {
 			let debtCoin: Coin = actions[1].liquidate.debt_coin
 
 			expect(debtCoin.denom).toBe('uusd')
-			expect(debtCoin.amount).toBe('220')
+			expect(debtCoin.amount).toBe('1100')
 		})
 
 		it('Should not do any swap of the collateral', () => {
