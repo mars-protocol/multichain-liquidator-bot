@@ -22,6 +22,10 @@ import {
 } from 'mars-liquidation-node'
 import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types.js'
 
+const MAX_DEBT_AMOUNT = 1000000000
+const AXL_USDC_DENOM = 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858'
+const NOBLE_USDC_DENOM = 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4'
+
 export class ActionGenerator {
 	private routeRequester: RouteRequester
 
@@ -70,11 +74,10 @@ export class ActionGenerator {
 				  }
 				: this.findLargestDebt(account.debts, oraclePrices)
 
-		let maxDebtAmount = debt.amount.gt(5000000000)
-			? new BigNumber(5000000000).dividedBy(oraclePrices.get(debt.denom)!)
+		const maxDebtAmount = debt.amount.gt(MAX_DEBT_AMOUNT)
+			? new BigNumber(MAX_DEBT_AMOUNT).dividedBy(oraclePrices.get(debt.denom)!)
 			: new BigNumber(debt.amount)
 
-		maxDebtAmount = maxDebtAmount.dividedBy(5)
 		const liquidationAmountInputs: LiquidationAmountInputs = {
 			collateral_amount: collateral.amount.toFixed(0),
 			collateral_price: oraclePrices.get(collateral.denom)!.toFixed(18),
@@ -224,7 +227,7 @@ export class ActionGenerator {
 			console.log(collateral)
 		}
 
-		if (debtDenom === 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858') {
+		if (debtDenom === AXL_USDC_DENOM) {
 			console.log(maxRepayableAmount)
 
 			let actions: Action[] = [
@@ -232,7 +235,7 @@ export class ActionGenerator {
 				{
 					borrow: {
 						amount: new BigNumber(maxRepayableAmount).toFixed(0),
-						denom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4',
+						denom: NOBLE_USDC_DENOM,
 					},
 				},
 				// swap to axlsdc
@@ -240,15 +243,15 @@ export class ActionGenerator {
 					swap_exact_in: {
 						coin_in: {
 							amount: 'account_balance',
-							denom: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4',
+							denom: NOBLE_USDC_DENOM,
 						},
-						denom_out: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858',
+						denom_out: AXL_USDC_DENOM,
 						route: {
 							osmo: {
 								swaps: [
 									{
 										pool_id: 1212,
-										to: 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858',
+										to: AXL_USDC_DENOM,
 									},
 								],
 							},
