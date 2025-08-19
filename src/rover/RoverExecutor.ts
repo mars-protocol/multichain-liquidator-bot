@@ -100,6 +100,12 @@ export class RoverExecutor extends BaseExecutor {
 	}
 
 	run = async () => {
+		const labels = this.getMetricsLabels()
+		const startTime = Date.now()
+
+		// Reset per-loop (live) metrics
+		this.metrics.resetLoopMetrics(labels)
+
 		try {
 			let endpointPath =
 				this.config.apiVersion === 'v1'
@@ -121,11 +127,20 @@ export class RoverExecutor extends BaseExecutor {
 						Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
 				)
 				.sort((accountA, accountB) => Number(accountB.total_debt) - Number(accountA.total_debt))
-			// Sleep to avoid spamming.
 
+			// Record unhealthy positions detected
+			this.metrics.liquidationsUnhealthyPositionsDetectedTotal.inc(labels, targetAccounts.length)
+
+			// Set current unhealthy accounts count
+			this.metrics.setUnhealthyAccounts(labels, targetAccounts.length)
+
+			// Sleep to avoid spamming.
 			if (targetAccounts.length == 0) {
 				console.log('No unhealthy accounts found. Sleeping for 5 seconds')
 				await sleep(5000)
+				// Record duration
+				const duration = (Date.now() - startTime) / 1000
+				this.metrics.liquidationsDurationSeconds.observe(labels, duration)
 				return
 			}
 			// create chunks of accounts to liquidate
@@ -140,19 +155,34 @@ export class RoverExecutor extends BaseExecutor {
 				for (const account of chunk) {
 					const nextLiquidator = liquidatorAddressesIterator.next()
 					console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
+					// Record liquidation attempt
+					this.metrics.recordLiquidationAttempt(labels.chain, labels.sc_addr, labels.product)
 					liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value!))
 				}
 				await Promise.all(liquidationPromises)
 				await sleep(4000)
 			}
+
+			// Record duration for successful run
+			const duration = (Date.now() - startTime) / 1000
+			this.metrics.liquidationsDurationSeconds.observe(labels, duration)
 		} catch (ex) {
 			if (process.env.DEBUG) {
 				console.error(ex)
 			}
+			// Record error
+			const errorType = ex instanceof Error ? ex.constructor.name : 'UnknownError'
+			this.metrics.recordLiquidationError(labels.chain, labels.sc_addr, labels.product, errorType)
+			this.metrics.incLoopErrors(labels)
+
+			// Record duration for failed run
+			const duration = (Date.now() - startTime) / 1000
+			this.metrics.liquidationsDurationSeconds.observe(labels, duration)
 		}
 	}
 
 	liquidate = async (accountId: string, liquidatorAddress: string) => {
+		const labels = this.getMetricsLabels()
 		try {
 			const account: Positions = await this.queryClient.queryPositionsForAccount(accountId)
 
@@ -237,12 +267,40 @@ export class RoverExecutor extends BaseExecutor {
 
 			const result = await this.signingClient.signAndBroadcast(liquidatorAddress, msgs, fee)
 
+			// Record gas spent
+			this.recordGasSpent(fee)
+
 			if (result.code !== 0) {
 				console.log(`Liquidation failed. TxHash: ${result.transactionHash}`)
+				this.metrics.recordLiquidationError(
+					labels.chain,
+					labels.sc_addr,
+					labels.product,
+					'TransactionFailed',
+				)
+				this.metrics.incLoopErrors(labels)
 			} else {
 				console.log(
 					`Liquidation successfull. TxHash: ${result.transactionHash}, account : ${accountId}`,
 				)
+
+				// Record successful liquidation
+				this.metrics.recordLiquidationSuccess(labels.chain, labels.sc_addr, labels.product)
+				this.metrics.incLoopSuccess(labels)
+
+				// Calculate and record amounts liquidated
+				if (account.debts && account.debts.length > 0) {
+					const totalDebtValue = account.debts.reduce((total, debt) => {
+						const price = this.prices.get(debt.denom) || new BigNumber(0)
+						return total.plus(new BigNumber(debt.amount).multipliedBy(price))
+					}, new BigNumber(0))
+					this.recordNotionalLiquidated(totalDebtValue.toNumber())
+				}
+
+				// Record stables won if stable was sent
+				if (stable) {
+					this.recordStablesWon(Number(stable.amount))
+				}
 			}
 		} catch (ex) {
 			if (process.env.DEBUG) {

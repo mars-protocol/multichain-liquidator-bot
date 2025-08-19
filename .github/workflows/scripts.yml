@@ -1,11 +1,27 @@
 name: Scripts
 
+permissions:
+  id-token: write
+  contents: read
+
 on:
   push:
     branches:
       - main
       - perps
   pull_request:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: string
+      deploy_to_v2:
+        description: 'Deploy to liquidator-bot-v2 as well'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   coverage:
@@ -39,3 +55,65 @@ jobs:
 
       - name: Check Formatting
         run: yarn format:check
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'yarn'
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
+      - name: Build with TypeScript
+        run: yarn build
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::864899827754:role/GithubAccess-Role-i5z555522u1j
+      - name: Login to Amazon ECR
+        id: login-ecr-public
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Deploy to liquidator-bot
+        env:
+          AWS_REGION: ap-southeast-1
+          AWS_ECR_REGISTRY_URI: 864899827754.dkr.ecr.ap-southeast-1.amazonaws.com
+          AWS_ECR_REPOSITORY_NAME: liquidator-bot
+        run: |
+          #!/bin/bash
+          set -e
+          set -o pipefail
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ECR_REGISTRY_URI
+          latest_commit=$(git rev-parse --short HEAD)
+          current_branch=$(git rev-parse --abbrev-ref HEAD)
+          image_tag="${AWS_ECR_REPOSITORY_NAME}:${current_branch}-${latest_commit}"
+          docker build --no-cache -t $image_tag .
+          image_uri="${AWS_ECR_REGISTRY_URI}/${image_tag}"
+          docker tag $image_tag $image_uri
+          docker push $image_uri
+          echo $image_uri
+      - name: Deploy to liquidator-bot-v2
+        env:
+          AWS_REGION: ap-southeast-1
+          AWS_ECR_REGISTRY_URI: 864899827754.dkr.ecr.ap-southeast-1.amazonaws.com
+          AWS_ECR_REPOSITORY_NAME: liquidator-bot-v2
+        run: |
+          #!/bin/bash
+          set -e
+          set -o pipefail
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ECR_REGISTRY_URI
+          latest_commit=$(git rev-parse --short HEAD)
+          current_branch=$(git rev-parse --abbrev-ref HEAD)
+          image_tag="${AWS_ECR_REPOSITORY_NAME}:${current_branch}-${latest_commit}"
+          docker build --no-cache -t $image_tag .
+          image_uri="${AWS_ECR_REGISTRY_URI}/${image_tag}"
+          docker tag $image_tag $image_uri
+          docker push $image_uri
+          echo $image_uri

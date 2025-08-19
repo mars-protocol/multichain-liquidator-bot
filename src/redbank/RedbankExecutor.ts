@@ -74,6 +74,10 @@ export class RedbankExecutor extends BaseExecutor {
 				await this.run()
 			} catch (e) {
 				console.error('ERROR:', e)
+				// Record error
+				const labels = this.getMetricsLabels()
+				const errorType = e instanceof Error ? e.constructor.name : 'UnknownError'
+				this.metrics.recordLiquidationError(labels.chain, labels.sc_addr, labels.product, errorType)
 			}
 		}
 	}
@@ -360,6 +364,11 @@ export class RedbankExecutor extends BaseExecutor {
 
 	async run(): Promise<void> {
 		const liquidatorAddress = this.config.liquidatorMasterAddress
+		const labels = this.getMetricsLabels()
+		const startTime = Date.now()
+
+		// Reset per-loop (live) metrics
+		this.metrics.resetLoopMetrics(labels)
 
 		if (!this.queryClient || !this.signingClient)
 			throw new Error("Instantiate your clients before calling 'run()'")
@@ -401,81 +410,131 @@ export class RedbankExecutor extends BaseExecutor {
 			})
 			.slice(0, 10)
 
+		// Record unhealthy positions detected
+		this.metrics.liquidationsUnhealthyPositionsDetectedTotal.inc(labels, positions.length)
+
+		// Set current unhealthy accounts count
+		this.metrics.setUnhealthyAccounts(labels, positions.length)
+
 		if (positions.length == 0) {
 			//sleep to avoid spamming redis db when empty
 			await sleep(200)
 			console.log(' - No items for liquidation yet')
+			// Record duration even when no liquidations
+			const duration = (Date.now() - startTime) / 1000
+			this.metrics.liquidationsDurationSeconds.observe(labels, duration)
 			return
 		}
 
 		for (const position of positions) {
 			try {
-				await this.executeLiquidation(position, liquidatorAddress)
+				await this.executeLiquidation(position, liquidatorAddress, labels, startTime)
 			} catch (e) {
 				console.error(e)
 			}
 		}
 	}
 
-	async executeLiquidation(position: Position, liquidatorAddress: string): Promise<void> {
+	async executeLiquidation(position: Position, liquidatorAddress: string, labels: any, startTime: number): Promise<void> {
 		console.log(`- Liquidating ${position.Identifier}`)
+
+
+		// Record liquidation attempt
+		this.metrics.recordLiquidationAttempt(labels.chain, labels.sc_addr, labels.product)
+
 		// Fetch position data
 		const liquidateeDebts = await this.queryClient.queryRedbankDebts(position.Identifier)
 		const liquidateeCollaterals = await this.queryClient.queryRedbankCollaterals(
 			position.Identifier,
 		)
 
-		const { tx, debtToRepay } = await this.produceLiquidationTx({
-			address: position.Identifier,
-			debts: liquidateeDebts,
-			collaterals: liquidateeCollaterals,
-		})
-		// deposit any neutral in our account before starting liquidations
-		const firstMsgBatch: EncodeObject[] = []
-		await this.appendSwapToDebtMessages(
-			[debtToRepay],
-			liquidatorAddress,
-			firstMsgBatch,
-			new BigNumber(this.balances.get(this.config.neutralAssetDenom)!),
-		)
+		try {
+			const { tx, debtToRepay } = await this.produceLiquidationTx({
+				address: position.Identifier,
+				debts: liquidateeDebts,
+				collaterals: liquidateeCollaterals,
+			})
 
-		// Preferably, we liquidate via redbank directly. This is so that if the liquidation fails,
-		// the entire transaction fails and we do not swap.
-		// When using the liquidation filterer contract, transactions with no successfull liquidations
-		// will still succeed, meaning that we will still swap to the debt and have to swap back again.
-		// If liquidating via redbank, unsucessfull liquidations will error, preventing the swap
-		const execute: MsgExecuteContractEncodeObject = this.executeViaRedbankMsg(tx)
-		firstMsgBatch.push(execute)
+			// Record debt amount being liquidated
+			const debtValue = new BigNumber(debtToRepay.amount).multipliedBy(
+				this.prices.get(debtToRepay.denom) || 0,
+			)
+			this.recordNotionalLiquidated(debtValue.toNumber())
 
-		const firstFee = await this.getFee(
-			firstMsgBatch,
-			this.config.liquidatorMasterAddress,
-			this.config.chainName.toLowerCase(),
-		)
+			// deposit any neutral in our account before starting liquidations
+			const firstMsgBatch: EncodeObject[] = []
+			await this.appendSwapToDebtMessages(
+				[debtToRepay],
+				liquidatorAddress,
+				firstMsgBatch,
+				new BigNumber(this.balances.get(this.config.neutralAssetDenom)!),
+			)
 
-		const result = await this.signingClient.signAndBroadcast(
-			this.config.liquidatorMasterAddress,
-			firstMsgBatch,
-			firstFee,
-		)
+			// Preferably, we liquidate via redbank directly. This is so that if the liquidation fails,
+			// the entire transaction fails and we do not swap.
+			// When using the liquidation filterer contract, transactions with no successfull liquidations
+			// will still succeed, meaning that we will still swap to the debt and have to swap back again.
+			// If liquidating via redbank, unsucessfull liquidations will error, preventing the swap
+			const execute: MsgExecuteContractEncodeObject = this.executeViaRedbankMsg(tx)
+			firstMsgBatch.push(execute)
 
-		console.log(`Liquidation hash: ${result.transactionHash}`)
+			const firstFee = await this.getFee(
+				firstMsgBatch,
+				this.config.liquidatorMasterAddress,
+				this.config.chainName.toLowerCase(),
+			)
 
-		const collaterals: Collateral[] = await this.queryClient.queryRedbankCollaterals(
-			liquidatorAddress,
-		)
+			const result = await this.signingClient.signAndBroadcast(
+				this.config.liquidatorMasterAddress,
+				firstMsgBatch,
+				firstFee,
+			)
 
-		await this.liquidateCollaterals(liquidatorAddress, collaterals)
+			// Record gas spent
+			this.recordGasSpent(firstFee)
 
-		console.log(`- Liquidation Process Complete.`)
+			console.log('Liquidation hash:', result.transactionHash)
 
-		if (this.config.logResults) {
-			this.writeCsv()
+			const collaterals: Collateral[] = await this.queryClient.queryRedbankCollaterals(
+				liquidatorAddress,
+			)
+
+			await this.liquidateCollaterals(liquidatorAddress, collaterals)
+
+			// Record successful liquidation
+			this.metrics.recordLiquidationSuccess(labels.chain, labels.sc_addr, labels.product)
+			this.metrics.incLoopSuccess(labels)
+
+			console.log(`- Liquidation Process Complete.`)
+
+			if (this.config.logResults) {
+				this.writeCsv()
+			}
+		} catch (error) {
+			// Record liquidation error
+			const errorType = error instanceof Error ? error.constructor.name : 'UnknownError'
+			this.metrics.recordLiquidationError(labels.chain, labels.sc_addr, labels.product, errorType)
+			this.metrics.incLoopErrors(labels)
+			console.error(`Liquidation failed: ${error}`)
+			throw error
+		} finally {
+			// Always record duration
+			const duration = (Date.now() - startTime) / 1000
+			this.metrics.liquidationsDurationSeconds.observe(labels, duration)
 		}
 	}
 
 	async liquidateCollaterals(liquidatorAddress: string, collaterals: Collateral[]) {
 		let msgs: EncodeObject[] = []
+
+		// Capture neutral balance before liquidation
+		const neutralBalanceBefore = await this.signingClient?.getBalance(
+			liquidatorAddress,
+			this.config.neutralAssetDenom,
+		)
+		const neutralBalanceBeforeAmount = neutralBalanceBefore
+			? Number(neutralBalanceBefore.amount)
+			: 0
 
 		const balances = await this.signingClient?.getAllBalances(liquidatorAddress)
 
@@ -497,6 +556,22 @@ export class RedbankExecutor extends BaseExecutor {
 			this.config.chainName.toLowerCase(),
 		)
 		await this.signingClient.signAndBroadcast(this.config.liquidatorMasterAddress, msgs, secondFee)
+
+		// Record gas spent for collateral liquidation
+		this.recordGasSpent(secondFee)
+
+		// Record stables won (neutral asset gained from swapping collaterals)
+		const neutralBalanceAfter = await this.signingClient.getBalance(
+			liquidatorAddress,
+			this.config.neutralAssetDenom,
+		)
+		if (neutralBalanceAfter) {
+			const neutralBalanceAfterAmount = Number(neutralBalanceAfter.amount)
+			const stablesWon = neutralBalanceAfterAmount - neutralBalanceBeforeAmount
+			if (stablesWon > 0) {
+				this.recordStablesWon(stablesWon)
+			}
+		}
 	}
 
 	combineBalances(collaterals: Collateral[], balances: readonly Coin[]): Coin[] {

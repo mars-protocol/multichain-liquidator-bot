@@ -15,6 +15,7 @@ import { ChainQuery } from './query/chainQuery'
 import { PriceResponse } from 'marsjs-types/mars-oracle-osmosis/MarsOracleOsmosis.types'
 import { Market } from 'marsjs-types/mars-red-bank/MarsRedBank.types'
 import { Dictionary } from 'lodash'
+import { MetricsService } from './metrics'
 
 export interface BaseConfig {
 	lcdEndpoint: string
@@ -66,6 +67,7 @@ export class BaseExecutor {
 		public queryClient: ChainQuery,
 		public routeRequester: RouteRequester,
 		public ammRouter: AMMRouter = new AMMRouter(),
+		public metrics: MetricsService = MetricsService.getInstance(),
 	) {
 		console.log({ config })
 	}
@@ -364,5 +366,30 @@ export class BaseExecutor {
 		}
 
 		return fee
+	}
+
+	// Helper methods for metrics
+	protected recordGasSpent(fee: StdFee): void {
+		const gasAmount = fee.amount.reduce((total, coin) => total + Number(coin.amount), 0)
+		const labels = this.getMetricsLabels()
+		this.metrics.gasSpent.inc(labels, gasAmount)
+	}
+
+	protected recordNotionalLiquidated(amount: number): void {
+		const labels = this.getMetricsLabels()
+		this.metrics.notionalLiquidated.inc(labels, amount)
+	}
+
+	protected recordStablesWon(amount: number): void {
+		const labels = this.getMetricsLabels()
+		this.metrics.stablesWon.inc(labels, amount)
+	}
+
+	protected getMetricsLabels(): { chain: string; sc_addr: string; product: string } {
+		return {
+			chain: this.config.chainName,
+			sc_addr: this.config.liquidatorMasterAddress,
+			product: this.config.productName,
+		}
 	}
 }
