@@ -435,9 +435,13 @@ export class RedbankExecutor extends BaseExecutor {
 		}
 	}
 
-	async executeLiquidation(position: Position, liquidatorAddress: string, labels: any, startTime: number): Promise<void> {
+	async executeLiquidation(
+		position: Position,
+		liquidatorAddress: string,
+		labels: any,
+		startTime: number,
+	): Promise<void> {
 		console.log(`- Liquidating ${position.Identifier}`)
-
 
 		// Record liquidation attempt
 		this.metrics.recordLiquidationAttempt(labels.chain, labels.sc_addr, labels.product)

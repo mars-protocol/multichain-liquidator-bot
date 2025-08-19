@@ -410,7 +410,7 @@ export class RoverExecutor extends BaseExecutor {
 			if (this.lastFetchedVaultTime + this.VAULT_RELOAD_WINDOW < currentTimeMs) {
 				this.lastFetchedVaultTime = currentTimeMs
 			}
-			
+
 			await this.updateMarketsData()
 			await this.updatePriceSources()
 			await this.updateOraclePrices()

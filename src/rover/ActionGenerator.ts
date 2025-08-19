@@ -44,7 +44,7 @@ export class ActionGenerator {
 			account.deposits.length === 0 &&
 			account.lends.length === 0 &&
 			account.staked_astro_lps.length === 0
-		
+
 		const collateral: Collateral = hasNoCollaterals
 			? {
 					type: PositionType.DEPOSIT,
@@ -172,13 +172,13 @@ export class ActionGenerator {
 			return []
 		}
 
-		const receivedDebtAmount = 
+		const receivedDebtAmount =
 			// @ts-ignore
 			collateralToDebtActions[collateralToDebtActions.length - 1].swap_exact_in.min_receive
 		const remainingDebt = new BigNumber(receivedDebtAmount).minus(borrow.amount)
 		if (remainingDebt.isNegative()) {
 			console.log('SwapToStableMsg: No profit after repaying debt. Nothing to swap')
-			// If this occurs, we probably have an 
+			// If this occurs, we probably have an
 			return []
 		}
 		const assetInPrice = oraclePrices.get(collateralDenom)!
@@ -509,9 +509,9 @@ export class ActionGenerator {
 			swap_exact_in: {
 				coin_in: { denom: denomIn, amount: 'account_balance' },
 				denom_out: denomOut,
-				// Min receive is inaccurate atm, requires improvement in estimation of profit. 
+				// Min receive is inaccurate atm, requires improvement in estimation of profit.
 				// For now, we set to a small amount. If the liquidation tx is not profitable it
-				// will revert anyway. 
+				// will revert anyway.
 				min_receive: '100',
 				route: route,
 			},
