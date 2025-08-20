@@ -40,9 +40,9 @@ import { HdPath } from '@cosmjs/crypto'
 import { SwapAmountInRoute } from 'osmojs/dist/codegen/osmosis/poolmanager/v1beta1/swap_route'
 import { RouteHop } from './types/RouteHop'
 import { OsmoRoute } from './types/swapper'
-import { AssetInfoNative } from './query/amm/types/AstroportTypes'
 import { PerpPosition, Positions } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
+import { PoolAsset } from './types/Pool'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -145,26 +145,41 @@ export const produceSigningCosmWasmClient = async (
 	})
 }
 
-interface AstroportPairInfo {
-	data: {
-		asset_infos: AssetInfoNative[]
-	}
-}
-
-export const queryAstroportLpUnderlyingTokens = async (
-	lpToken: string,
-): Promise<string[] | undefined> => {
-	const pairAddress = lpToken.split('/')[1]
+export const queryAstroportLpUnderlyingCoins = async (lpCoin: Coin): Promise<Coin[]> => {
+	const pairAddress = lpCoin.denom.split('/')[1]
 
 	// Build the url
-	const encodedMsg = Buffer.from(JSON.stringify({ pair: {} })).toString('base64')
+	const encodedMsg = Buffer.from(
+		JSON.stringify({ simulate_withdraw: { lp_amount: lpCoin.amount } }),
+	).toString('base64')
 	const url = `${process.env.LCD_ENDPOINT}/cosmwasm/wasm/v1/contract/${pairAddress}/smart/${encodedMsg}`
 
 	// Fetch pair info
 	const response = await fetch(url)
-	const pairInfo: AstroportPairInfo = await response.json()
+	return (await response.json())['data'] as Coin[]
+}
 
-	return pairInfo.data.asset_infos.map((assetInfo) => assetInfo.native_token.denom)
+export const queryOsmosisLpUnderlyingCoins = async (lpCoin: Coin): Promise<Coin[]> => {
+	// Pool denoms are: gamm/pool/[id]
+	const poolId = lpCoin.denom.split('/')[2]
+	const response = await fetch(`${process.env.LCD_ENDPOINT}/osmosis/gamm/v1beta1/pools/${poolId}`)
+	const poolResponse = await response.json()
+
+	// Calculate how much of the underlying assets we will receive
+	const totalShares = poolResponse.pool.total_shares.amount
+
+	return poolResponse.pool.pool_assets.map((asset: PoolAsset) => {
+		const tokensPerShare = new BigNumber(asset.token.amount).dividedBy(totalShares)
+
+		// Multiply by 0.99 to account for a margin of error, as pool weights are not exact.
+		// The extra ~1% will be left in the rewards distributor contract.
+		const tokensToSwap = tokensPerShare.multipliedBy(lpCoin.amount).multipliedBy(0.99)
+
+		return {
+			denom: asset.token.denom,
+			amount: tokensToSwap.toFixed(0),
+		}
+	})
 }
 
 export const setPrice = async (

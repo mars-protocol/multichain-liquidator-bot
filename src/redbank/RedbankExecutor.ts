@@ -379,6 +379,7 @@ export class RedbankExecutor extends BaseExecutor {
 		const collateralsBefore: Collateral[] = await this.queryClient.queryRedbankCollaterals(
 			liquidatorAddress,
 		)
+
 		await this.liquidateCollaterals(liquidatorAddress, collateralsBefore)
 
 		let endpointPath =
@@ -398,16 +399,16 @@ export class RedbankExecutor extends BaseExecutor {
 				(position) =>
 					Number(position.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV!) &&
 					Number(position.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV!) &&
-					// position.account_id === "neutron1u44598z3a8fdy9e6cu7rpl2eqvl2shjvfg4sqd" &&
 					position.total_debt.length > 5,
 			)
 
-			.sort((a, b) => Number(a.total_debt) - Number(b.total_debt))
+			.sort((a, b) => Number(b.total_debt) - Number(a.total_debt))
 			.map((positionObject) => {
 				return {
 					Identifier: positionObject.account_id,
 				}
 			})
+			.slice(0, 10)
 
 		// Record unhealthy positions detected
 		this.metrics.liquidationsUnhealthyPositionsDetectedTotal.inc(labels, positions.length)
@@ -425,22 +426,35 @@ export class RedbankExecutor extends BaseExecutor {
 			return
 		}
 
-		const positionToLiquidate = positions[0]
+		for (const position of positions) {
+			try {
+				await this.executeLiquidation(position, liquidatorAddress, labels, startTime)
+			} catch (e) {
+				console.error(e)
+			}
+		}
+	}
 
-		console.log(`- Liquidating ${positionToLiquidate.Identifier}`)
+	async executeLiquidation(
+		position: Position,
+		liquidatorAddress: string,
+		labels: any,
+		startTime: number,
+	): Promise<void> {
+		console.log(`- Liquidating ${position.Identifier}`)
 
 		// Record liquidation attempt
 		this.metrics.recordLiquidationAttempt(labels.chain, labels.sc_addr, labels.product)
 
 		// Fetch position data
-		const liquidateeDebts = await this.queryClient.queryRedbankDebts(positionToLiquidate.Identifier)
+		const liquidateeDebts = await this.queryClient.queryRedbankDebts(position.Identifier)
 		const liquidateeCollaterals = await this.queryClient.queryRedbankCollaterals(
-			positionToLiquidate.Identifier,
+			position.Identifier,
 		)
 
 		try {
 			const { tx, debtToRepay } = await this.produceLiquidationTx({
-				address: positionToLiquidate.Identifier,
+				address: position.Identifier,
 				debts: liquidateeDebts,
 				collaterals: liquidateeCollaterals,
 			})

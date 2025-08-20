@@ -68,7 +68,6 @@ export class RoverExecutor extends BaseExecutor {
 	// Entry to rover executor
 	start = async () => {
 		await this.init()
-
 		// set up accounts
 		const accounts = await this.wallet.getAccounts()
 		// get liquidator addresses
@@ -79,12 +78,10 @@ export class RoverExecutor extends BaseExecutor {
 		// initiate our wallets (in case they are not)
 		await this.ensureWorkerMinBalance(liquidatorAddresses)
 		// Fetch or create our credit accounts for each address
-
 		const createCreditAccountpromises: Promise<CreateCreditAccountResponse>[] = []
 		liquidatorAddresses.map((address) =>
 			createCreditAccountpromises.push(this.getDefaultCreditAccount(address)),
 		)
-
 		const results: CreateCreditAccountResponse[] = await Promise.all(createCreditAccountpromises)
 		results.forEach((result) =>
 			this.liquidatorAccounts.set(result.liquidatorAddress, result.tokenId),
@@ -116,7 +113,6 @@ export class RoverExecutor extends BaseExecutor {
 					: `v2/unhealthy_positions?chain=${this.config.chainName}&product=${this.config.productName}`
 			// Pop latest unhealthy positions from the list - cap this by the number of liquidators we have available
 			const url = `${this.config.marsEndpoint!}/${endpointPath}`
-
 			const response = await fetch(url)
 			let targetAccountObjects: {
 				account_id: string
@@ -129,7 +125,6 @@ export class RoverExecutor extends BaseExecutor {
 					(account) =>
 						Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
 						Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
-					// To target specific accounts, filter here
 				)
 				.sort((accountA, accountB) => Number(accountB.total_debt) - Number(accountA.total_debt))
 
@@ -148,7 +143,6 @@ export class RoverExecutor extends BaseExecutor {
 				this.metrics.liquidationsDurationSeconds.observe(labels, duration)
 				return
 			}
-
 			// create chunks of accounts to liquidate
 			const unhealthyAccountChunks = []
 			for (let i = 0; i < targetAccounts.length; i += this.liquidatorAccounts.size) {
@@ -323,6 +317,7 @@ export class RoverExecutor extends BaseExecutor {
 		assetParams: Map<string, AssetParamsBaseForAddr>,
 		perpParams: Map<string, PerpParams>,
 	): HealthData => {
+		positions.vaults = []
 		let hc: HealthComputer = {
 			kind: 'default',
 			positions: positions,
