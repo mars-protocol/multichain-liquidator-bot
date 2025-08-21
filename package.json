@@ -35,8 +35,6 @@
 		"csv-writer": "^1.6.0",
 		"dotenv": "^16.0.2",
 		"lodash": "^4.17.21",
-		"mars-liquidation-node": "1.0.0",
-		"mars-rover-health-computer-node": "2.2.0",
 		"marsjs-types": "2.3.0",
 		"osmojs": "^16.5.1",
 		"prom-client": "^15.1.3",
