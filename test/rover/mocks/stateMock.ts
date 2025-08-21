@@ -15,7 +15,7 @@ import {
 	PerpParams,
 	RedBankSettings,
 } from 'marsjs-types/mars-params/MarsParams.types'
-import { HealthData, HealthValuesResponse } from 'mars-liquidation-node'
+import { HealthData, HealthValuesResponse } from 'mars-liquidation'
 import { compute_health_js, HealthComputer } from 'mars-rover-health-computer-node'
 
 export class StateMock {
@@ -152,6 +152,13 @@ export const defaultAssetParams: AssetParamsBaseForAddr = {
 	credit_manager: defaultCmSettingsForAddr,
 	denom: 'uatom',
 	deposit_cap: '100000000000',
+	interest_rate_model: {
+		base: '0',
+		optimal_utilization_rate: '0.85',
+		slope_1: '0.1',
+		slope_2: '1.2',
+	},
+	reserve_factor: '0.1',
 	liquidation_bonus: defaultLiquidationBonus,
 	liquidation_threshold: '0.85',
 	max_loan_to_value: '0.8',
