@@ -35,9 +35,7 @@
 		"csv-writer": "^1.6.0",
 		"dotenv": "^16.0.2",
 		"lodash": "^4.17.21",
-		"mars-liquidation-node": "1.0.0",
-		"mars-rover-health-computer-node": "2.2.0",
-		"marsjs-types": "2.0.2",
+		"marsjs-types": "2.3.0",
 		"osmojs": "^16.5.1",
 		"prom-client": "^15.1.3",
 		"redis": "^4.3.0",
@@ -45,7 +43,9 @@
 		"requests": "^0.3.0",
 		"ts-jest": "^29.2.5",
 		"ts-node": "^10.9.1",
-		"uuid": "^9.0.0"
+		"uuid": "^9.0.0",
+		"mars-rover-health-computer-node": "2.3.0-node",
+		"mars-liquidation": "2.3.0"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.21.0",

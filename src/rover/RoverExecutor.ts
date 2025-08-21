@@ -26,7 +26,7 @@ import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 import { compute_health_js, HealthComputer } from 'mars-rover-health-computer-node'
 import { TokensResponse } from 'marsjs-types/mars-account-nft/MarsAccountNft.types'
 import { ChainQuery } from '../query/chainQuery'
-import { HealthData } from 'mars-liquidation-node'
+import { HealthData } from 'mars-liquidation'
 
 interface CreateCreditAccountResponse {
 	tokenId: number

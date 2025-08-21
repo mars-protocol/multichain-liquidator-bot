@@ -19,7 +19,7 @@ import {
 	LiquidationAmountInputs,
 	calculate_liquidation_amounts_js,
 	HealthData,
-} from 'mars-liquidation-node'
+} from 'mars-liquidation'
 import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types.js'
 
 const MAX_DEBT_AMOUNT = 1000000000
