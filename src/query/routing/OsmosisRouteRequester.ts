@@ -1,17 +1,16 @@
-import Long from 'long'
-import { RouteHop } from '../../types/RouteHop'
-import { RequestRouteResponse, RouteRequester } from './RouteRequesterInterface'
+import { RouteRequester, GenericRoute } from './RouteRequesterInterface'
 import { RouteResponse } from '../../types/OsmosisRouteResponse'
-import { PoolType } from '../../types/Pool'
 import BigNumber from 'bignumber.js'
 
 export class OsmosisRouteRequester extends RouteRequester {
-	async requestRoute(
-		tokenInDenom: string,
-		tokenOutDenom: string,
-		tokenInAmount: string,
-	): Promise<RequestRouteResponse> {
-		let url = `${this.apiUrl}/router/quote?tokenIn=${tokenInAmount}${tokenInDenom}&tokenOutDenom=${tokenOutDenom}`
+	async getRoute(params: {
+		denomIn: string
+		denomOut: string
+		amountIn: string
+		chainIdIn: string
+		chainIdOut: string
+	}): Promise<GenericRoute> {
+		let url = `${this.apiUrl}/router/quote?tokenIn=${params.amountIn}${params.denomIn}&tokenOutDenom=${params.denomOut}`
 
 		const response = await fetch(url)
 
@@ -21,30 +20,26 @@ export class OsmosisRouteRequester extends RouteRequester {
 
 		let routeResponse: RouteResponse = await response.json()
 
-		let route = routeResponse.route[0].pools.map((pool) => {
-			let routeHop: RouteHop = {
-				poolId: new Long(pool.id),
-				tokenInDenom: tokenInDenom,
-				tokenOutDenom: pool.token_out_denom,
-				pool: {
-					address: 'notrequired',
-					id: new Long(pool.id),
-					poolType: PoolType.XYK,
-					swapFee: pool.spread_factor,
-					token0: tokenInDenom,
-					token1: pool.token_out_denom,
-				},
-			}
-			tokenInDenom = pool.token_out_denom
-			return routeHop
-		})
+		// Convert Osmosis route to GenericRoute format
+		const steps = routeResponse.route[0].pools.map((pool) => ({
+			venue: 'osmosis',
+			denomIn: params.denomIn,
+			denomOut: pool.token_out_denom,
+			pool: pool.id.toString(),
+		}))
 
 		// allow for 2.5% slippage from what we estimated
 		const minOutput = new BigNumber(routeResponse.amount_out).multipliedBy(0.975).toFixed(0)
 
 		return {
-			route,
-			expectedOutput: minOutput,
+			amountIn: params.amountIn,
+			estimatedAmountOut: minOutput,
+			operations: [
+				{
+					chainId: params.chainIdIn,
+					steps,
+				},
+			],
 		}
 	}
 }

@@ -262,11 +262,13 @@ export class RedbankExecutor extends BaseExecutor {
 					: new BigNumber(coin.amount)
 
 			if (coinAmount.multipliedBy(this.prices.get(coin.denom)!).isGreaterThan(10000)) {
-				const routeResponse = await this.routeRequester.requestRoute(
-					coin.denom,
-					this.config.neutralAssetDenom,
-					coin.amount,
-				)
+				const routeResponse = await this.routeRequester.getRoute({
+					denomIn: coin.denom,
+					denomOut: this.config.neutralAssetDenom,
+					amountIn: coin.amount,
+					chainIdIn: this.config.chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
+					chainIdOut: this.config.chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
+				})
 
 				let minOutput = coinAmount
 					.multipliedBy(this.prices.get(coin.denom)!)
@@ -279,9 +281,12 @@ export class RedbankExecutor extends BaseExecutor {
 
 				expectedNeutralCoins = expectedNeutralCoins.plus(minOutput)
 
+				// Convert GenericRoute to legacy format for exchange interface
+				const legacyRoute = this.convertGenericRouteToLegacy(routeResponse)
+
 				msgs.push(
 					this.exchangeInterface.produceSwapMessage(
-						routeResponse.route,
+						legacyRoute.route,
 						{ denom: coin.denom, amount: coinAmount.toFixed(0) },
 						minOutput,
 						liquidatorAddress,
@@ -322,15 +327,20 @@ export class RedbankExecutor extends BaseExecutor {
 					debtValue = neutralAvailable
 				}
 
-				const routeResponse = await this.routeRequester.requestRoute(
-					this.config.neutralAssetDenom,
-					debt.denom,
-					debtValue.toFixed(0),
-				)
+				const routeResponse = await this.routeRequester.getRoute({
+					denomIn: this.config.neutralAssetDenom,
+					denomOut: debt.denom,
+					amountIn: debtValue.toFixed(0),
+					chainIdIn: this.config.chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
+					chainIdOut: this.config.chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
+				})
+
+				// Convert GenericRoute to legacy format for exchange interface
+				const legacyRoute = this.convertGenericRouteToLegacy(routeResponse)
 
 				msgs.push(
 					this.exchangeInterface.produceSwapMessage(
-						routeResponse.route,
+						legacyRoute.route,
 						{ denom: this.config.neutralAssetDenom, amount: debtValue.toFixed(0) },
 						debtAmountRequiredFromSwap.toFixed(0),
 						liquidatorAddress,
@@ -600,5 +610,33 @@ export class RedbankExecutor extends BaseExecutor {
 		const result: Coin[] = []
 		coinMap.forEach((coin) => result.push(coin))
 		return result
+	}
+
+	/**
+	 * Convert GenericRoute to legacy format for exchange interface compatibility
+	 */
+	private convertGenericRouteToLegacy(genericRoute: any): any {
+		// Flatten all steps from all operations
+		const allSteps = genericRoute.operations.flatMap((op: any) => op.steps)
+
+		// Convert to legacy RouteHop format
+		const routeHops = allSteps.map((step: any, index: number) => ({
+			poolId: index + 1, // Generate sequential pool IDs
+			tokenInDenom: step.denomIn,
+			tokenOutDenom: step.denomOut,
+			pool: {
+				token0: step.denomIn,
+				token1: step.denomOut,
+				id: index + 1,
+				swapFee: '0.003', // Default fee
+				address: step.pool || '',
+				poolType: 'XYK' as any,
+			},
+		}))
+
+		return {
+			route: routeHops,
+			expectedOutput: genericRoute.estimatedAmountOut,
+		}
 	}
 }

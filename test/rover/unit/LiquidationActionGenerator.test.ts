@@ -2,14 +2,12 @@ import { Action, ActionCoin, Coin } from 'marsjs-types/mars-credit-manager/MarsC
 import { RouteRequester } from '../../../src/query/routing/RouteRequesterInterface'
 import { ActionGenerator } from '../../../src/rover/ActionGenerator'
 import { defaultPerpPosition, StateMock } from '../mocks/stateMock'
-import Long from 'long'
-import { Pool } from '../../../src/types/Pool'
 
 describe('Liquidation Action Generator Tests', () => {
 	let mock = StateMock.default()
 
 	const mockRouteRequester: jest.Mocked<RouteRequester> = {
-		requestRoute: jest.fn(),
+		getRoute: jest.fn(),
 		apiUrl: 'http://localhost:8080',
 	}
 
@@ -34,31 +32,41 @@ describe('Liquidation Action Generator Tests', () => {
 
 			// We need to mock the route requester to return the correct routes
 			// First swap call is to swap collateral to debt
-			mockRouteRequester.requestRoute.mockResolvedValueOnce({
-				route: [
+			mockRouteRequester.getRoute.mockResolvedValueOnce({
+				amountIn: '1000',
+				estimatedAmountOut: '100',
+				operations: [
 					{
-						poolId: Long.fromNumber(1),
-						tokenInDenom: 'uusd',
-						tokenOutDenom: 'uatom',
-						pool: {} as Pool,
+						chainId: 'osmosis-1',
+						steps: [
+							{
+								venue: 'osmosis',
+								denomIn: 'uusd',
+								denomOut: 'uatom',
+								pool: '1',
+							},
+						],
 					},
 				],
-				// todo
-				expectedOutput: '100',
 			})
 
 			// next swap is to swap debt to stable
-			mockRouteRequester.requestRoute.mockResolvedValueOnce({
-				route: [
+			mockRouteRequester.getRoute.mockResolvedValueOnce({
+				amountIn: '100',
+				estimatedAmountOut: '100',
+				operations: [
 					{
-						poolId: Long.fromNumber(1),
-						tokenInDenom: 'uatom',
-						tokenOutDenom: 'uusd',
-						pool: {} as Pool,
+						chainId: 'osmosis-1',
+						steps: [
+							{
+								venue: 'osmosis',
+								denomIn: 'uatom',
+								denomOut: 'uusd',
+								pool: '1',
+							},
+						],
 					},
 				],
-				//todo
-				expectedOutput: '100',
 			})
 
 			actions = await liquidationActionGenerator.generateLiquidationActions(
@@ -157,31 +165,41 @@ describe('Liquidation Action Generator Tests', () => {
 
 			// We need to mock the route requester to return the correct routes
 			// First swap call is to swap collateral to debt
-			mockRouteRequester.requestRoute.mockResolvedValueOnce({
-				route: [
+			mockRouteRequester.getRoute.mockResolvedValueOnce({
+				amountIn: '1000',
+				estimatedAmountOut: '100',
+				operations: [
 					{
-						poolId: Long.fromNumber(1),
-						tokenInDenom: 'uusd',
-						tokenOutDenom: 'uatom',
-						pool: {} as Pool,
+						chainId: 'osmosis-1',
+						steps: [
+							{
+								venue: 'osmosis',
+								denomIn: 'uusd',
+								denomOut: 'uatom',
+								pool: '1',
+							},
+						],
 					},
 				],
-				// todo
-				expectedOutput: '100',
 			})
 
 			// next swap is to swap debt to stable
-			mockRouteRequester.requestRoute.mockResolvedValueOnce({
-				route: [
+			mockRouteRequester.getRoute.mockResolvedValueOnce({
+				amountIn: '100',
+				estimatedAmountOut: '100',
+				operations: [
 					{
-						poolId: Long.fromNumber(1),
-						tokenInDenom: 'uatom',
-						tokenOutDenom: 'uusd',
-						pool: {} as Pool,
+						chainId: 'osmosis-1',
+						steps: [
+							{
+								venue: 'osmosis',
+								denomIn: 'uatom',
+								denomOut: 'uusd',
+								pool: '1',
+							},
+						],
 					},
 				],
-				//todo
-				expectedOutput: '100',
 			})
 
 			actions = await liquidationActionGenerator.generateLiquidationActions(

@@ -11,8 +11,8 @@ import { Osmosis } from './exchange/Osmosis.js'
 import { getRedbankConfig } from './redbank/config/getConfig.js'
 import { getConfig as getRoverConfig } from './rover/config/getConfig.js'
 import { AstroportCW } from './exchange/Astroport.js'
-import { AstroportRouteRequester } from './query/routing/AstroportRouteRequester.js'
 import { OsmosisRouteRequester } from './query/routing/OsmosisRouteRequester.js'
+import { SkipRouteRequester } from './query/routing/skip/SkipRouteRequester.js'
 import { RouteRequester } from './query/routing/RouteRequesterInterface.js'
 import { ChainQuery } from './query/chainQuery.js'
 import { MetricsService } from './metrics.js'
@@ -67,7 +67,7 @@ export const main = async () => {
 		chainName === 'osmosis' ? new Osmosis() : new AstroportCW(prefix, config.astroportRouter!)
 	const routeRequester =
 		chainName === 'neutron'
-			? new AstroportRouteRequester(process.env.ASTROPORT_API_URL!)
+			? new SkipRouteRequester('https://api.skip.build')
 			: new OsmosisRouteRequester(process.env.SQS_URL!)
 
 	// Start metrics server
