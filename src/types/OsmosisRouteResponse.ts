@@ -3,10 +3,15 @@ export interface AmountIn {
 	amount: string
 }
 
+export interface PoolBalance {
+	denom: string
+	amount: string
+}
+
 export interface Pool {
 	id: number
 	type: number
-	balances: any[]
+	balances: PoolBalance[]
 	spread_factor: string
 	token_out_denom: string
 	taker_fee: string

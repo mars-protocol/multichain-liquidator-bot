@@ -8,6 +8,7 @@ import {
 	Positions,
 	DebtAmount,
 } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
+import { GenericRoute } from '../query/routing/RouteRequesterInterface'
 import BigNumber from 'bignumber.js'
 import {
 	calculateTotalPerpPnl,
@@ -593,15 +594,15 @@ export class ActionGenerator {
 	/**
 	 * Convert GenericRoute to SwapperRoute format for backward compatibility
 	 */
-	private convertGenericRouteToSwapperRoute(genericRoute: any, chainName: string): SwapperRoute {
+	private convertGenericRouteToSwapperRoute(genericRoute: GenericRoute, chainName: string): SwapperRoute {
 		// Flatten all steps from all operations
-		const allSteps = genericRoute.operations.flatMap((op: any) => op.steps)
+		const allSteps = genericRoute.operations.flatMap((op) => op.steps)
 
 		if (chainName === 'osmosis') {
 			return {
 				osmo: {
-					swaps: allSteps.map((step: any, index: number) => ({
-						pool_id: index + 1, // Generate sequential pool IDs
+					swaps: allSteps.map((step) => ({
+					pool_id: parseInt(step.pool || '0', 10), 
 						to: step.denomOut,
 					})),
 				},
@@ -609,7 +610,7 @@ export class ActionGenerator {
 		} else {
 			return {
 				astro: {
-					swaps: allSteps.map((step: any) => ({
+					swaps: allSteps.map((step) => ({
 						from: step.denomIn,
 						to: step.denomOut,
 					})),

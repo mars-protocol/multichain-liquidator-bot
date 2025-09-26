@@ -9,7 +9,7 @@ interface RouteRequest {
 	dest_asset_denom: string
 	dest_asset_chain_id: string
 	amount_in: string
-	swap_venues: any[]
+	swap_venues: SwapVenue[]
 }
 
 export interface SwapVenue {
@@ -22,6 +22,11 @@ export interface SwapOperation {
 	pool: string
 	denom_in: string
 	denom_out: string
+}
+
+export interface EstimatedFee {
+	denom: string
+	amount: string
 }
 
 interface Swap {
@@ -61,7 +66,7 @@ export interface SwapRoute {
 	txs_required: number
 	usd_amount_in: string
 	usd_amount_out: string
-	estimated_fees: any[]
+	estimated_fees: EstimatedFee[]
 	required_chain_addresses: string[]
 	estimated_route_duration_seconds: number
 	swap_venue: SwapVenue
@@ -85,10 +90,12 @@ export async function getSwapRoute(
 			{
 				chain_id: 'neutron-1',
 				name: 'neutron-duality',
+				logo_uri: '',
 			},
 			{
 				chain_id: 'neutron-1',
 				name: 'neutron-astroport',
+				logo_uri: '',
 			},
 		],
 	}

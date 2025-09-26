@@ -4,6 +4,10 @@ import { toUtf8 } from '@cosmjs/encoding'
 import { Coin, SigningStargateClient } from '@cosmjs/stargate'
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx.js'
 import { EncodeObject } from '@cosmjs/proto-signing'
+import { GenericRoute } from '../query/routing/RouteRequesterInterface'
+import { RouteHop } from '../types/RouteHop'
+import { PoolType } from '../types/Pool'
+import Long from 'long'
 
 import { produceExecuteContractMessage, produceWithdrawMessage, sleep } from '../helpers'
 import { cosmwasm } from 'osmojs'
@@ -448,7 +452,7 @@ export class RedbankExecutor extends BaseExecutor {
 	async executeLiquidation(
 		position: Position,
 		liquidatorAddress: string,
-		labels: any,
+		labels: { chain: string; sc_addr: string; product: string },
 		startTime: number,
 	): Promise<void> {
 		console.log(`- Liquidating ${position.Identifier}`)
@@ -615,22 +619,22 @@ export class RedbankExecutor extends BaseExecutor {
 	/**
 	 * Convert GenericRoute to legacy format for exchange interface compatibility
 	 */
-	private convertGenericRouteToLegacy(genericRoute: any): any {
+	private convertGenericRouteToLegacy(genericRoute: GenericRoute): { route: RouteHop[]; expectedOutput: string } {
 		// Flatten all steps from all operations
-		const allSteps = genericRoute.operations.flatMap((op: any) => op.steps)
+		const allSteps = genericRoute.operations.flatMap((op) => op.steps)
 
 		// Convert to legacy RouteHop format
-		const routeHops = allSteps.map((step: any, index: number) => ({
-			poolId: index + 1, // Generate sequential pool IDs
+		const routeHops: RouteHop[] = allSteps.map((step, index: number) => ({
+			poolId: Long.fromNumber(index + 1), // Generate sequential pool IDs
 			tokenInDenom: step.denomIn,
 			tokenOutDenom: step.denomOut,
 			pool: {
 				token0: step.denomIn,
 				token1: step.denomOut,
-				id: index + 1,
+				id: Long.fromNumber(index + 1),
 				swapFee: '0.003', // Default fee
 				address: step.pool || '',
-				poolType: 'XYK' as any,
+				poolType: PoolType.XYK,
 			},
 		}))
 
