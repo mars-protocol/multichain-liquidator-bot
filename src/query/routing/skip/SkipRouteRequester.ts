@@ -41,7 +41,6 @@ export class SkipRouteRequester extends RouteRequester {
 			throw new Error('No swap route available')
 		}
 
-		console.log('skipRoute', JSON.stringify(skipRoute))
 		const operations = skipRoute.operations.map((operation: Operation) => ({
 			chainId: skipRoute.source_asset_chain_id,
 			steps: operation.swap.swap_in.swap_operations.map((swapOp: SwapOperation) => ({
