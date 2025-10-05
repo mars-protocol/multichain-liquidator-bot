@@ -8,6 +8,7 @@ import {
 	Positions,
 	DebtAmount,
 } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
+import { GenericRoute } from '../query/routing/RouteRequesterInterface'
 import BigNumber from 'bignumber.js'
 import {
 	calculateTotalPerpPnl,
@@ -319,33 +320,26 @@ export class ActionGenerator {
 		const priceRatio = assetInPrice.dividedBy(assetOutPrice)
 
 		let minReceive = amountBN.multipliedBy(priceRatio).multipliedBy(1 - Number(slippage))
-		const route = await this.routeRequester.requestRoute(assetInDenom, assetOutDenom, amountIn)
+
+		// Use the new generic route method
+		const genericRoute = await this.routeRequester.getRoute({
+			denomIn: assetInDenom,
+			denomOut: assetOutDenom,
+			amountIn: amountIn,
+			chainIdIn: chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
+			chainIdOut: chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
+		})
+
 		if (minReceive.isNaN() || minReceive.lt(10)) {
 			minReceive = new BigNumber(10)
 		}
 
-		const swapperRoute: SwapperRoute =
-			chainName === 'osmosis'
-				? {
-						osmo: {
-							swaps: route.route.map((swap) => {
-								return {
-									pool_id: swap.poolId.toNumber(),
-									to: swap.tokenOutDenom,
-								} as any
-							}),
-						},
-				  }
-				: {
-						astro: {
-							swaps: route.route.map((swap) => {
-								return {
-									from: swap.tokenInDenom,
-									to: swap.tokenOutDenom,
-								}
-							}),
-						},
-				  }
+		// Convert GenericRoute to SwapperRoute format
+		const swapperRoute: SwapperRoute = this.convertGenericRouteToSwapperRoute(
+			genericRoute,
+			chainName,
+		)
+
 		return this.produceSwapAction(assetInDenom, assetOutDenom, minReceive.toFixed(0), swapperRoute)
 	}
 
@@ -595,5 +589,33 @@ export class ActionGenerator {
 			})
 			.sort((debtA, debtB) => debtA.value.minus(debtB.value).toNumber())
 			.pop()!
+	}
+
+	/**
+	 * Convert GenericRoute to SwapperRoute format for backward compatibility
+	 */
+	private convertGenericRouteToSwapperRoute(genericRoute: GenericRoute, chainName: string): SwapperRoute {
+		// Flatten all steps from all operations
+		const allSteps = genericRoute.operations.flatMap((op) => op.steps)
+
+		if (chainName === 'osmosis') {
+			return {
+				osmo: {
+					swaps: allSteps.map((step) => ({
+					pool_id: parseInt(step.pool || '0', 10), 
+						to: step.denomOut,
+					})),
+				},
+			}
+		} else {
+			return {
+				astro: {
+					swaps: allSteps.map((step) => ({
+						from: step.denomIn,
+						to: step.denomOut,
+					})),
+				},
+			}
+		}
 	}
 }

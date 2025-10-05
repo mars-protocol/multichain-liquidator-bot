@@ -2,11 +2,15 @@ import Long from 'long'
 import { RouteHop } from '../types/RouteHop'
 import { fromString } from '../types/Pool'
 
+export interface PoolBalance {
+	denom: string
+	amount: string
+}
+
 export interface Pool {
 	id: number
 	type: number
-	// TODO add more specific type
-	balances: any[]
+	balances: PoolBalance[]
 	spread_factor: string
 	token_out_denom: string
 	taker_fee: string

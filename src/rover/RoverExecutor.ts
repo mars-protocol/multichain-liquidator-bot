@@ -23,6 +23,7 @@ import {
 	VaultConfigBaseForString,
 } from 'marsjs-types/mars-params/MarsParams.types'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
+import { SkipRouteRequester } from '../query/routing/skip/SkipRouteRequester'
 import { compute_health_js, HealthComputer } from 'mars-rover-health-computer-node'
 import { TokensResponse } from 'marsjs-types/mars-account-nft/MarsAccountNft.types'
 import { ChainQuery } from '../query/chainQuery'
@@ -57,11 +58,18 @@ export class RoverExecutor extends BaseExecutor {
 		client: SigningStargateClient,
 		queryClient: ChainQuery,
 		wallet: DirectSecp256k1HdWallet,
-		routeRequester: RouteRequester,
+		routeRequester?: RouteRequester,
 	) {
-		super(config, client, queryClient, routeRequester)
+		super(
+			config,
+			client,
+			queryClient,
+			routeRequester ?? new SkipRouteRequester('https://api.skip.build'),
+		)
 		this.config = config
-		this.liquidationActionGenerator = new ActionGenerator(routeRequester)
+		this.liquidationActionGenerator = new ActionGenerator(
+			routeRequester ?? new SkipRouteRequester('https://api.skip.build'),
+		)
 		this.wallet = wallet
 	}
 

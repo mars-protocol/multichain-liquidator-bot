@@ -1,4 +1,20 @@
-import { RouteHop } from '../../types/RouteHop'
+/**
+ * Generic route interface that can work with any routing service
+ */
+export interface GenericRoute {
+	amountIn: string
+	estimatedAmountOut: string
+	operations: Array<{
+		chainId: string
+		steps: Array<{
+			venue: string
+			denomIn: string
+			denomOut: string
+			pool?: string
+		}>
+	}>
+}
+
 /**
  * Route requester requests a route from an endpoint that is often an off chain source,
  * that provides a route for a given tokenIn and tokenOut. This is often a more reliable
@@ -12,14 +28,14 @@ export abstract class RouteRequester {
 		this.apiUrl = apiUrl
 	}
 
-	abstract requestRoute(
-		tokenInDenom: string,
-		tokenOutDenom: string,
-		tokenInAmount: string,
-	): Promise<RequestRouteResponse>
-}
-
-export interface RequestRouteResponse {
-	route: RouteHop[]
-	expectedOutput: string
+	/**
+	 * Generic route method that returns a standardized route format
+	 */
+	abstract getRoute(params: {
+		denomIn: string
+		denomOut: string
+		amountIn: string
+		chainIdIn: string
+		chainIdOut: string
+	}): Promise<GenericRoute>
 }
