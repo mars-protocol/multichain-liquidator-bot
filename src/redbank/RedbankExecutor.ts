@@ -198,48 +198,143 @@ export class RedbankExecutor extends BaseExecutor {
 				maxRepayableValue: JSON.stringify(maxRepayableValue),
 				remainingNeutral: JSON.stringify(remainingNeutral),
 				neutralAssetDenom: this.config.neutralAssetDenom,
-				debtDenom: debtDenom,
-				debtPrice: debtPrice,
-				collateralPrice: collateralPrice,
-				liquidationBonus: liquidationBonus,
-				protocolLiquidationFee: protocolLiquidationFee,
+				targetHealthFactor: this.targetHealthFactor,
+				totalDebtValue: JSON.stringify(totalDebtValue),
+				largestDebt: JSON.stringify(largestDebt),
+				largestCollateralValue: JSON.stringify(largestCollateralValue),
 			})
 
-			const liquidateTx = {
-				collateral_denom: largestCollateralDenom,
-				debt_denom: largestDebt.denom,
-				user_address: positionData.address,
-				amount: amountToRepay.multipliedBy(0.98).toFixed(0),
+			if (!buyDebtRoute) {
+				const message = `No buy debt route available for ${debtDenom}`
+				console.error(message)
+				throw new Error(message)
 			}
 
-			const newTotalDebt = totalDebtValue.plus(new BigNumber(amountToRepay).multipliedBy(debtPrice))
+			const tx = await this.generateGenericLiquidationTx(
+				positionData.address,
+				largestCollateral.denom,
+				debtDenom,
+				collateralPrice.toNumber(),
+				buyDebtRoute,
+				amountToRepay,
+				this.prices.get(this.config.neutralAssetDenom)!.toNumber(),
+				totalDebtValue,
+				largestCollateral.amount,
+				protocolLiquidationFee,
+			)
 
-			txs.push(liquidateTx)
+			txs.push(tx.tx)
+			debtsToRepay.set(debtDenom, tx.debtToRepay)
 
-			// update debts + totals
-			const existingDebt = debtsToRepay.get(liquidateTx.debt_denom) || 0
-			debtsToRepay.set(liquidateTx.debt_denom, new BigNumber(amountToRepay).plus(existingDebt))
-			totalDebtValue = newTotalDebt
-			return {
-				tx: liquidateTx,
-				debtToRepay: {
-					denom: liquidateTx.debt_denom,
-					amount: amountToRepay.toFixed(0),
-				},
+			totalDebtValue = totalDebtValue.plus(tx.debtValueToRepay)
+		}
+
+		// todo review this method - we have a map, and an array. No consistency...
+		let debtToRepay = null
+		for (const [denom, amount] of debtsToRepay.entries()) {
+			debtToRepay = {
+				denom,
+				amount: amount.toFixed(0),
 			}
 		}
 
-		throw new Error('Missing collateral or debt for position')
+		return {
+			tx: txs[0],
+			debtToRepay: debtToRepay!,
+		}
+	}
+
+	async generateGenericLiquidationTx(
+		address: string,
+		collateralDenom: string,
+		debtDenom: string,
+		collateralPrice: number,
+		buyDebtRoute: RouteHop[],
+		amountToRepay: BigNumber,
+		neutralPrice: number,
+		totalDebtValue: BigNumber,
+		largestCollateralAmount: string,
+		protocolLiquidationFee: number,
+	): Promise<{
+		tx: LiquidationTx
+		debtToRepay: BigNumber
+		debtValueToRepay: BigNumber
+	}> {
+		// how much neutral do we have to swap with
+		const availableNeutral = this.balances.get(this.config.neutralAssetDenom)!
+
+		// Amount of neutral stable required to repay the debt
+		// Amount to repay will be defined in the underlying debt asset
+		const debtValueToRepay = amountToRepay.multipliedBy(this.prices.get(debtDenom) || 0)
+
+		const notionalRequired = debtValueToRepay
+			.multipliedBy(1 + protocolLiquidationFee)
+			.multipliedBy(1.0035)
+			.plus(totalDebtValue)
+
+		let debtToRepay = amountToRepay
+
+		// if the debt is more than we have, cap it to what we have
+		if (notionalRequired.gt(availableNeutral * neutralPrice)) {
+			debtToRepay = new BigNumber(availableNeutral * neutralPrice).dividedBy(
+				this.prices.get(debtDenom) || 0,
+			)
+		}
+
+		const collateralAmountToWithdraw = debtToRepay.multipliedBy(1.02).multipliedBy(
+			this.prices.get(debtDenom) || 0,
+		)
+
+		if (debtToRepay.toFixed(0) === '0') {
+			throw new Error(
+				`Debt needed for liquidation is zero. Debt denom: ${debtDenom}, Neutral quantity: ${availableNeutral}`,
+			)
+		}
+
+		console.log('Largest collateral amount', largestCollateralAmount)
+
+			const withdrawAmount = collateralAmountToWithdraw.dividedBy(collateralPrice)
+
+		if (withdrawAmount.gt(largestCollateralAmount)) {
+			console.warn(
+				`withdrawAmount is greater than largest collateral amount. capping at ${largestCollateralAmount}`,
+			)
+		}
+
+			const newTx = {
+				user_address: address,
+				amount: debtToRepay.toFixed(0),
+				collateral_denom: collateralDenom,
+				debt_denom: debtDenom,
+				swapRoute: JSON.stringify(buyDebtRoute),
+				withdrawAmount: withdrawAmount.gt(largestCollateralAmount)
+					? largestCollateralAmount
+					: withdrawAmount.toFixed(0),
+			} as unknown as LiquidationTx
+
+		return {
+			tx: newTx,
+			debtToRepay,
+			debtValueToRepay,
+		}
 	}
 
 	appendWithdrawMessages(
-		collateralsWon: Collateral[],
+		collaterals: Collateral[],
 		liquidatorAddress: string,
 		msgs: EncodeObject[],
-	): EncodeObject[] {
-		// for each asset, create a withdraw message
-		collateralsWon.forEach((collateral) => {
+	) {
+		collaterals.forEach((collateral) => {
+			const penniesInCollateral = new BigNumber(collateral.amount)
+				.multipliedBy(this.prices.get(collateral.denom)!)
+				.dividedBy(1000000)
+
+			if (penniesInCollateral.isLessThan(10000000)) {
+				return
+			}
+
 			const denom = collateral.denom
+
 			msgs.push(
 				executeContract(
 					produceWithdrawMessage(liquidatorAddress, denom, this.config.contracts.redbank)
