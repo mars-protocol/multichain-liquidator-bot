@@ -114,9 +114,17 @@ export async function getSwapRoute(
 		}
 
 		const data: SwapRoute = await res.json()
+
 		return data
 	} catch (error) {
 		console.error('Error fetching route:', error)
+		console.error('params:', JSON.stringify({
+			denomIn,
+			denomOut,
+			amountIn,
+			chainIdIn,
+			chainIdOut,
+		}))
 		throw error
 	}
 }

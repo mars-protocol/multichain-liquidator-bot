@@ -10,6 +10,8 @@
 		"clean": "rimraf build",
 		"build": "tsc",
 		"start": "yarn build && node build/src/main",
+		"repay-small-debts": "yarn build && node build/src/scripts/repaySmallDebts",
+		"repay-debts-no-liquidation": "yarn build && node build/src/scripts/repayDebtsWithoutLiquidation",
 		"test": "yarn clean && yarn build && jest",
 		"test:coverage": "yarn clean && yarn build && jest --coverage",
 		"lint": "yarn format-check && eslint . && yarn build",

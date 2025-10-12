@@ -145,7 +145,32 @@ export const produceSigningCosmWasmClient = async (
 	})
 }
 
-export const queryAstroportLpUnderlyingCoins = async (lpCoin: Coin): Promise<Coin[]> => {
+export type AstroportAssetInfo =
+	| {
+			native_token: {
+				denom: string
+			}
+		}
+	| {
+			token: {
+				contract_addr: string
+			}
+		}
+
+export interface AstroportSimulateWithdrawCoin {
+	amount: string
+	info: AstroportAssetInfo
+}
+
+export const isNativeTokenInfo = (
+	info: AstroportAssetInfo,
+): info is { native_token: { denom: string } } => {
+	return 'native_token' in info
+}
+
+export const queryAstroportLpUnderlyingCoins = async (
+	lpCoin: Coin,
+): Promise<AstroportSimulateWithdrawCoin[]> => {
 	const pairAddress = lpCoin.denom.split('/')[1]
 
 	// Build the url
@@ -153,10 +178,11 @@ export const queryAstroportLpUnderlyingCoins = async (lpCoin: Coin): Promise<Coi
 		JSON.stringify({ simulate_withdraw: { lp_amount: lpCoin.amount } }),
 	).toString('base64')
 	const url = `${process.env.LCD_ENDPOINT}/cosmwasm/wasm/v1/contract/${pairAddress}/smart/${encodedMsg}`
-
+	console.log(`Querying Astroport LP underlying coins for ${lpCoin.denom}`)
+	console.log(`URL: ${url}`)
 	// Fetch pair info
 	const response = await fetch(url)
-	return (await response.json())['data'] as Coin[]
+	return (await response.json())['data'] as AstroportSimulateWithdrawCoin[]
 }
 
 export const queryOsmosisLpUnderlyingCoins = async (lpCoin: Coin): Promise<Coin[]> => {
