@@ -150,12 +150,12 @@ export type AstroportAssetInfo =
 			native_token: {
 				denom: string
 			}
-		}
+	  }
 	| {
 			token: {
 				contract_addr: string
 			}
-		}
+	  }
 
 export interface AstroportSimulateWithdrawCoin {
 	amount: string

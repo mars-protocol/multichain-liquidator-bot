@@ -40,12 +40,12 @@ export const getConfig = (
 			apiVersion: 'v1',
 			sqsUrl: 'https://sqs.osmosis.zone/',
 			usePerps: false,
-				borrowSubstitutes: {
-					[OSMOSIS_AXL_USDC_DENOM]: {
-						denom: OSMOSIS_NOBLE_USDC_DENOM,
-						priceBuffer: 0.02,
-					},
+			borrowSubstitutes: {
+				[OSMOSIS_AXL_USDC_DENOM]: {
+					denom: OSMOSIS_NOBLE_USDC_DENOM,
+					priceBuffer: 0.02,
 				},
+			},
 		}
 	}
 
@@ -81,11 +81,11 @@ export const getConfig = (
 		stableBalanceThreshold: 5000000,
 		sqsUrl: 'https://sqs.osmosis.zone/',
 		usePerps: false,
-			borrowSubstitutes: {
-				[OSMOSIS_AXL_USDC_DENOM]: {
-					denom: OSMOSIS_NOBLE_USDC_DENOM,
-					priceBuffer: 0.02,
-				},
+		borrowSubstitutes: {
+			[OSMOSIS_AXL_USDC_DENOM]: {
+				denom: OSMOSIS_NOBLE_USDC_DENOM,
+				priceBuffer: 0.02,
 			},
+		},
 	}
 }

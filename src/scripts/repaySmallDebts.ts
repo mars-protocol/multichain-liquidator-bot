@@ -53,7 +53,9 @@ const main = async () => {
 	const maxLtv = Number(process.env.MAX_LIQUIDATION_LTV!)
 	const minLtv = Number(process.env.MIN_LIQUIDATION_LTV!)
 	if (Number.isNaN(maxLtv) || Number.isNaN(minLtv)) {
-		throw new Error('MAX_LIQUIDATION_LTV and MIN_LIQUIDATION_LTV environment variables must be set.')
+		throw new Error(
+			'MAX_LIQUIDATION_LTV and MIN_LIQUIDATION_LTV environment variables must be set.',
+		)
 	}
 
 	const labels = {

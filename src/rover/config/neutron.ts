@@ -43,12 +43,12 @@ export const getConfig = (
 			apiVersion: 'v2',
 			sqsUrl: 'https://sqs.osmosis.zone/',
 			usePerps: true,
-				borrowSubstitutes: {
-					[NEUTRON_AXL_USDC_DENOM]: {
-						denom: NEUTRON_NOBLE_USDC_DENOM,
-						priceBuffer: 0.02,
-					},
+			borrowSubstitutes: {
+				[NEUTRON_AXL_USDC_DENOM]: {
+					denom: NEUTRON_NOBLE_USDC_DENOM,
+					priceBuffer: 0.02,
 				},
+			},
 		}
 	}
 

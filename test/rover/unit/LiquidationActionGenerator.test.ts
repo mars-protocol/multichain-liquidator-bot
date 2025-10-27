@@ -589,9 +589,9 @@ describe('Liquidation Action Generator Tests', () => {
 
 			mockRouteRequester.getRoute.mockReset()
 
-		const substituteToDebtRoute = {
-			amountIn: '600',
-			estimatedAmountOut: '600',
+			const substituteToDebtRoute = {
+				amountIn: '600',
+				estimatedAmountOut: '600',
 				operations: [
 					{
 						chainId: 'osmosis-1',
@@ -605,25 +605,25 @@ describe('Liquidation Action Generator Tests', () => {
 						],
 					},
 				],
-		}
+			}
 
-		const debtToSubstituteRoute = {
-			amountIn: '600',
-			estimatedAmountOut: '600',
-			operations: [
-				{
-					chainId: 'osmosis-1',
-					steps: [
-						{
-							venue: 'osmosis',
-							denomIn: OSMOSIS_AXL_USDC_DENOM,
-							denomOut: OSMOSIS_NOBLE_USDC_DENOM,
-							pool: '1',
-						},
-					],
-				},
-			],
-		}
+			const debtToSubstituteRoute = {
+				amountIn: '600',
+				estimatedAmountOut: '600',
+				operations: [
+					{
+						chainId: 'osmosis-1',
+						steps: [
+							{
+								venue: 'osmosis',
+								denomIn: OSMOSIS_AXL_USDC_DENOM,
+								denomOut: OSMOSIS_NOBLE_USDC_DENOM,
+								pool: '1',
+							},
+						],
+					},
+				],
+			}
 
 			const collateralToSubstituteRoute = {
 				amountIn: '600',
@@ -665,12 +665,12 @@ describe('Liquidation Action Generator Tests', () => {
 			// Force the position to be liquidatable
 			health.liquidation_health_factor = '0.5'
 
-		mockRouteRequester.getRoute
-			.mockResolvedValueOnce(substituteToDebtRoute)
-			.mockResolvedValueOnce(substituteToDebtRoute)
-			.mockResolvedValueOnce(debtToSubstituteRoute)
-			.mockResolvedValueOnce(collateralToSubstituteRoute)
-			.mockResolvedValueOnce(substituteToNeutralRoute)
+			mockRouteRequester.getRoute
+				.mockResolvedValueOnce(substituteToDebtRoute)
+				.mockResolvedValueOnce(substituteToDebtRoute)
+				.mockResolvedValueOnce(debtToSubstituteRoute)
+				.mockResolvedValueOnce(collateralToSubstituteRoute)
+				.mockResolvedValueOnce(substituteToNeutralRoute)
 
 			actions = await substituteActionGenerator.generateLiquidationActions(
 				'osmosis',

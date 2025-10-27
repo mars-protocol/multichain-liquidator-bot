@@ -16,7 +16,6 @@ export class SkipRouteRequester extends RouteRequester {
 		chainIdIn: string
 		chainIdOut: string
 	}): Promise<GenericRoute> {
-
 		try {
 			const swapRoute = await getSwapRoute(
 				params.denomIn,
@@ -51,7 +50,7 @@ export class SkipRouteRequester extends RouteRequester {
 				pool: swapOp.pool,
 			})),
 		}))
-		console.log("operations")	
+		console.log('operations')
 		console.log(JSON.stringify(operations))
 		return {
 			amountIn: skipRoute.amount_in,

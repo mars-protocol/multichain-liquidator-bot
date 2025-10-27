@@ -403,19 +403,19 @@ export class ActionGenerator {
 			denom: substituteDenom,
 		}
 
-	const borrowActions: Action[] = [this.produceBorrowAction(substituteBorrowCoin)]
+		const borrowActions: Action[] = [this.produceBorrowAction(substituteBorrowCoin)]
 
-	const swapAction = await this.generateSwapActions(
-		chainName,
-		substituteDenom,
-		debtDenom,
-		substitutePrice,
-		debtPrice,
-		substituteBorrowCoin.amount,
-		swapSlippage,
-	)
+		const swapAction = await this.generateSwapActions(
+			chainName,
+			substituteDenom,
+			debtDenom,
+			substitutePrice,
+			debtPrice,
+			substituteBorrowCoin.amount,
+			swapSlippage,
+		)
 
-	borrowActions.push(swapAction)
+		borrowActions.push(swapAction)
 
 		return borrowActions
 	}
@@ -549,7 +549,9 @@ export class ActionGenerator {
 				const astroportUnderlyingCoins = await queryAstroportLpUnderlyingCoins(lpCoin)
 				for (const coin of astroportUnderlyingCoins) {
 					if (!isNativeTokenInfo(coin.info)) {
-						console.log(`Skipping non-native Astroport underlying asset: ${JSON.stringify(coin.info)}`)
+						console.log(
+							`Skipping non-native Astroport underlying asset: ${JSON.stringify(coin.info)}`,
+						)
 						continue
 					}
 					const underlyingDenom = coin.info.native_token.denom
@@ -794,7 +796,10 @@ export class ActionGenerator {
 	/**
 	 * Convert GenericRoute to SwapperRoute format for backward compatibility
 	 */
-	private convertGenericRouteToSwapperRoute(genericRoute: GenericRoute, chainName: string): SwapperRoute {
+	private convertGenericRouteToSwapperRoute(
+		genericRoute: GenericRoute,
+		chainName: string,
+	): SwapperRoute {
 		// Flatten all steps from all operations
 		const allSteps = genericRoute.operations.flatMap((op) => op.steps)
 		if (allSteps.length === 0) {

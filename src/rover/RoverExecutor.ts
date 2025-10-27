@@ -62,7 +62,8 @@ export class RoverExecutor extends BaseExecutor {
 		wallet: DirectSecp256k1HdWallet,
 		routeRequester?: RouteRequester,
 	) {
-		const effectiveRouteRequester = routeRequester ?? new SkipRouteRequester('https://api.skip.build')
+		const effectiveRouteRequester =
+			routeRequester ?? new SkipRouteRequester('https://api.skip.build')
 
 		super(config, client, queryClient, effectiveRouteRequester)
 		this.config = config
@@ -132,7 +133,7 @@ export class RoverExecutor extends BaseExecutor {
 				.filter(
 					(account) =>
 						Number(account.health_factor) < Number(process.env.MAX_LIQUIDATION_LTV) &&
-					Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
+						Number(account.health_factor) > Number(process.env.MIN_LIQUIDATION_LTV),
 				)
 				.sort((accountA, accountB) => Number(accountB.total_debt) - Number(accountA.total_debt))
 

@@ -281,9 +281,9 @@ export class RedbankExecutor extends BaseExecutor {
 			)
 		}
 
-		const collateralAmountToWithdraw = debtToRepay.multipliedBy(1.02).multipliedBy(
-			this.prices.get(debtDenom) || 0,
-		)
+		const collateralAmountToWithdraw = debtToRepay
+			.multipliedBy(1.02)
+			.multipliedBy(this.prices.get(debtDenom) || 0)
 
 		if (debtToRepay.toFixed(0) === '0') {
 			throw new Error(
@@ -293,7 +293,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 		console.log('Largest collateral amount', largestCollateralAmount)
 
-			const withdrawAmount = collateralAmountToWithdraw.dividedBy(collateralPrice)
+		const withdrawAmount = collateralAmountToWithdraw.dividedBy(collateralPrice)
 
 		if (withdrawAmount.gt(largestCollateralAmount)) {
 			console.warn(
@@ -301,16 +301,16 @@ export class RedbankExecutor extends BaseExecutor {
 			)
 		}
 
-			const newTx = {
-				user_address: address,
-				amount: debtToRepay.toFixed(0),
-				collateral_denom: collateralDenom,
-				debt_denom: debtDenom,
-				swapRoute: JSON.stringify(buyDebtRoute),
-				withdrawAmount: withdrawAmount.gt(largestCollateralAmount)
-					? largestCollateralAmount
-					: withdrawAmount.toFixed(0),
-			} as unknown as LiquidationTx
+		const newTx = {
+			user_address: address,
+			amount: debtToRepay.toFixed(0),
+			collateral_denom: collateralDenom,
+			debt_denom: debtDenom,
+			swapRoute: JSON.stringify(buyDebtRoute),
+			withdrawAmount: withdrawAmount.gt(largestCollateralAmount)
+				? largestCollateralAmount
+				: withdrawAmount.toFixed(0),
+		} as unknown as LiquidationTx
 
 		return {
 			tx: newTx,
@@ -714,7 +714,10 @@ export class RedbankExecutor extends BaseExecutor {
 	/**
 	 * Convert GenericRoute to legacy format for exchange interface compatibility
 	 */
-	private convertGenericRouteToLegacy(genericRoute: GenericRoute): { route: RouteHop[]; expectedOutput: string } {
+	private convertGenericRouteToLegacy(genericRoute: GenericRoute): {
+		route: RouteHop[]
+		expectedOutput: string
+	} {
 		// Flatten all steps from all operations
 		const allSteps = genericRoute.operations.flatMap((op) => op.steps)
 
