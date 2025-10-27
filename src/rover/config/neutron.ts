@@ -1,6 +1,7 @@
 import { mapValues } from 'lodash'
 import { Network } from '../../types/network'
 import { RoverExecutorConfig as CreditManagerConfig } from '../RoverExecutor'
+import { NEUTRON_AXL_USDC_DENOM, NEUTRON_NOBLE_USDC_DENOM } from '../constants/denoms.js'
 
 export const getConfig = (
 	liquidatorMasterAddress: string,
@@ -42,6 +43,12 @@ export const getConfig = (
 			apiVersion: 'v2',
 			sqsUrl: 'https://sqs.osmosis.zone/',
 			usePerps: true,
+			borrowSubstitutes: {
+				[NEUTRON_AXL_USDC_DENOM]: {
+					denom: NEUTRON_NOBLE_USDC_DENOM,
+					priceBuffer: 0.02,
+				},
+			},
 		}
 	}
 
@@ -78,5 +85,11 @@ export const getConfig = (
 		apiVersion: 'v2',
 		sqsUrl: 'https://sqs.osmosis.zone/',
 		usePerps: true,
+		borrowSubstitutes: {
+			[NEUTRON_AXL_USDC_DENOM]: {
+				denom: NEUTRON_NOBLE_USDC_DENOM,
+				priceBuffer: 0.02,
+			},
+		},
 	}
 }

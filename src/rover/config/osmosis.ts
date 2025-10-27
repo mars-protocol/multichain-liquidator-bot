@@ -1,6 +1,7 @@
 import { mapValues } from 'lodash'
 import { Network } from '../../types/network'
 import { RoverExecutorConfig } from '../RoverExecutor'
+import { OSMOSIS_AXL_USDC_DENOM, OSMOSIS_NOBLE_USDC_DENOM } from '../constants/denoms.js'
 
 export const getConfig = (
 	liquidatorMasterAddress: string,
@@ -39,6 +40,12 @@ export const getConfig = (
 			apiVersion: 'v1',
 			sqsUrl: 'https://sqs.osmosis.zone/',
 			usePerps: false,
+			borrowSubstitutes: {
+				[OSMOSIS_AXL_USDC_DENOM]: {
+					denom: OSMOSIS_NOBLE_USDC_DENOM,
+					priceBuffer: 0.02,
+				},
+			},
 		}
 	}
 
@@ -74,5 +81,11 @@ export const getConfig = (
 		stableBalanceThreshold: 5000000,
 		sqsUrl: 'https://sqs.osmosis.zone/',
 		usePerps: false,
+		borrowSubstitutes: {
+			[OSMOSIS_AXL_USDC_DENOM]: {
+				denom: OSMOSIS_NOBLE_USDC_DENOM,
+				priceBuffer: 0.02,
+			},
+		},
 	}
 }

@@ -14,6 +14,7 @@ import {
 	calculateTotalPerpPnl,
 	queryAstroportLpUnderlyingCoins,
 	queryOsmosisLpUnderlyingCoins,
+	isNativeTokenInfo,
 } from '../helpers'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 import {
@@ -22,16 +23,18 @@ import {
 	HealthData,
 } from 'mars-liquidation'
 import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types.js'
+import { BorrowSubstituteMap } from './types/BorrowConfig.js'
 
-const MAX_DEBT_AMOUNT = 1000000000
-const AXL_USDC_DENOM = 'ibc/D189335C6E4A68B513C10AB227BF1C1D38C746766278BA3EEB4FB14124F1D858'
-const NOBLE_USDC_DENOM = 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4'
+const MAX_DEBT_AMOUNT = 5000000000
+const LIQUIDATION_BUFFER = 0.03
 
 export class ActionGenerator {
 	private routeRequester: RouteRequester
+	private borrowSubstitutes: BorrowSubstituteMap
 
-	constructor(routeRequester: RouteRequester) {
+	constructor(routeRequester: RouteRequester, borrowSubstitutes: BorrowSubstituteMap = {}) {
 		this.routeRequester = routeRequester
+		this.borrowSubstitutes = borrowSubstitutes
 	}
 
 	generateLiquidationActions = async (
@@ -75,9 +78,46 @@ export class ActionGenerator {
 				  }
 				: this.findLargestDebt(account.debts, oraclePrices)
 
-		const maxDebtAmount = debt.amount.gt(MAX_DEBT_AMOUNT)
+		let maxDebtAmount = debt.amount.gt(MAX_DEBT_AMOUNT)
 			? new BigNumber(MAX_DEBT_AMOUNT).dividedBy(oraclePrices.get(debt.denom)!)
 			: new BigNumber(debt.amount)
+
+		const debtAssetParams = assetParams.get(debt.denom)
+		const collateralAssetParams = assetParams.get(collateral.denom)
+
+		const debtCloseFactor = debtAssetParams?.close_factor
+		if (debtCloseFactor) {
+			const debtCloseFactorBn = new BigNumber(debtCloseFactor)
+			const debtCloseFactorLimit = new BigNumber(debt.amount).multipliedBy(debtCloseFactorBn)
+			maxDebtAmount = BigNumber.minimum(maxDebtAmount, debtCloseFactorLimit)
+		}
+
+		const collateralCloseFactor = collateralAssetParams?.close_factor
+		const collateralPrice = oraclePrices.get(collateral.denom)
+		const debtPrice = oraclePrices.get(debt.denom)
+
+		if (
+			collateralCloseFactor &&
+			collateralPrice &&
+			debtPrice &&
+			!collateralPrice.isZero() &&
+			!debtPrice.isZero()
+		) {
+			const collateralCloseFactorBn = new BigNumber(collateralCloseFactor)
+			const collateralValue = collateral.amount.multipliedBy(collateralPrice)
+			const collateralCloseFactorLimit = collateralValue
+				.multipliedBy(collateralCloseFactorBn)
+				.dividedBy(debtPrice)
+			maxDebtAmount = BigNumber.minimum(maxDebtAmount, collateralCloseFactorLimit)
+		}
+
+		maxDebtAmount = maxDebtAmount
+			.multipliedBy(new BigNumber(1).minus(LIQUIDATION_BUFFER))
+			.integerValue(BigNumber.ROUND_DOWN)
+
+		if (maxDebtAmount.lte(0)) {
+			maxDebtAmount = new BigNumber(1)
+		}
 
 		const liquidationAmountInputs: LiquidationAmountInputs = {
 			collateral_amount: collateral.amount.toFixed(0),
@@ -98,26 +138,34 @@ export class ActionGenerator {
 			return []
 		}
 
+		const slippage = process.env.SLIPPAGE || '0.005'
+
 		const liquidationAmounts = calculate_liquidation_amounts_js(liquidationAmountInputs)
 
-		let borrowActions: Action[] = this.produceBorrowActions(
+		const borrowActions: Action[] = await this.produceBorrowActions(
+			chainName,
 			debt.denom,
 			maxDebtAmount,
 			collateral,
 			redbankMarkets,
+			assetParams,
+			oraclePrices,
+			slippage,
 		)
 
-		// variables
-		const { borrow } = borrowActions[0] as { borrow: Coin }
+		if (borrowActions.length === 0) {
+			console.log(`Unable to construct borrow actions for debt denom ${debt.denom}`)
+			return []
+		}
 
-		const slippage = process.env.SLIPPAGE || '0.005'
+		const firstBorrowAction = borrowActions[0] as { borrow?: Coin }
+		if (!firstBorrowAction.borrow) {
+			console.log(`First borrow action missing borrow payload for ${debt.denom}`)
+			return []
+		}
 
-		const liquidateAction = this.produceLiquidationAction(
-			collateral.type,
-			{ denom: debt.denom, amount: maxDebtAmount.toFixed(0) },
-			account.account_id,
-			collateral.denom,
-		)
+		const borrow = firstBorrowAction.borrow
+		const borrowSwapMinReceive = this.getMinReceiveForDenom(borrowActions, debt.denom)
 
 		const collateralToDebtActions =
 			collateral.denom !== borrow.denom
@@ -128,6 +176,49 @@ export class ActionGenerator {
 							denom: collateral.denom,
 						},
 						borrow,
+						slippage,
+						oraclePrices,
+				  )
+				: []
+
+		const collateralSwapMinReceive = this.getMinReceiveForDenom(
+			collateralToDebtActions,
+			borrow.denom,
+		)
+
+		let liquidationDebtAmount = maxDebtAmount
+		if (borrowSwapMinReceive.gt(0)) {
+			liquidationDebtAmount = BigNumber.minimum(liquidationDebtAmount, borrowSwapMinReceive)
+		}
+
+		if (collateralSwapMinReceive.gt(0)) {
+			liquidationDebtAmount = BigNumber.minimum(liquidationDebtAmount, collateralSwapMinReceive)
+		}
+
+		liquidationDebtAmount = liquidationDebtAmount.integerValue(BigNumber.ROUND_DOWN)
+		if (liquidationDebtAmount.lte(0)) {
+			console.log('Calculated liquidation debt amount is non-positive after min_receive capping')
+			return []
+		}
+
+		if (borrow.denom === debt.denom) {
+			borrow.amount = liquidationDebtAmount.toFixed(0)
+		}
+
+		const liquidateAction = this.produceLiquidationAction(
+			collateral.type,
+			{ denom: debt.denom, amount: liquidationDebtAmount.toFixed(0) },
+			account.account_id,
+			collateral.denom,
+		)
+
+		const debtExcessSwapActions =
+			borrow.denom !== debt.denom
+				? await this.swapDebtExcessToBorrowActions(
+						chainName,
+						debt.denom,
+						borrow,
+						liquidationDebtAmount.toFixed(0),
 						slippage,
 						oraclePrices,
 				  )
@@ -150,6 +241,7 @@ export class ActionGenerator {
 		const actions = [
 			...borrowActions,
 			liquidateAction,
+			...debtExcessSwapActions,
 			...collateralToDebtActions,
 			...repayMsg,
 			...swapToStableActions,
@@ -216,76 +308,116 @@ export class ActionGenerator {
 	 * @param debt The largest debt in the position
 	 * @param collateral The largest collateral in the position
 	 */
-	produceBorrowActions = (
+	produceBorrowActions = async (
+		chainName: string,
 		debtDenom: string,
 		maxRepayableAmount: BigNumber,
 		collateral: Collateral,
 		//@ts-ignore - to be used for todos in method
 		markets: map<string, MarketInfo[]>,
-	): Action[] => {
-		// TODO
+		assetParams: Map<string, AssetParamsBaseForAddr>,
+		oraclePrices: Map<string, BigNumber>,
+		defaultSlippage: string,
+	): Promise<Action[]> => {
+		// keep collateral & markets params to satisfy future enhancements
 		if (false) {
 			console.log(collateral)
+			console.log(markets)
 		}
 
-		if (debtDenom === AXL_USDC_DENOM) {
-			console.log(maxRepayableAmount)
+		const debtAssetParams = assetParams.get(debtDenom)
+		const borrowIsEnabled = debtAssetParams?.red_bank?.borrow_enabled ?? true
 
-			let actions: Action[] = [
-				// borrow usdc
-				{
-					borrow: {
-						amount: new BigNumber(maxRepayableAmount).toFixed(0),
-						denom: NOBLE_USDC_DENOM,
-					},
-				},
-				// swap to axlsdc
-				{
-					swap_exact_in: {
-						coin_in: {
-							amount: 'account_balance',
-							denom: NOBLE_USDC_DENOM,
-						},
-						denom_out: AXL_USDC_DENOM,
-						route: {
-							osmo: {
-								swaps: [
-									{
-										pool_id: 1212,
-										to: AXL_USDC_DENOM,
-									},
-								],
-							},
-						},
-						min_receive: new BigNumber(maxRepayableAmount).multipliedBy(0.98).toFixed(0),
-					},
-				},
-			]
-
-			return actions
+		if (borrowIsEnabled) {
+			const debtCoin: Coin = {
+				amount: maxRepayableAmount.toFixed(0),
+				denom: debtDenom,
+			}
+			return [this.produceBorrowAction(debtCoin)]
 		}
 
-		// estimate our debt to repay - this depends on collateral amount and close factor
-		// let maxRepayValue = new BigNumber(collateral.value * collateral.closeFactor)
-		// const maxDebtValue = debt.price.multipliedBy(debt.amount)
-		// const debtCeiling = new BigNumber(1000000000)
-		// if (maxDebtValue.isGreaterThan(debtCeiling)) {
-		// 	maxRepayValue = debtCeiling
-		// }
-		// const debtToRepayRatio = maxDebtValue <= maxRepayValue ? new BigNumber(1) : maxRepayValue.dividedBy(maxDebtValue)
+		const substituteConfig = this.borrowSubstitutes[debtDenom]
 
-		// // debt amount is a number, not a value (e.g in dollar / base asset denominated terms)
-		// let debtAmount = debtToRepayRatio.multipliedBy(debt.amount)
-		const debtCoin: Coin = {
-			amount: maxRepayableAmount.toFixed(0),
-			denom: debtDenom,
+		if (!substituteConfig) {
+			console.warn(
+				`Borrow disabled for ${debtDenom} but no substitute configured. Skipping liquidation.`,
+			)
+			return []
 		}
 
-		// TODO - check if asset is whitelisted
-		// TODO - borrow without liquidity in debt asset
-		// TODO - borrow without debt asset enabled for borrow
+		const substituteDenom = substituteConfig.denom
+		const substituteAssetParams = assetParams.get(substituteDenom)
 
-		return [this.produceBorrowAction(debtCoin)]
+		if (substituteAssetParams?.red_bank?.borrow_enabled === false) {
+			console.warn(
+				`Configured substitute ${substituteDenom} for ${debtDenom} is not borrow enabled. Skipping liquidation.`,
+			)
+			return []
+		}
+
+		const debtPrice = oraclePrices.get(debtDenom) ?? new BigNumber(1)
+		const substitutePrice = oraclePrices.get(substituteDenom) ?? new BigNumber(1)
+		const bufferMultiplier = new BigNumber(1).plus(substituteConfig.priceBuffer ?? 0.02)
+
+		let substituteAmount = maxRepayableAmount
+			.multipliedBy(debtPrice)
+			.multipliedBy(bufferMultiplier)
+			.dividedBy(substitutePrice)
+			.integerValue(BigNumber.ROUND_UP)
+
+		if (substituteAmount.isZero()) {
+			substituteAmount = new BigNumber(1)
+		}
+
+		const swapSlippage = substituteConfig.slippage ?? defaultSlippage
+
+		let substituteBorrowAmount = substituteAmount.integerValue(BigNumber.ROUND_UP)
+		if (substituteBorrowAmount.lte(0)) {
+			substituteBorrowAmount = new BigNumber(1)
+		}
+
+		try {
+			const routeQuote = await this.routeRequester.getRoute({
+				denomIn: substituteDenom,
+				denomOut: debtDenom,
+				amountIn: substituteBorrowAmount.toFixed(0),
+				chainIdIn: chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
+				chainIdOut: chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
+			})
+
+			const estimatedOut = new BigNumber(routeQuote.estimatedAmountOut || '0')
+			if (estimatedOut.gt(0) && estimatedOut.lt(maxRepayableAmount)) {
+				const multiplier = maxRepayableAmount
+					.dividedBy(estimatedOut)
+					.multipliedBy(new BigNumber(1).plus(LIQUIDATION_BUFFER))
+				substituteBorrowAmount = substituteBorrowAmount
+					.multipliedBy(multiplier)
+					.integerValue(BigNumber.ROUND_UP)
+			}
+		} catch (error) {
+			console.warn('Failed to pre-quote substitute swap; proceeding with initial estimate', error)
+		}
+
+		const substituteBorrowCoin: Coin = {
+			amount: substituteBorrowAmount.toFixed(0),
+			denom: substituteDenom,
+		}
+
+		const borrowActions: Action[] = [this.produceBorrowAction(substituteBorrowCoin)]
+
+		const swapAction = await this.generateSwapActions(
+			chainName,
+			substituteDenom,
+			debtDenom,
+			substitutePrice,
+			debtPrice,
+			substituteBorrowCoin.amount,
+			swapSlippage,
+		)
+
+		borrowActions.push(swapAction)
+
+		return borrowActions
 	}
 
 	/**
@@ -329,6 +461,14 @@ export class ActionGenerator {
 			chainIdIn: chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
 			chainIdOut: chainName === 'osmosis' ? 'osmosis-1' : 'neutron-1',
 		})
+
+		const estimatedOut = new BigNumber(genericRoute.estimatedAmountOut || '0')
+		if (estimatedOut.gt(0)) {
+			const estimatedMin = estimatedOut.multipliedBy(1 - Number(slippage))
+			if (minReceive.isNaN() || estimatedMin.lt(minReceive)) {
+				minReceive = estimatedMin
+			}
+		}
 
 		if (minReceive.isNaN() || minReceive.lt(10)) {
 			minReceive = new BigNumber(10)
@@ -399,25 +539,51 @@ export class ActionGenerator {
 
 		// Check if is LP token
 		if (collateralDenom.startsWith('gamm/') || collateralDenom.endsWith('astroport/share')) {
+			console.log('Withdrawing liquidity')
 			actions.push(this.produceWithdrawLiquidityAction(collateralDenom))
 			const lpCoin = {
 				amount: collateralAmount.toFixed(0),
 				denom: collateralDenom,
 			}
-			// find underlying tokens and swap to borrowed asset
-			const underlyingCoins = collateralDenom.endsWith('astroport/share')
-				? await queryAstroportLpUnderlyingCoins(lpCoin)!
-				: await queryOsmosisLpUnderlyingCoins(lpCoin)!
-			for (const coin of underlyingCoins) {
-				if (coin.denom !== borrowed.denom) {
-					// TODO: This could be a source of bugs, if the amount of underlying tokens in the pools
-					// are not even.
+			if (collateralDenom.endsWith('astroport/share')) {
+				const astroportUnderlyingCoins = await queryAstroportLpUnderlyingCoins(lpCoin)
+				for (const coin of astroportUnderlyingCoins) {
+					if (!isNativeTokenInfo(coin.info)) {
+						console.log(
+							`Skipping non-native Astroport underlying asset: ${JSON.stringify(coin.info)}`,
+						)
+						continue
+					}
+					const underlyingDenom = coin.info.native_token.denom
+					if (underlyingDenom === borrowed.denom) {
+						continue
+					}
+					const priceForSwap = prices.get(underlyingDenom) ?? assetInPrice
+					actions = actions.concat(
+						await this.generateSwapActions(
+							chainName,
+							underlyingDenom,
+							borrowed.denom,
+							priceForSwap,
+							assetOutPrice,
+							coin.amount,
+							slippage,
+						),
+					)
+				}
+			} else {
+				const osmosisUnderlyingCoins = await queryOsmosisLpUnderlyingCoins(lpCoin)
+				for (const coin of osmosisUnderlyingCoins) {
+					if (coin.denom === borrowed.denom) {
+						continue
+					}
+					const priceForSwap = prices.get(coin.denom) ?? assetInPrice
 					actions = actions.concat(
 						await this.generateSwapActions(
 							chainName,
 							coin.denom,
 							borrowed.denom,
-							assetInPrice,
+							priceForSwap,
 							assetOutPrice,
 							coin.amount,
 							slippage,
@@ -440,6 +606,30 @@ export class ActionGenerator {
 		}
 
 		return actions
+	}
+
+	private swapDebtExcessToBorrowActions = async (
+		chainName: string,
+		debtDenom: string,
+		borrow: Coin,
+		estimatedAmountIn: string,
+		slippage: string,
+		prices: Map<string, BigNumber>,
+	): Promise<Action[]> => {
+		const debtPrice = prices.get(debtDenom) ?? new BigNumber(1)
+		const borrowPrice = prices.get(borrow.denom) ?? new BigNumber(1)
+
+		return [
+			await this.generateSwapActions(
+				chainName,
+				debtDenom,
+				borrow.denom,
+				debtPrice,
+				borrowPrice,
+				estimatedAmountIn,
+				slippage,
+			),
+		]
 	}
 
 	/**
@@ -506,13 +696,25 @@ export class ActionGenerator {
 			swap_exact_in: {
 				coin_in: { denom: denomIn, amount: 'account_balance' },
 				denom_out: denomOut,
-				// Min receive is inaccurate atm, requires improvement in estimation of profit.
-				// For now, we set to a small amount. If the liquidation tx is not profitable it
-				// will revert anyway.
-				min_receive: '100',
+				min_receive: minReceive,
 				route: route,
 			},
 		}
+	}
+
+	private getMinReceiveForDenom = (actions: Action[], denomOut: string): BigNumber => {
+		let minReceive: BigNumber | null = null
+		actions.forEach((action) => {
+			const swap = (action as any).swap_exact_in
+			if (swap && swap.denom_out === denomOut) {
+				const value = new BigNumber(swap.min_receive || '0')
+				if (minReceive === null || value.lt(minReceive)) {
+					minReceive = value
+				}
+			}
+		})
+
+		return minReceive ?? new BigNumber(0)
 	}
 
 	/**
@@ -594,28 +796,51 @@ export class ActionGenerator {
 	/**
 	 * Convert GenericRoute to SwapperRoute format for backward compatibility
 	 */
-	private convertGenericRouteToSwapperRoute(genericRoute: GenericRoute, chainName: string): SwapperRoute {
+	private convertGenericRouteToSwapperRoute(
+		genericRoute: GenericRoute,
+		chainName: string,
+	): SwapperRoute {
 		// Flatten all steps from all operations
 		const allSteps = genericRoute.operations.flatMap((op) => op.steps)
+		if (allSteps.length === 0) {
+			throw new Error('No steps found in generic route')
+		}
 
-		if (chainName === 'osmosis') {
+		const venues = new Set(allSteps.map((step) => (step.venue || '').toLowerCase()))
+		const venuesArray = Array.from(venues)
+		const isOsmosisRoute =
+			chainName === 'osmosis' || venuesArray.some((venue) => venue.includes('osmosis'))
+		if (isOsmosisRoute) {
 			return {
 				osmo: {
 					swaps: allSteps.map((step) => ({
-					pool_id: parseInt(step.pool || '0', 10), 
+						pool_id: parseInt(step.pool || '0', 10),
 						to: step.denomOut,
 					})),
 				},
 			}
-		} else {
+		}
+
+		const isDualityRoute = venuesArray.some((venue) => venue.includes('duality'))
+		if (isDualityRoute) {
+			const lastStep = allSteps[allSteps.length - 1]
+			const swapDenoms = [allSteps[0].denomIn, ...allSteps.map((step) => step.denomOut)]
 			return {
-				astro: {
-					swaps: allSteps.map((step) => ({
-						from: step.denomIn,
-						to: step.denomOut,
-					})),
+				duality: {
+					from: allSteps[0].denomIn,
+					swap_denoms: swapDenoms,
+					to: lastStep.denomOut,
 				},
 			}
+		}
+
+		return {
+			astro: {
+				swaps: allSteps.map((step) => ({
+					from: step.denomIn,
+					to: step.denomOut,
+				})),
+			},
 		}
 	}
 }

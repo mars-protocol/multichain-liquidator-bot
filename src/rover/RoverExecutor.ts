@@ -28,6 +28,7 @@ import { compute_health_js, HealthComputer } from 'mars-rover-health-computer-no
 import { TokensResponse } from 'marsjs-types/mars-account-nft/MarsAccountNft.types'
 import { ChainQuery } from '../query/chainQuery'
 import { HealthData } from 'mars-liquidation'
+import { BorrowSubstituteMap } from './types/BorrowConfig.js'
 
 interface CreateCreditAccountResponse {
 	tokenId: number
@@ -39,6 +40,7 @@ export interface RoverExecutorConfig extends BaseConfig {
 	maxLiquidators: number
 	stableBalanceThreshold: number
 	usePerps: boolean
+	borrowSubstitutes?: BorrowSubstituteMap
 }
 
 export class RoverExecutor extends BaseExecutor {
@@ -60,15 +62,14 @@ export class RoverExecutor extends BaseExecutor {
 		wallet: DirectSecp256k1HdWallet,
 		routeRequester?: RouteRequester,
 	) {
-		super(
-			config,
-			client,
-			queryClient,
-			routeRequester ?? new SkipRouteRequester('https://api.skip.build'),
-		)
+		const effectiveRouteRequester =
+			routeRequester ?? new SkipRouteRequester('https://api.skip.build')
+
+		super(config, client, queryClient, effectiveRouteRequester)
 		this.config = config
 		this.liquidationActionGenerator = new ActionGenerator(
-			routeRequester ?? new SkipRouteRequester('https://api.skip.build'),
+			effectiveRouteRequester,
+			config.borrowSubstitutes ?? {},
 		)
 		this.wallet = wallet
 	}
