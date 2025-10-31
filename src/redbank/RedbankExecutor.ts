@@ -28,6 +28,7 @@ import {
 } from './LiquidationHelpers'
 import { RouteRequester } from '../query/routing/RouteRequesterInterface'
 import { ChainQuery } from '../query/chainQuery'
+import { logger } from '../logger'
 
 const { executeContract } = cosmwasm.wasm.v1.MessageComposer.withTypeUrl
 
@@ -77,7 +78,7 @@ export class RedbankExecutor extends BaseExecutor {
 			try {
 				await this.run()
 			} catch (e) {
-				console.error('ERROR:', e)
+				logger.error('ERROR:', e)
 				// Record error
 				const labels = this.getMetricsLabels()
 				const errorType = e instanceof Error ? e.constructor.name : 'UnknownError'
@@ -95,7 +96,7 @@ export class RedbankExecutor extends BaseExecutor {
 				this.config.contracts.params,
 			)
 		} catch (e) {
-			console.error(e)
+			logger.error(e)
 		}
 	}
 
@@ -190,7 +191,7 @@ export class RedbankExecutor extends BaseExecutor {
 							amountToRepay,
 					  )
 
-			console.log({
+			logger.info({
 				amountToRepay: JSON.stringify(amountToRepay),
 				buyDebtRoute: JSON.stringify(buyDebtRoute),
 				maxDebtRepayableValue: JSON.stringify(maxDebtRepayableValue),
@@ -206,7 +207,7 @@ export class RedbankExecutor extends BaseExecutor {
 
 			if (!buyDebtRoute) {
 				const message = `No buy debt route available for ${debtDenom}`
-				console.error(message)
+				logger.error(message)
 				throw new Error(message)
 			}
 
@@ -291,12 +292,12 @@ export class RedbankExecutor extends BaseExecutor {
 			)
 		}
 
-		console.log('Largest collateral amount', largestCollateralAmount)
+		logger.info('Largest collateral amount', largestCollateralAmount)
 
 		const withdrawAmount = collateralAmountToWithdraw.dividedBy(collateralPrice)
 
 		if (withdrawAmount.gt(largestCollateralAmount)) {
-			console.warn(
+			logger.warn(
 				`withdrawAmount is greater than largest collateral amount. capping at ${largestCollateralAmount}`,
 			)
 		}
@@ -528,7 +529,7 @@ export class RedbankExecutor extends BaseExecutor {
 		if (positions.length == 0) {
 			//sleep to avoid spamming redis db when empty
 			await sleep(200)
-			console.log(' - No items for liquidation yet')
+			logger.info(' - No items for liquidation yet')
 			// Record duration even when no liquidations
 			const duration = (Date.now() - startTime) / 1000
 			this.metrics.liquidationsDurationSeconds.observe(labels, duration)
@@ -539,7 +540,7 @@ export class RedbankExecutor extends BaseExecutor {
 			try {
 				await this.executeLiquidation(position, liquidatorAddress, labels, startTime)
 			} catch (e) {
-				console.error(e)
+				logger.error(e)
 			}
 		}
 	}
@@ -550,7 +551,7 @@ export class RedbankExecutor extends BaseExecutor {
 		labels: { chain: string; sc_addr: string; product: string },
 		startTime: number,
 	): Promise<void> {
-		console.log(`- Liquidating ${position.Identifier}`)
+		logger.info(`- Liquidating ${position.Identifier}`)
 
 		// Record liquidation attempt
 		this.metrics.recordLiquidationAttempt(labels.chain, labels.sc_addr, labels.product)
@@ -606,7 +607,7 @@ export class RedbankExecutor extends BaseExecutor {
 			// Record gas spent
 			this.recordGasSpent(firstFee)
 
-			console.log('Liquidation hash:', result.transactionHash)
+			logger.info('Liquidation hash:', result.transactionHash)
 
 			const collaterals: Collateral[] = await this.queryClient.queryRedbankCollaterals(
 				liquidatorAddress,
@@ -618,7 +619,7 @@ export class RedbankExecutor extends BaseExecutor {
 			this.metrics.recordLiquidationSuccess(labels.chain, labels.sc_addr, labels.product)
 			this.metrics.incLoopSuccess(labels)
 
-			console.log(`- Liquidation Process Complete.`)
+			logger.info(`- Liquidation Process Complete.`)
 
 			if (this.config.logResults) {
 				this.writeCsv()
@@ -628,7 +629,7 @@ export class RedbankExecutor extends BaseExecutor {
 			const errorType = error instanceof Error ? error.constructor.name : 'UnknownError'
 			this.metrics.recordLiquidationError(labels.chain, labels.sc_addr, labels.product, errorType)
 			this.metrics.incLoopErrors(labels)
-			console.error(`Liquidation failed: ${error}`)
+			logger.error(`Liquidation failed: ${error}`)
 			throw error
 		} finally {
 			// Always record duration

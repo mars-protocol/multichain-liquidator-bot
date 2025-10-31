@@ -16,6 +16,7 @@ import { SkipRouteRequester } from './query/routing/skip/SkipRouteRequester.js'
 import { RouteRequester } from './query/routing/RouteRequesterInterface.js'
 import { ChainQuery } from './query/chainQuery.js'
 import { MetricsService } from './metrics.js'
+import { logger } from './logger'
 
 const REDBANK = 'Redbank'
 const ROVER = 'Rover'
@@ -74,7 +75,7 @@ export const main = async () => {
 	const metricsPort = process.env.METRICS_PORT ? parseInt(process.env.METRICS_PORT) : 9090
 	const metrics = MetricsService.getInstance()
 	metrics.startMetricsServer(metricsPort)
-	console.log(`Metrics server started on port ${metricsPort}`)
+	logger.info(`Metrics server started on port ${metricsPort}`)
 
 	switch (executorType) {
 		case REDBANK:
@@ -129,6 +130,6 @@ const launchRedbank = async (
 }
 
 main().catch((e) => {
-	console.log(e)
+	logger.error(e)
 	process.exit(1)
 })

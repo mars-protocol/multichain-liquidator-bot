@@ -24,6 +24,7 @@ import {
 } from 'mars-liquidation'
 import { AssetParamsBaseForAddr } from 'marsjs-types/mars-params/MarsParams.types.js'
 import { BorrowSubstituteMap } from './types/BorrowConfig.js'
+import { logger } from '../logger'
 
 const MAX_DEBT_AMOUNT = 5000000000
 const LIQUIDATION_BUFFER = 0.03
@@ -134,7 +135,7 @@ export class ActionGenerator {
 
 		const liqHf: number = liquidationAmountInputs.health.liquidation_health_factor
 		if (liqHf == null || liqHf >= 1) {
-			console.log(`Position with id ${account.account_id} is not liquidatable. HF : ${liqHf}`)
+			logger.info(`Position with id ${account.account_id} is not liquidatable. HF : ${liqHf}`)
 			return []
 		}
 
@@ -154,13 +155,13 @@ export class ActionGenerator {
 		)
 
 		if (borrowActions.length === 0) {
-			console.log(`Unable to construct borrow actions for debt denom ${debt.denom}`)
+			logger.info(`Unable to construct borrow actions for debt denom ${debt.denom}`)
 			return []
 		}
 
 		const firstBorrowAction = borrowActions[0] as { borrow?: Coin }
 		if (!firstBorrowAction.borrow) {
-			console.log(`First borrow action missing borrow payload for ${debt.denom}`)
+			logger.info(`First borrow action missing borrow payload for ${debt.denom}`)
 			return []
 		}
 
@@ -197,7 +198,7 @@ export class ActionGenerator {
 
 		liquidationDebtAmount = liquidationDebtAmount.integerValue(BigNumber.ROUND_DOWN)
 		if (liquidationDebtAmount.lte(0)) {
-			console.log('Calculated liquidation debt amount is non-positive after min_receive capping')
+			logger.info('Calculated liquidation debt amount is non-positive after min_receive capping')
 			return []
 		}
 
@@ -248,7 +249,7 @@ export class ActionGenerator {
 			refundAll,
 		]
 		if (process.env.DEBUG) {
-			actions.forEach((action) => console.log(JSON.stringify(action)))
+			actions.forEach((action) => logger.info(JSON.stringify(action)))
 		}
 
 		return actions
@@ -264,7 +265,7 @@ export class ActionGenerator {
 		slippage: string,
 	): Promise<Action[]> => {
 		if (borrow.denom === neutralDenom || collateralToDebtActions.length === 0) {
-			console.log(`Borrow denom ${borrow.denom} is the same as neutral denom ${neutralDenom}`)
+			logger.info(`Borrow denom ${borrow.denom} is the same as neutral denom ${neutralDenom}`)
 			return []
 		}
 
@@ -273,7 +274,7 @@ export class ActionGenerator {
 			collateralToDebtActions[collateralToDebtActions.length - 1].swap_exact_in.min_receive
 		const remainingDebt = new BigNumber(receivedDebtAmount).minus(borrow.amount)
 		if (remainingDebt.isNegative()) {
-			console.log('SwapToStableMsg: No profit after repaying debt. Nothing to swap')
+			logger.info('SwapToStableMsg: No profit after repaying debt. Nothing to swap')
 			// If this occurs, we probably have an
 			return []
 		}
@@ -321,8 +322,8 @@ export class ActionGenerator {
 	): Promise<Action[]> => {
 		// keep collateral & markets params to satisfy future enhancements
 		if (false) {
-			console.log(collateral)
-			console.log(markets)
+			logger.info(collateral)
+			logger.info(markets)
 		}
 
 		const debtAssetParams = assetParams.get(debtDenom)
@@ -339,7 +340,7 @@ export class ActionGenerator {
 		const substituteConfig = this.borrowSubstitutes[debtDenom]
 
 		if (!substituteConfig) {
-			console.warn(
+			logger.warn(
 				`Borrow disabled for ${debtDenom} but no substitute configured. Skipping liquidation.`,
 			)
 			return []
@@ -349,7 +350,7 @@ export class ActionGenerator {
 		const substituteAssetParams = assetParams.get(substituteDenom)
 
 		if (substituteAssetParams?.red_bank?.borrow_enabled === false) {
-			console.warn(
+			logger.warn(
 				`Configured substitute ${substituteDenom} for ${debtDenom} is not borrow enabled. Skipping liquidation.`,
 			)
 			return []
@@ -395,7 +396,7 @@ export class ActionGenerator {
 					.integerValue(BigNumber.ROUND_UP)
 			}
 		} catch (error) {
-			console.warn('Failed to pre-quote substitute swap; proceeding with initial estimate', error)
+			logger.warn('Failed to pre-quote substitute swap; proceeding with initial estimate', error)
 		}
 
 		const substituteBorrowCoin: Coin = {
@@ -539,7 +540,7 @@ export class ActionGenerator {
 
 		// Check if is LP token
 		if (collateralDenom.startsWith('gamm/') || collateralDenom.endsWith('astroport/share')) {
-			console.log('Withdrawing liquidity')
+			logger.info('Withdrawing liquidity')
 			actions.push(this.produceWithdrawLiquidityAction(collateralDenom))
 			const lpCoin = {
 				amount: collateralAmount.toFixed(0),
@@ -549,7 +550,7 @@ export class ActionGenerator {
 				const astroportUnderlyingCoins = await queryAstroportLpUnderlyingCoins(lpCoin)
 				for (const coin of astroportUnderlyingCoins) {
 					if (!isNativeTokenInfo(coin.info)) {
-						console.log(
+						logger.info(
 							`Skipping non-native Astroport underlying asset: ${JSON.stringify(coin.info)}`,
 						)
 						continue
@@ -691,7 +692,7 @@ export class ActionGenerator {
 		minReceive: string,
 		route: SwapperRoute | null = null,
 	): Action => {
-		console.log(`minReceive: ${minReceive}`)
+		logger.info(`minReceive: ${minReceive}`)
 		return {
 			swap_exact_in: {
 				coin_in: { denom: denomIn, amount: 'account_balance' },

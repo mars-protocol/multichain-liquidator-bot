@@ -16,6 +16,7 @@ import { PriceResponse } from 'marsjs-types/mars-oracle-osmosis/MarsOracleOsmosi
 import { Market } from 'marsjs-types/mars-red-bank/MarsRedBank.types'
 import { Dictionary } from 'lodash'
 import { MetricsService } from './metrics'
+import { logger } from './logger'
 
 export interface BaseConfig {
 	lcdEndpoint: string
@@ -69,7 +70,7 @@ export class BaseExecutor {
 		public ammRouter: AMMRouter = new AMMRouter(),
 		public metrics: MetricsService = MetricsService.getInstance(),
 	) {
-		console.log({ config })
+		logger.debug('BaseExecutor config', config)
 	}
 
 	applyAvailableLiquidity = (market: Market): MarketInfo => {
@@ -142,14 +143,14 @@ export class BaseExecutor {
 				fetching = response.length === limit
 				retries = 0
 			} catch (e) {
-				console.warn(e)
+				logger.warn(e)
 				retries++
 				if (retries >= maxRetries) {
-					console.warn('Max retries exceeded, exiting', maxRetries)
+					logger.warn('Max retries exceeded, exiting', maxRetries)
 					fetching = false
 				} else {
 					await sleep(5000)
-					console.info('Retrying...')
+					logger.info('Retrying...')
 				}
 			}
 		}
@@ -177,14 +178,14 @@ export class BaseExecutor {
 				fetching = response.length === limit
 				retries = 0
 			} catch (e) {
-				console.warn(e)
+				logger.warn(e)
 				retries++
 				if (retries >= maxRetries) {
-					console.warn('Max retries exceeded, exiting', maxRetries)
+					logger.warn('Max retries exceeded, exiting', maxRetries)
 					fetching = false
 				} else {
 					await sleep(5000)
-					console.info('Retrying...')
+					logger.info('Retrying...')
 				}
 			}
 		}
@@ -230,14 +231,14 @@ export class BaseExecutor {
 				fetching = response.length === 5
 				retries = 0
 			} catch (ex) {
-				console.warn(ex)
+				logger.warn(ex)
 				retries++
 				if (retries > maxRetries) {
-					console.warn('Max retries exceeded, exiting', maxRetries)
+					logger.warn('Max retries exceeded, exiting', maxRetries)
 					fetching = false
 				} else {
 					await sleep(5000)
-					console.info('Retrying...')
+					logger.info('Retrying...')
 				}
 			}
 		}
@@ -262,7 +263,7 @@ export class BaseExecutor {
 				}
 			})
 		} catch (e) {
-			console.error(e)
+			logger.error(e)
 		}
 	}
 

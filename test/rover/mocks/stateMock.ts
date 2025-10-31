@@ -17,6 +17,7 @@ import {
 } from 'marsjs-types/mars-params/MarsParams.types'
 import { HealthData, HealthValuesResponse } from 'mars-liquidation'
 import { compute_health_js, HealthComputer } from 'mars-rover-health-computer-node'
+import { logger } from '../../../src/logger'
 
 export class StateMock {
 	constructor(
@@ -34,7 +35,7 @@ export class StateMock {
 	public setUserDebts(debts: Coin[]): void {
 		this.account.debts = debts.map((debt) => {
 			let object = { ...debt, shares: debt.amount }
-			console.log(JSON.stringify(object))
+			logger.info(JSON.stringify(object))
 			return object
 		})
 	}

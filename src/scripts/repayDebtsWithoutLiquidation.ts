@@ -3,6 +3,7 @@ import { Coin, EncodeObject } from '@cosmjs/proto-signing'
 import { MetricsService } from '../metrics.js'
 import { buildRedbankExecutor } from './utils/buildRedbankExecutor.js'
 import { produceRepayMessage } from '../helpers.js'
+import { logger } from '../logger'
 
 const DEFAULT_DEBT_THRESHOLD = 5_000_000
 const DEFAULT_COLLATERAL_THRESHOLD = 1_000
@@ -47,7 +48,7 @@ const main = async () => {
 	const metricsPort = process.env.METRICS_PORT ? parseInt(process.env.METRICS_PORT) : 9090
 	const metrics = MetricsService.getInstance()
 	metrics.startMetricsServer(metricsPort)
-	console.log(`Metrics server started on port ${metricsPort}`)
+	logger.info(`Metrics server started on port ${metricsPort}`)
 
 	const executor = await buildRedbankExecutor()
 	const { config } = executor
@@ -76,7 +77,7 @@ const main = async () => {
 		)
 	}
 
-	console.log(
+	logger.info(
 		`Starting repay-only workflow with debt threshold ${debtThreshold} and collateral threshold ${collateralThreshold}.`,
 	)
 
@@ -101,12 +102,12 @@ const main = async () => {
 		)
 		.sort((a, b) => new BigNumber(a.total_debt).comparedTo(b.total_debt))
 
-	console.log(
+	logger.info(
 		`Evaluating ${candidates.length} unhealthy position(s) for repay-only closure (debt < ${debtThreshold}).`,
 	)
 
 	for (const candidate of candidates) {
-		console.log(
+		logger.info(
 			`- Checking ${candidate.account_id} (total debt: ${candidate.total_debt}, health factor: ${candidate.health_factor})`,
 		)
 
@@ -115,7 +116,7 @@ const main = async () => {
 			const neutralBalance = new BigNumber(executor.balances.get(config.neutralAssetDenom) || 0)
 
 			if (neutralBalance.isZero()) {
-				console.log(
+				logger.info(
 					`  Skipping ${candidate.account_id}; neutral balance (${config.neutralAssetDenom}) is zero.`,
 				)
 				break
@@ -123,7 +124,7 @@ const main = async () => {
 
 			const debts = await executor.queryClient.queryRedbankDebts(candidate.account_id)
 			if (!debts.length) {
-				console.log(`  Skipping ${candidate.account_id}; no outstanding debts.`)
+				logger.info(`  Skipping ${candidate.account_id}; no outstanding debts.`)
 				continue
 			}
 
@@ -134,7 +135,7 @@ const main = async () => {
 			}, new BigNumber(0))
 
 			if (collateralValue.isGreaterThan(collateralThreshold)) {
-				console.log(
+				logger.info(
 					`  Skipping ${candidate.account_id}; collateral value ${collateralValue.toFixed(
 						0,
 					)} exceeds threshold ${collateralThreshold}.`,
@@ -151,7 +152,7 @@ const main = async () => {
 			}
 
 			if (!debtsByDenom.size) {
-				console.log(`  Skipping ${candidate.account_id}; repayable debts round to zero.`)
+				logger.info(`  Skipping ${candidate.account_id}; repayable debts round to zero.`)
 				continue
 			}
 
@@ -169,7 +170,7 @@ const main = async () => {
 			})
 
 			if (directNeutralNeeded.gt(neutralBalance)) {
-				console.log(
+				logger.info(
 					`  Skipping ${candidate.account_id}; needs ${directNeutralNeeded.toFixed(0)} ${
 						config.neutralAssetDenom
 					}, only ${neutralBalance.toFixed(0)} available.`,
@@ -204,7 +205,7 @@ const main = async () => {
 			})
 
 			if (msgBatch.length === 0) {
-				console.log(`  No messages generated for ${candidate.account_id}, skipping.`)
+				logger.info(`  No messages generated for ${candidate.account_id}, skipping.`)
 				continue
 			}
 
@@ -225,12 +226,12 @@ const main = async () => {
 				new BigNumber(0),
 			)
 
-			console.log(`  Repay-only transaction hash: ${result.transactionHash}`)
-			console.log(`  Estimated notional repaid: ${totalRepaidValue.toFixed(0)}`)
+			logger.info(`  Repay-only transaction hash: ${result.transactionHash}`)
+			logger.info(`  Estimated notional repaid: ${totalRepaidValue.toFixed(0)}`)
 
 			await executor.setBalances(liquidatorAddress)
 		} catch (error) {
-			console.error(
+			logger.error(
 				`  Failed to repay debt for ${candidate.account_id}:`,
 				error instanceof Error ? error.message : error,
 			)
@@ -239,6 +240,6 @@ const main = async () => {
 }
 
 main().catch((error) => {
-	console.error(error)
+	logger.error(error)
 	process.exit(1)
 })

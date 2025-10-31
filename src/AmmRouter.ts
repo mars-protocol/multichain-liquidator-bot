@@ -7,6 +7,7 @@ import { ConcentratedLiquidityPool, Pool, PoolType, XYKPool } from './types/Pool
 import { Coin, Dec, Int } from '@keplr-wallet/unit'
 import { ConcentratedLiquidityMath, BigDec } from '@osmosis-labs/math'
 import Long from 'long'
+import { logger } from './logger'
 // const { calcOutGivenIn, calcInGivenOut } = ConcentratedLiquidityMath
 
 export interface AMMRouterInterface {
@@ -45,7 +46,7 @@ export class AMMRouter implements AMMRouterInterface {
 		let amountAfterFees = new BigNumber(0)
 
 		if (tokenInAmount.isEqualTo(0)) {
-			console.log('ERROR - cannot use token in amount of 0')
+			logger.error('Cannot use token in amount of 0')
 			return amountAfterFees
 		}
 
@@ -163,7 +164,7 @@ export class AMMRouter implements AMMRouterInterface {
 		let amountAfterFees = new BigNumber(0)
 
 		if (tokenOutRequired.isEqualTo(0)) {
-			console.log('ERROR - cannot use token out amount of 0')
+			logger.error('Cannot use token out amount of 0')
 			return amountAfterFees
 		}
 		try {

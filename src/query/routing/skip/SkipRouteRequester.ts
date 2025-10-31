@@ -50,8 +50,6 @@ export class SkipRouteRequester extends RouteRequester {
 				pool: swapOp.pool,
 			})),
 		}))
-		console.log('operations')
-		console.log(JSON.stringify(operations))
 		return {
 			amountIn: skipRoute.amount_in,
 			estimatedAmountOut: skipRoute.amount_out,
