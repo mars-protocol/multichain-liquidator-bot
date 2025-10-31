@@ -2,6 +2,7 @@ import BigNumber from 'bignumber.js'
 import { MetricsService } from '../metrics.js'
 import { buildRedbankExecutor } from './utils/buildRedbankExecutor.js'
 import { Position } from '../types/position.js'
+import { logger } from '../logger'
 
 const DEFAULT_SMALL_DEBT_THRESHOLD = 5_000_000
 
@@ -31,7 +32,7 @@ const main = async () => {
 	const metricsPort = process.env.METRICS_PORT ? parseInt(process.env.METRICS_PORT) : 9090
 	const metrics = MetricsService.getInstance()
 	metrics.startMetricsServer(metricsPort)
-	console.log(`Metrics server started on port ${metricsPort}`)
+	logger.info(`Metrics server started on port ${metricsPort}`)
 
 	const executor = await buildRedbankExecutor()
 	const { config } = executor
@@ -64,7 +65,7 @@ const main = async () => {
 		product: config.productName,
 	}
 
-	console.log(`Starting small debt liquidation workflow with threshold ${threshold}.`)
+	logger.info(`Starting small debt liquidation workflow with threshold ${threshold}.`)
 
 	await executor.init()
 	await executor.setBalances(liquidatorAddress)
@@ -94,16 +95,16 @@ const main = async () => {
 		}))
 		.slice(0, 10)
 
-	console.log(`Found ${candidates.length} unhealthy position(s) below threshold.`)
+	logger.info(`Found ${candidates.length} unhealthy position(s) below threshold.`)
 
 	const startTime = Date.now()
 	for (const position of candidates) {
 		try {
-			console.log(`- Liquidating ${position.Identifier}`)
+			logger.info(`- Liquidating ${position.Identifier}`)
 			await executor.setBalances(liquidatorAddress)
 			await executor.executeLiquidation(position, liquidatorAddress, labels, startTime)
 		} catch (error) {
-			console.error(
+			logger.error(
 				`Failed to liquidate ${position.Identifier}:`,
 				error instanceof Error ? error.message : error,
 			)
@@ -112,6 +113,6 @@ const main = async () => {
 }
 
 main().catch((error) => {
-	console.error(error)
+	logger.error(error)
 	process.exit(1)
 })

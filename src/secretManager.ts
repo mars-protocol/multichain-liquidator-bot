@@ -1,5 +1,6 @@
 // for types - see original
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
+import { logger } from './logger'
 export const getSecretManager = () => {
 	const client = new SecretsManagerClient({
 		region: 'ap-southeast-1',
@@ -12,7 +13,7 @@ export const getSecretManager = () => {
 				return mnemonic
 			} else {
 				const secretName = process.env.WALLET_MNEMONIC_SECRET_NAME
-				console.log('Fetching mnemonic')
+				logger.info('Fetching mnemonic')
 				const response = await client.send(
 					new GetSecretValueCommand({
 						SecretId: secretName,
@@ -21,7 +22,7 @@ export const getSecretManager = () => {
 				)
 
 				const secret = JSON.parse(response.SecretString!)
-				console.log('Successfully retrieved mnemonic')
+				logger.info('Successfully retrieved mnemonic')
 				return Object.values(secret)[0] as string
 			}
 		},

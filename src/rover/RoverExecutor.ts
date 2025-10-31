@@ -29,6 +29,7 @@ import { TokensResponse } from 'marsjs-types/mars-account-nft/MarsAccountNft.typ
 import { ChainQuery } from '../query/chainQuery'
 import { HealthData } from 'mars-liquidation'
 import { BorrowSubstituteMap } from './types/BorrowConfig.js'
+import { logger } from '../logger'
 
 interface CreateCreditAccountResponse {
 	tokenId: number
@@ -145,7 +146,7 @@ export class RoverExecutor extends BaseExecutor {
 
 			// Sleep to avoid spamming.
 			if (targetAccounts.length == 0) {
-				console.log('No unhealthy accounts found. Sleeping for 5 seconds')
+				logger.info('No unhealthy accounts found. Sleeping for 5 seconds')
 				await sleep(5000)
 				// Record duration
 				const duration = (Date.now() - startTime) / 1000
@@ -163,7 +164,7 @@ export class RoverExecutor extends BaseExecutor {
 				const liquidationPromises: Promise<void>[] = []
 				for (const account of chunk) {
 					const nextLiquidator = liquidatorAddressesIterator.next()
-					console.log('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
+					logger.info('liquidating: ', account.account_id, ' with ', nextLiquidator.value)
 					// Record liquidation attempt
 					this.metrics.recordLiquidationAttempt(labels.chain, labels.sc_addr, labels.product)
 					liquidationPromises.push(this.liquidate(account.account_id, nextLiquidator.value!))
@@ -177,7 +178,7 @@ export class RoverExecutor extends BaseExecutor {
 			this.metrics.liquidationsDurationSeconds.observe(labels, duration)
 		} catch (ex) {
 			if (process.env.DEBUG) {
-				console.error(ex)
+				logger.error(ex)
 			}
 			// Record error
 			const errorType = ex instanceof Error ? ex.constructor.name : 'UnknownError'
@@ -280,7 +281,7 @@ export class RoverExecutor extends BaseExecutor {
 			this.recordGasSpent(fee)
 
 			if (result.code !== 0) {
-				console.log(`Liquidation failed. TxHash: ${result.transactionHash}`)
+				logger.info(`Liquidation failed. TxHash: ${result.transactionHash}`)
 				this.metrics.recordLiquidationError(
 					labels.chain,
 					labels.sc_addr,
@@ -289,7 +290,7 @@ export class RoverExecutor extends BaseExecutor {
 				)
 				this.metrics.incLoopErrors(labels)
 			} else {
-				console.log(
+				logger.info(
 					`Liquidation successfull. TxHash: ${result.transactionHash}, account : ${accountId}`,
 				)
 
@@ -313,7 +314,7 @@ export class RoverExecutor extends BaseExecutor {
 			}
 		} catch (ex) {
 			if (process.env.DEBUG) {
-				console.error(ex)
+				logger.error(ex)
 			}
 		}
 	}
@@ -407,7 +408,7 @@ export class RoverExecutor extends BaseExecutor {
 				)
 			}
 		} catch (ex) {
-			console.error(ex)
+			logger.error(ex)
 		} finally {
 		}
 	}
@@ -428,8 +429,8 @@ export class RoverExecutor extends BaseExecutor {
 			}
 			await this.updateAssetParams()
 		} catch (ex) {
-			console.error('Failed to refresh data')
-			console.error(JSON.stringify(ex))
+			logger.error('Failed to refresh data')
+			logger.error(JSON.stringify(ex))
 		}
 	}
 

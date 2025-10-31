@@ -43,6 +43,7 @@ import { OsmoRoute } from './types/swapper'
 import { PerpPosition, Positions } from 'marsjs-types/mars-credit-manager/MarsCreditManager.types'
 import BigNumber from 'bignumber.js'
 import { PoolAsset } from './types/Pool'
+import { logger } from './logger'
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl
 osmosis.gamm.v1beta1.MsgSwapExactAmountIn
@@ -66,8 +67,8 @@ export function readAddresses(deployConfigPath: string): ProtocolAddresses {
 
 		return camelCaseKeys(deployData.addresses) as ProtocolAddresses
 	} catch (e) {
-		console.error(`Failed to load artifacts path - could not find ${deployConfigPath}`)
-		process.exit(1)
+		logger.error(`Failed to load artifacts path - could not find ${deployConfigPath}`)
+		throw new Error(`Failed to load artifacts path - could not find ${deployConfigPath}`)
 	}
 }
 
@@ -178,8 +179,8 @@ export const queryAstroportLpUnderlyingCoins = async (
 		JSON.stringify({ simulate_withdraw: { lp_amount: lpCoin.amount } }),
 	).toString('base64')
 	const url = `${process.env.LCD_ENDPOINT}/cosmwasm/wasm/v1/contract/${pairAddress}/smart/${encodedMsg}`
-	console.log(`Querying Astroport LP underlying coins for ${lpCoin.denom}`)
-	console.log(`URL: ${url}`)
+	logger.info(`Querying Astroport LP underlying coins for ${lpCoin.denom}`)
+	logger.info(`URL: ${url}`)
 	// Fetch pair info
 	const response = await fetch(url)
 	return (await response.json())['data'] as AstroportSimulateWithdrawCoin[]
@@ -238,12 +239,12 @@ export const seedAddresses = async (
 	const seededAddresses: string[] = []
 	const sendTokenMsgs: EncodeObject[] = []
 
-	console.log(`seeding children for ${sender}`)
+	logger.info(`seeding children for ${sender}`)
 	accounts.forEach((account) => {
 		if (account.address === sender) return
 
 		const addressToSeed = account.address
-		console.log(`seeding ${addressToSeed}`)
+		logger.info(`seeding ${addressToSeed}`)
 
 		// todo - optimise this into one msg
 		const gasMsg = {

@@ -1,5 +1,6 @@
 import promClient from 'prom-client'
 import http from 'http'
+import { logger } from './logger'
 
 export class MetricsService {
 	private static instance: MetricsService
@@ -134,7 +135,7 @@ export class MetricsService {
 	}
 
 	public startMetricsServer(port: number = 9090): void {
-		const server = http.createServer(async (req, res) => {
+		const server = http.createServer(async (req: http.IncomingMessage, res: http.ServerResponse) => {
 			if (req.url === '/metrics') {
 				res.setHeader('Content-Type', this.register.contentType)
 				res.end(await this.register.metrics())
@@ -148,7 +149,7 @@ export class MetricsService {
 		})
 
 		server.listen(port, () => {
-			console.log(`Metrics server listening on port ${port}`)
+			logger.info(`Metrics server listening on port ${port}`)
 		})
 	}
 

@@ -1,3 +1,4 @@
+import { logger } from '../../../logger'
 /**
  * Skip API v2 Fungible Route Client
  * Fetches swap routes from https://api.skip.build/v2/fungible/route
@@ -117,8 +118,8 @@ export async function getSwapRoute(
 
 		return data
 	} catch (error) {
-		console.error('Error fetching route:', error)
-		console.error(
+		logger.error('Error fetching route:', error)
+		logger.error(
 			'params:',
 			JSON.stringify({
 				denomIn,

@@ -156,7 +156,7 @@
 // 				gas : '200000'
 // 			}
 
-// 			console.log(`sending ${Math.abs(difference)} ${key} to ${liquidatorAddress}`)
+// 			logger.info(`sending ${Math.abs(difference)} ${key} to ${liquidatorAddress}`)
 // 			await sgClient.sendTokens(
 // 				deployerAddress,
 // 				liquidatorAddress,
@@ -203,11 +203,11 @@
 // 	}
 
 // 	for (const debt of positionDebts) {
-// 		console.log(`depositing ${debt.amount} ${debt.denom}`)
+// 		logger.info(`depositing ${debt.amount} ${debt.denom}`)
 // 		await deposit(cwClient, deployerAddress, debt.denom, debt.amount, testConfig.redbankAddress)
 // 	}
 
-// 	console.log('Creating Positions...')
+// 	logger.info('Creating Positions...')
 // 	const length = useableAddresses.length
 // 	let index = 0
 // 	while (index < length) {
@@ -221,10 +221,10 @@
 // 				await borrow(cwClient, address, debt.denom, debt.amount, testConfig.redbankAddress)
 // 			}
 
-// 			console.log(`- created position for address ${address}`)
+// 			logger.info(`- created position for address ${address}`)
 // 		} catch (e) {
-// 			console.error(`- error occurred creating position for ${address}`)
-// 			console.error(e)
+// 			logger.error(`- error occurred creating position for ${address}`)
+// 			logger.error(e)
 // 		}
 
 // 		index += 1
@@ -240,13 +240,13 @@
 // 	const exchangeInterface = new Osmosis()
 // 	for (const address of useableAddresses){
 // 		const healthBeforeLiquidation = await queryHealth(cwClient, address, testConfig.redbankAddress)
-// 		console.log({
+// 		logger.info({
 // 			address,
 // 			health: JSON.stringify(healthBeforeLiquidation.health_status)
 // 		})
 // 	}
 
-// 	console.log(`Waiting for liquidations to complete...`)
+// 	logger.info(`Waiting for liquidations to complete...`)
 // 	initialBalance = {
 // 		[testConfig.usdcDenom]: await cwClient.getBalance(liquidatorAddress, testConfig.usdcDenom),
 // 		[testConfig.gasDenom]: await cwClient.getBalance(liquidatorAddress, testConfig.gasDenom)
@@ -259,11 +259,11 @@
 // 		const health = await queryHealth(cwClient, address, testConfig.redbankAddress)
 
 // 		const ltv = Number(health.health_status.borrowing.liq_threshold_hf)
-// 		console.log({ address, ltv })
+// 		logger.info({ address, ltv })
 // 		if ( ltv < 1) {
-// 			console.log(`${address} is still unhealthy`)
+// 			logger.info(`${address} is still unhealthy`)
 // 		} else {
-// 			console.log(`${address} is healthy`)
+// 			logger.info(`${address} is healthy`)
 // 		}
 // 	}
 
@@ -272,7 +272,7 @@
 // 		[testConfig.usdcDenom]: await cwClient.getBalance(liquidatorAddress, testConfig.usdcDenom),
 // 	}
 
-// 	console.log({
+// 	logger.info({
 // 		updatedBalance,
 // 		initialBalance,
 // 	})
@@ -281,12 +281,12 @@
 
 // 	// record results
 // 	if (gains < 0) {
-// 		console.error('ERROR : Updated balance was smaller than initial balance. Asset')
+// 		logger.error('ERROR : Updated balance was smaller than initial balance. Asset')
 // 	} else if (gains === 0) {
-// 		console.log('No liquidations occurred')
+// 		logger.info('No liquidations occurred')
 // 	} else {
-// 		console.log('Successfully completed liquidations :)')
-// 		console.log(`Gained ${gains}`)
+// 		logger.info('Successfully completed liquidations :)')
+// 		logger.info(`Gained ${gains}`)
 // 	}
 // }
 
@@ -1383,11 +1383,11 @@
 
 // 	exec(command, (error, _, stderr) => {
 // 	if (error) {
-// 		console.error(`Error: ${error.message}`);
+// 		logger.error(`Error: ${error.message}`);
 // 		return;
 // 	}
 // 	if (stderr) {
-// 		console.error(`Stderr: ${stderr}`);
+// 		logger.error(`Stderr: ${stderr}`);
 // 		return;
 // 	}
 // 	});
@@ -1397,12 +1397,12 @@
 // 	try {
 // 		fs.writeFileSync('pool.json', jsonData);
 // 	  } catch (error) {
-// 		console.error('Error writing to pool.json:', error);
+// 		logger.error('Error writing to pool.json:', error);
 // 	  }
 // }
 
 // main().catch((e) => {
-// 	console.log(e)
+// 	logger.info(e)
 // 	process.exit(1)
 // })
 

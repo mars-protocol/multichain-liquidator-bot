@@ -63,13 +63,13 @@
 
 // 	const masterAddress = (await wallet.getAccounts())[0].address
 
-// 	console.log('Master account setup complete')
+// 	logger.info('Master account setup complete')
 
-// 	console.log({ masterAddress })
+// 	logger.info({ masterAddress })
 
 // 	if (testConfig.seedRedbankRequired) {
 // 		await seedRedbank(client, masterAddress, testConfig)
-// 		console.log('Seeded redbank')
+// 		logger.info('Seeded redbank')
 // 	}
 
 // 	const config: RoverExecutorConfig = {
@@ -195,8 +195,8 @@
 // 		)
 // 	}
 
-// 	console.log('Finished All Test Cases')
-// 	console.log({ results })
+// 	logger.info('Finished All Test Cases')
+// 	logger.info({ results })
 // }
 
 // const runLiquidateAllTest = async (
@@ -208,7 +208,7 @@
 // 	config: RoverExecutorConfig,
 // ) : Promise<boolean> => {
 // 	try {
-// 		console.log('Starting liquidate multiple test')
+// 		logger.info('Starting liquidate multiple test')
 // 		const queueName = process.env.LIQUIDATION_QUEUE_NAME!
 // 		const redisClient = await new RedisInterface().connect()
 
@@ -282,19 +282,19 @@
 // 			liquidated = (!newHealthFactorResults[0].liquidatable && !newHealthFactorResults[1].liquidatable && !newHealthFactorResults[2].liquidatable)
 
 // 			if (liquidated) {
-// 				console.log(newHealthFactorResults)
+// 				logger.info(newHealthFactorResults)
 // 			}
 
 // 			await sleep(1 * second)
 // 		}
 
 // 		if (!liquidated) {
-// 			console.log('Failed to liquidate all positions')
+// 			logger.info('Failed to liquidate all positions')
 // 		}
-// 		console.log('Finished multi liquidation test')
+// 		logger.info('Finished multi liquidation test')
 // 		return liquidated
 // 	} catch (e) {
-// 		console.error(e)
+// 		logger.error(e)
 // 		return false
 // 	} finally {
 // 		await resetPrice(
@@ -316,7 +316,7 @@
 // 	masterAddress: string,
 // 	config: RoverExecutorConfig,
 // ): Promise<boolean> => {
-// 	console.log('Starting unlocking vault test')
+// 	logger.info('Starting unlocking vault test')
 // 	try {
 // 		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
 
@@ -335,7 +335,7 @@
 // 			'u_n_l_o_c_k_i_n_g',
 // 		)
 
-// 		console.log('created vault position')
+// 		logger.info('created vault position')
 
 // 		await setPrice(
 // 			cwClient,
@@ -346,7 +346,7 @@
 // 		)
 // 		await executor.liquidate(victimAccountId, masterAddress)
 // 	} catch (e) {
-// 		console.error(e)
+// 		logger.error(e)
 // 		return false
 // 	} finally {
 // 		await resetPrice(
@@ -358,7 +358,7 @@
 // 		)
 // 	}
 
-// 	console.log('Finished vault test')
+// 	logger.info('Finished vault test')
 // 	return true
 // }
 
@@ -371,7 +371,7 @@
 // 	config: RoverExecutorConfig,
 // ): Promise<boolean> => {
 // 	try {
-// 		console.log('Testing locked vault')
+// 		logger.info('Testing locked vault')
 // 		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
 
 //         await updateCoinsWhitelist(
@@ -402,7 +402,7 @@
 // 			'l_o_c_k_e_d',
 // 		)
 
-// 		console.log('created vault position')
+// 		logger.info('created vault position')
 
 // 		await setPrice(
 // 			cwClient,
@@ -420,11 +420,11 @@
 // 			client,
 // 		)
 // 	} catch (e) {
-// 		console.log(e)
+// 		logger.info(e)
 // 		return false
 // 	}
 
-// 	console.log('Finished vault test')
+// 	logger.info('Finished vault test')
 // 	return true
 // }
 
@@ -437,7 +437,7 @@
 // 	config: RoverExecutorConfig,
 // ): Promise<boolean> => {
 // 	try {
-// 		console.log('Starting simple coin test')
+// 		logger.info('Starting simple coin test')
 
 // 		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
 
@@ -467,9 +467,9 @@
 // 		)
 // 		await executor.liquidate(victimAccountId,masterAddress)
 
-// 		console.log('Finished simple test')
+// 		logger.info('Finished simple test')
 // 	} catch (e) {
-// 		console.error(e)
+// 		logger.error(e)
 // 		return false
 // 	} finally {
 // 		await resetPrice(
@@ -492,7 +492,7 @@
 // 	config: RoverExecutorConfig,
 // ): Promise<boolean> => {
 // 	try {
-// 		console.log('Starting lpCoin test')
+// 		logger.info('Starting lpCoin test')
 //         await updateCoinsWhitelist(
 //             masterAddress,
 //             testConfig.marsParamsAddress,
@@ -615,9 +615,9 @@
 // 		await executor.refreshData()
 // 		await executor.liquidate(victimAccountId, masterAddress)
 
-// 		console.log('Finished simple test')
+// 		logger.info('Finished simple test')
 // 	} catch (e) {
-// 		console.error(e)
+// 		logger.error(e)
 // 		return false
 // 	} finally {
 // 		await resetPrice(
@@ -647,7 +647,7 @@
 // 	config: RoverExecutorConfig,
 // ): Promise<boolean> => {
 // 	try {
-// 		console.log('Starting disabled market test')
+// 		logger.info('Starting disabled market test')
 
 // 		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
 
@@ -689,9 +689,9 @@
 // 		)
 // 		await executor.liquidate(victimAccountId, masterAddress)
 
-// 		console.log('Completed market disabled test')
+// 		logger.info('Completed market disabled test')
 // 	} catch (e) {
-// 		console.log(e)
+// 		logger.info(e)
 // 		return false
 // 	} finally {
 // 		// Re enable borrow
@@ -720,7 +720,7 @@
 // 	masterAddress: string,
 // ): Promise<boolean> => {
 // 	try {
-// 		console.log('Starting illiquid market test')
+// 		logger.info('Starting illiquid market test')
 // 		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
 
 // 		// Set up our liquidatee
@@ -769,7 +769,7 @@
 // 		const borrowAmount = (marketLiquidity - 100).toFixed(0)
 // 		const borrowMessage = { borrow: { denom: testConfig.atomDenom, amount: borrowAmount } }
 
-// 		console.log('updating tests')
+// 		logger.info('updating tests')
 // 		await client.signAndBroadcast(
 // 			masterAddress,
 // 			[
@@ -797,9 +797,9 @@
 // 		await executor.liquidate(victimAccountId, masterAddress)
 
 // 		// return assets
-// 		console.log('Completed illiquid market test')
+// 		logger.info('Completed illiquid market test')
 // 	} catch (e) {
-// 		console.log(e)
+// 		logger.info(e)
 // 		return false
 // 	} finally {
 // 		await resetPrice(
@@ -820,7 +820,7 @@
 // 	masterAddress: string
 // ): Promise<boolean> => {
 // 	try {
-// 		console.log('Starting creditLine exceeded test')
+// 		logger.info('Starting creditLine exceeded test')
 
 // 		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
 
@@ -884,9 +884,9 @@
 // 		// todo fix tests
 // 		await executor.liquidate(victimAccountId, masterAddress)
 
-// 		console.log('Completed credit line exceeded test')
+// 		logger.info('Completed credit line exceeded test')
 // 	} catch (e) {
-// 		console.error(e)
+// 		logger.error(e)
 // 		return false
 // 	} finally {
 // 		const resetAtomPriceMsg = {
@@ -935,7 +935,7 @@
 // 	config: RoverExecutorConfig,
 // ): Promise<boolean> => {
 // 	try {
-// 		console.log('Starting non whitelisted coin test')
+// 		logger.info('Starting non whitelisted coin test')
 // 		const estimatedPrice = getEstimatedPoolPrice(executor.ammRouter, testConfig.atomDenom)
 
 // 		const victimAccount = await createVictimCoinPosition(
@@ -975,7 +975,7 @@
 
 // 		await executor.liquidate(victimAccount, masterAddress)
 // 	} catch (e) {
-// 		console.error(e)
+// 		logger.error(e)
 // 		return false
 // 	} finally {
 // 		await resetPrice(
@@ -1240,7 +1240,7 @@
 
 // 	const victimAccountId = await createCreditAccount(victimAddress, vNft, vExec)
 
-// 	console.log({borrowCoin})
+// 	logger.info({borrowCoin})
 // 	// create fist victim - todo generalise this
 // 	await updateCreditAccount(
 // 		[

@@ -1,4 +1,5 @@
 import { createObjectCsvWriter } from 'csv-writer'
+import { logger } from './logger'
 
 export interface Header {
 	id: string
@@ -37,9 +38,9 @@ export class CSVWriter {
 			path: this.filePath,
 			header: this.headers,
 		})
-		console.log('writing results')
+		logger.info('writing results')
 		await writer.writeRecords(this.rows).then(() => {
-			console.log('...Done')
+			logger.info('...Done')
 		})
 	}
 }
